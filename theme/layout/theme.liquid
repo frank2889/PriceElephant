@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="{{ request.locale.iso_code }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} - {{ shop.name }}</title>
+    {{ content_for_header }}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    {{ 'base.css' | asset_url | stylesheet_tag }}
+    <style>
+      :root {
+        --primary-black: {{ settings.primary_color | default: '#000000' }};
+        --primary-white: {{ settings.background_color | default: '#ffffff' }};
+        --text-black: #000000;
+        --text-white: #ffffff;
+        --text-gray: #666666;
+        --border-light: #e5e5e5;
+        --background-light: #fafafa;
+      }
+    </style>
+  </head>
+  <body class="priceelephant" style="font-family: 'Inter', {{ settings.body_font.family | default: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' }};">
+    {% section 'header' %}
+
+    <main id="MainContent" class="site-main" role="main">
+      {{ content_for_layout }}
+    </main>
+
+    {% section 'footer' %}
+
+    {{ 'price-charts.js' | asset_url | script_tag }}
+    {{ 'price-alerts.js' | asset_url | script_tag }}
+  </body>
+</html>

@@ -1,0 +1,625 @@
+{% assign analysis_heading = section.settings.heading | default: 'BUSINESS INTELLIGENCE DASHBOARD' %}
+<section class="business-intelligence" id="BusinessIntelligence" data-product-handle="{{ product.handle | default: '' }}">
+  <div class="container">
+    <header class="business-intelligence__header">
+      <h2 class="bi-title">{{ analysis_heading }}</h2>
+      <p class="bi-subtitle">{{ section.settings.subheading | default: 'Real-time marktanalyse en pricing intelligence voor uw business' }}</p>
+      <div class="bi-stats">
+        <div class="stat-item">
+          <span class="stat-value" id="total-products">{{ collections['all'].products_count | default: 0 }}</span>
+          <span class="stat-label">PRODUCTEN GEMONITORD</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="active-alerts">{{ section.settings.active_alerts | default: 23 }}</span>
+          <span class="stat-label">ACTIEVE ALERTS</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="margin-improvement">+{{ section.settings.margin_improvement | default: 12 }}%</span>
+          <span class="stat-label">MARGE VERBETERING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Business Analytics Grid -->
+    <div class="business-analytics__grid">
+      <!-- Market Overview -->
+      <div class="analytics-panel market-overview">
+        <h3 class="panel-title">MARKT OVERZICHT</h3>
+        <div class="market-data">
+          <div class="market-item">
+            <span class="market-label">Gemiddelde concurrentieprijs:</span>
+            <span class="market-value" id="avg-competitor-price">Berekenen...</span>
+          </div>
+          <div class="market-item">
+            <span class="market-label">Jouw marktpositie:</span>
+            <span class="market-value competitive" id="market-position">#2 van 5</span>
+          </div>
+          <div class="market-item">
+            <span class="market-label">Prijsfluctuatie (7d):</span>
+            <span class="market-value stable" id="price-volatility">Laag (±2%)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Competitor Intelligence -->
+      <div class="analytics-panel competitor-intelligence">
+        <h3 class="panel-title">CONCURRENTIE INTELLIGENCE</h3>
+        <div class="competitor-grid" id="CompetitorGrid">
+          {% render 'competitor-prices' %}
+        </div>
+        <button type="button" class="btn-analytics" onclick="refreshCompetitorData()">
+          🔄 VERVERS DATA
+        </button>
+      </div>
+
+      <!-- Performance Metrics -->
+      <div class="analytics-panel performance-metrics">
+        <h3 class="panel-title">PERFORMANCE METRICS</h3>
+        <div class="metrics-list">
+          <div class="metric-item">
+            <span class="metric-icon">💰</span>
+            <div class="metric-details">
+              <span class="metric-value">€{{ section.settings.monthly_revenue | default: 45250 | money_without_currency }}</span>
+              <span class="metric-label">Maandelijkse omzet</span>
+            </div>
+            <span class="metric-change positive">+8%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-icon">📊</span>
+            <div class="metric-details">
+              <span class="metric-value">{{ section.settings.conversion_rate | default: 3.4 }}%</span>
+              <span class="metric-label">Conversie ratio</span>
+            </div>
+            <span class="metric-change positive">+0.3%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-icon">⚡</span>
+            <div class="metric-details">
+              <span class="metric-value">{{ section.settings.avg_order_value | default: 127 }}</span>
+              <span class="metric-label">Gem. bestelwaarde</span>
+            </div>
+            <span class="metric-change positive">+12€</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing Actions -->
+      <div class="analytics-panel pricing-actions">
+        <h3 class="panel-title">PRICING ACTIES</h3>
+        <div class="action-items">
+          <div class="action-item urgent">
+            <span class="action-icon">🚨</span>
+            <div class="action-details">
+              <strong>Concurrent verlaagde prijs</strong>
+              <p>Amazon: iPhone 15 Pro nu €1.029 (-€70)</p>
+            </div>
+            <button class="action-btn">REAGEER</button>
+          </div>
+          <div class="action-item opportunity">
+            <span class="action-icon">💡</span>
+            <div class="action-details">
+              <strong>Prijs optimalisatie kans</strong>
+              <p>MacBook Air: +€30 mogelijk (marge: 18% → 21%)</p>
+            </div>
+            <button class="action-btn">TOEPASSEN</button>
+          </div>
+          <div class="action-item info">
+            <span class="action-icon">📈</span>
+            <div class="action-details">
+              <strong>Trend alert</strong>
+              <p>AirPods category: prijzen stijgen gemiddeld 5%</p>
+            </div>
+            <button class="action-btn">BEKIJK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Business Alert Setup -->
+    {% if section.settings.enable_business_alerts %}
+      <div class="business-alert-setup">
+        <h3 class="alert-title">BUSINESS ALERTS CONFIGUREREN</h3>
+        <form class="business-alert-form" data-product-id="{{ product.id | default: '' }}">
+          <div class="alert-form-grid">
+            <div class="alert-field">
+              <label for="alert-email-{{ section.id }}">Business email:</label>
+              <input id="alert-email-{{ section.id }}" type="email" name="business_email" placeholder="manager@company.com" required>
+            </div>
+            <div class="alert-field">
+              <label for="price-threshold-{{ section.id }}">Prijs drempel (%):</label>
+              <input id="price-threshold-{{ section.id }}" type="number" name="price_threshold" placeholder="5" min="1" max="50" required>
+            </div>
+            <div class="alert-field">
+              <label for="alert-frequency-{{ section.id }}">Frequentie:</label>
+              <select id="alert-frequency-{{ section.id }}" name="alert_frequency">
+                <option value="instant">Instant</option>
+                <option value="hourly">Elk uur</option>
+                <option value="daily">Dagelijks</option>
+                <option value="weekly">Wekelijks</option>
+              </select>
+            </div>
+            <button type="submit" class="btn-analytics btn-primary">ALERT ACTIVEREN</button>
+          </div>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+// Business Intelligence Functions
+function refreshCompetitorData() {
+  const grid = document.getElementById('CompetitorGrid');
+  if (grid) {
+    grid.innerHTML = '<p class="loading">Data wordt vernieuwd...</p>';
+    
+    // Simulate API call
+    setTimeout(() => {
+      location.reload(); // In production, update via AJAX
+    }, 2000);
+  }
+}
+
+// Initialize Business Analytics
+document.addEventListener('DOMContentLoaded', function() {
+  // Simulate real-time data updates
+  setInterval(updateBusinessMetrics, 30000); // Update every 30 seconds
+  
+  // Load initial competitive data
+  loadCompetitiveIntelligence();
+});
+
+function updateBusinessMetrics() {
+  // Simulate metric updates
+  const metrics = document.querySelectorAll('.stat-value');
+  metrics.forEach(metric => {
+    if (metric.id === 'active-alerts') {
+      // Simulate alert count changes
+      const currentValue = parseInt(metric.textContent);
+      metric.textContent = Math.max(0, currentValue + Math.floor(Math.random() * 3 - 1));
+    }
+  });
+}
+
+function loadCompetitiveIntelligence() {
+  // Simulate loading competitive data
+  const avgPrice = document.getElementById('avg-competitor-price');
+  const position = document.getElementById('market-position');
+  const volatility = document.getElementById('price-volatility');
+  
+  setTimeout(() => {
+    if (avgPrice) avgPrice.textContent = '€{{ product.price | plus: 15 | money_without_currency | default: "1.049" }}';
+    if (position) position.textContent = '#2 van 5 (Competitief)';
+    if (volatility) volatility.textContent = 'Gemiddeld (±4%)';
+  }, 1000);
+}
+
+// Handle business alert form
+const alertForm = document.querySelector('.business-alert-form');
+if (alertForm) {
+  alertForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    alert('Business alert geactiveerd! U ontvangt notificaties op het opgegeven email adres.');
+  });
+}
+</script>
+
+<style>
+.business-intelligence {
+  padding: 3rem 0;
+  background: #ffffff;
+  color: #000000;
+}
+
+.business-intelligence__header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.bi-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+  margin-bottom: 1rem;
+}
+
+.bi-subtitle {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.bi-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 1.5rem;
+  background: #000;
+  color: #fff;
+}
+
+.stat-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 900;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+
+.business-analytics__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.analytics-panel {
+  background: #f8f8f8;
+  border: 2px solid #000;
+  padding: 2rem;
+}
+
+.panel-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #000;
+  padding-bottom: 0.5rem;
+}
+
+.market-data {
+  space-y: 1rem;
+}
+
+.market-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.market-label {
+  font-weight: 500;
+}
+
+.market-value {
+  font-weight: 700;
+}
+
+.market-value.competitive {
+  color: #28a745;
+}
+
+.market-value.stable {
+  color: #007bff;
+}
+
+.competitor-grid {
+  margin-bottom: 1.5rem;
+  min-height: 200px;
+}
+
+.btn-analytics {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #000;
+  background: transparent;
+  color: #000;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-analytics:hover {
+  background: #000;
+  color: #fff;
+}
+
+.btn-analytics.btn-primary {
+  background: #000;
+  color: #fff;
+}
+
+.metrics-list {
+  space-y: 1rem;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #ddd;
+}
+
+.metric-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.metric-details {
+  flex: 1;
+}
+
+.metric-value {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.metric-change {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.metric-change.positive {
+  color: #28a745;
+}
+
+.action-items {
+  space-y: 1rem;
+}
+
+.action-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  border-left: 4px solid #ddd;
+  background: #fff;
+}
+
+.action-item.urgent {
+  border-left-color: #dc3545;
+}
+
+.action-item.opportunity {
+  border-left-color: #ffc107;
+}
+
+.action-item.info {
+  border-left-color: #007bff;
+}
+
+.action-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.action-details {
+  flex: 1;
+}
+
+.action-details strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.action-details p {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+}
+
+.action-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #000;
+  background: transparent;
+  color: #000;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #000;
+  color: #fff;
+}
+
+.business-alert-setup {
+  background: #000;
+  color: #fff;
+  padding: 2rem;
+  margin-top: 2rem;
+}
+
+.alert-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.alert-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.alert-field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alert-field input,
+.alert-field select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #333;
+  background: #fff;
+  color: #000;
+  font-weight: 500;
+}
+
+.loading {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 2rem;
+}
+
+@media (max-width: 768px) {
+  .business-analytics__grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bi-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .alert-form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .metric-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+}
+</style>
+
+{% schema %}
+{
+  "name": "Business Intelligence Dashboard",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Dashboard heading",
+      "default": "BUSINESS INTELLIGENCE DASHBOARD"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "label": "Dashboard description"
+    },
+    {
+      "type": "number",
+      "id": "active_alerts",
+      "label": "Active alerts count",
+      "default": 23
+    },
+    {
+      "type": "number",
+      "id": "margin_improvement",
+      "label": "Margin improvement (%)",
+      "default": 12
+    },
+    {
+      "type": "number",
+      "id": "monthly_revenue",
+      "label": "Monthly revenue (euros)",
+      "default": 45250
+    },
+    {
+      "type": "number",
+      "id": "conversion_rate",
+      "label": "Conversion rate (%)",
+      "default": 3.4
+    },
+    {
+      "type": "number",
+      "id": "avg_order_value",
+      "label": "Average order value (euros)",
+      "default": 127
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_business_alerts",
+      "label": "Enable business alert setup",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "data_refresh_rate",
+      "label": "Data refresh rate",
+      "options": [
+        {
+          "value": "realtime",
+          "label": "Real-time"
+        },
+        {
+          "value": "5min",
+          "label": "Every 5 minutes"
+        },
+        {
+          "value": "15min",
+          "label": "Every 15 minutes"
+        },
+        {
+          "value": "1hour",
+          "label": "Hourly"
+        }
+      ],
+      "default": "15min"
+    }
+  ],
+  "blocks": [],
+  "presets": [
+    {
+      "name": "Business Intelligence Dashboard"
+    }
+  ]
+}
+{% endschema %}
+      "default": "Live price comparison"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Bekijk hoe we scoren ten opzichte van de markt."
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_alerts",
+      "label": "Show price alert signup",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "Price comparison"
+    }
+  ]
+}
+{% endschema %}

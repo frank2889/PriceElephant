@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PriceElephant - E-COMMERCE SCALING COMPANY</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        :root {
+            /* Exact Canva Design Colors */
+            --primary-purple: #7C3AED;
+            --primary-light-purple: #A78BFA;
+            --primary-dark-purple: #2E1065;
+            --text-dark: #1F2937;
+            --text-medium: #6B7280;
+            --text-light: #9CA3AF;
+            --text-white: #ffffff;
+            --background-primary: #F9FAFB;
+            --background-light: #F3F4F6;
+            --border-light: #E5E7EB;
+            --button-purple: #8B5CF6;
+            --button-hover: #7C3AED;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background: #F9FAFB;
+            font-weight: 400;
+            font-size: 16px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Modern Clean Header */
+        .site-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            padding: 20px 0;
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .brand {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-purple);
+            text-decoration: none;
+            text-transform: lowercase;
+            letter-spacing: -0.5px;
+        }
+        
+        .nav {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+        }
+        
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-dark);
+            font-weight: 500;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: color 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            color: var(--primary-purple);
+        }
+        
+        .header-cta {
+            background: var(--button-purple);
+            color: var(--text-white);
+            padding: 10px 20px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+            transition: all 0.2s ease;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        .header-cta:hover {
+            background: var(--button-hover);
+        }
+        
+        /* Hero Section - Clean Minimal Style */
+        .hero {
+            background: #F9FAFB;
+            color: var(--text-dark);
+            padding: 100px 0 140px 0;
+            text-align: left;
+            position: relative;
+        }
+        
+        .hero-subtitle {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-medium);
+        }
+        
+        .hero-massive-text {
+            font-size: clamp(60px, 12vw, 120px);
+            font-weight: 800;
+            line-height: 0.9;
+            margin-bottom: 32px;
+            text-transform: uppercase;
+            letter-spacing: -3px;
+            background: linear-gradient(90deg, var(--primary-dark-purple) 0%, var(--primary-purple) 40%, var(--primary-light-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero-description {
+            font-size: 17px;
+            font-weight: 400;
+            margin-bottom: 36px;
+            line-height: 1.7;
+            max-width: 580px;
+            color: var(--text-dark);
+        }
+        
+        .hero-cta {
+            background: var(--button-purple);
+            color: var(--text-white);
+            padding: 14px 32px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+            transition: all 0.2s ease;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        .hero-cta:hover {
+            background: var(--button-hover);
+            transform: translateY(-1px);
+        }
+        
+        /* Section Styling */
+        .section {
+            padding: 80px 0;
+        }
+        
+        .section-subtitle {
+            font-size: 13px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-medium);
+            margin-bottom: 16px;
+        }
+        
+        .section-title {
+            font-size: clamp(36px, 6vw, 56px);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 48px;
+            text-transform: uppercase;
+            letter-spacing: -1.5px;
+            color: var(--primary-dark-purple);
+        }
+        
+        /* Power Of Cards */
+        .power-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            margin-bottom: 80px;
+        }
+        
+        .power-card {
+            background: white;
+            border: 1px solid var(--border-light);
+            padding: 40px;
+            transition: all 0.2s ease;
+            border-radius: 12px;
+        }
+        
+        .power-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        }
+        
+        .power-icon {
+            width: 56px;
+            height: 56px;
+            margin-bottom: 24px;
+            background: var(--button-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-white);
+            font-size: 24px;
+            border-radius: 10px;
+        }
+        
+        .power-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-dark);
+        }
+        
+        .power-description {
+            font-size: 15px;
+            font-weight: 400;
+            line-height: 1.6;
+            color: var(--text-medium);
+        }
+        
+        /* Dashboard Demo */
+        .dashboard-demo {
+            background: white;
+            padding: 48px 40px;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            margin: 40px 0;
+        }
+        
+        .demo-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .metric-card {
+            background: var(--primary-white);
+            padding: 30px 20px;
+            text-align: center;
+            border: 1px solid var(--border-light);
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary-dark-purple);
+            margin-bottom: 8px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-medium);
+        }
+        
+        .dashboard-preview {
+            background: var(--primary-white);
+            border: 1px solid var(--border-light);
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .dashboard-placeholder {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-purple);
+            border: 2px dashed rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+        }
+        
+        /* Footer - Dark Navy Style */
+        .site-footer {
+            background: #1E1B4B;
+            color: rgba(255, 255, 255, 0.7);
+            padding: 64px 0 32px 0;
+            margin-top: 80px;
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 60px;
+        }
+        
+        .footer-brand h3 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            text-transform: lowercase;
+            color: #A78BFA;
+        }
+        
+        .footer-tagline {
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .footer-description {
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .footer-powered {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .footer-column h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .footer-links {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s ease;
+        }
+        
+        .footer-links a:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 40px;
+            text-align: center;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .nav {
+                gap: 20px;
+            }
+            
+            .hero {
+                padding: 60px 0 80px 0;
+                text-align: center;
+            }
+            
+            .power-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="container">
+            <div class="header-content">
+                <a href="#" class="brand">priceelephant</a>
+                <nav class="nav">
+                    <a href="#" class="nav-link">Dashboard</a>
+                    <a href="#" class="nav-link">Pricing</a>
+                    <a href="#" class="nav-link">Analytics</a>
+                    <a href="#" class="nav-link">Over ons</a>
+                </nav>
+                <a href="#" class="header-cta">👋 Plan een gesprek</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-subtitle">E-COMMERCE SCALING COMPANY</div>
+            <h1 class="hero-massive-text">SCALE IT UP</h1>
+            <p class="hero-description">
+                Wij schalen je e-commerce business op met intelligente pricing strategieën. 
+                Monitor concurrentenprijzen real-time, optimaliseer je marges en versnel je groei met data-gedreven inzichten.
+            </p>
+            <a href="#" class="hero-cta">Ontdek onze aanpak</a>
+        </div>
+    </section>
+
+    <!-- The Power Of Section -->
+    <section class="section">
+        <div class="container">
+            <div class="section-subtitle">PRICE INTELLIGENCE PLATFORM</div>
+            <h2 class="section-title">THE POWER OF<br>COMPETITIVE PRICING</h2>
+            
+            <div class="power-cards">
+                <div class="power-card">
+                    <div class="power-icon">📊</div>
+                    <h3 class="power-title">Versnel je groei</h3>
+                    <p class="power-description">
+                        Verhoog het rendement uit je pricing strategie met slimme algoritmes en real-time marktinzichten die je concurrentievoordeel versterken.
+                    </p>
+                </div>
+                
+                <div class="power-card">
+                    <div class="power-icon">🎯</div>
+                    <h3 class="power-title">Verstevig je grip</h3>
+                    <p class="power-description">
+                        Bouw een onbreekbaar fundament voor je pricing decisions met geautomatiseerde monitoring en intelligente alertsystemen.
+                    </p>
+                </div>
+                
+                <div class="power-card">
+                    <div class="power-icon">⚡</div>
+                    <h3 class="power-title">Verhoog je flexibiliteit</h3>
+                    <p class="power-description">
+                        Creëer ruimte om sneller te anticiperen op marktveranderingen en pricing kansen met AI-gedreven recommendations.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Dashboard Demo -->
+            <div class="dashboard-demo">
+                <h3 class="demo-title">Business Intelligence Dashboard</h3>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">+23%</div>
+                        <div class="metric-label">Marge verbetering</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">1.247</div>
+                        <div class="metric-label">Gemonitorde producten</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">€47K</div>
+                        <div class="metric-label">Extra omzet/maand</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">94%</div>
+                        <div class="metric-label">Pricing accuraatheid</div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-preview">
+                    <div class="dashboard-placeholder">
+                        🚀 LIVE PRICING INTELLIGENCE DASHBOARD<br>
+                        Real-time competitor monitoring & AI recommendations
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How We Work Section -->
+    <section class="section">
+        <div class="container">
+            <div class="section-subtitle">HOW WE WORK</div>
+            <h2 class="section-title">HOE WE GROEI<br>VERSNELLEN</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px;">
+                <div style="padding: 40px; border: 1px solid var(--border-light); background: var(--primary-white);">
+                    <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; text-transform: uppercase;">REAL-TIME MONITORING</h4>
+                    <p style="color: var(--text-gray); line-height: 1.6;">
+                        24/7 monitoring van concurrentenprijzen across alle belangrijke retailers. 
+                        Krijg instant alerts bij prijswijzigingen en marktbewegingen.
+                    </p>
+                </div>
+                
+                <div style="padding: 40px; border: 1px solid var(--border-light); background: var(--primary-white);">
+                    <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; text-transform: uppercase;">AI PRICING STRATEGY</h4>
+                    <p style="color: var(--text-gray); line-height: 1.6;">
+                        Machine learning algorithms analyseren marktdata en geven je de optimale 
+                        prijsstrategie voor maximale marge en competitiviteit.
+                    </p>
+                </div>
+                
+                <div style="padding: 40px; border: 1px solid var(--border-light); background: var(--primary-white);">
+                    <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; text-transform: uppercase;">BUSINESS INTELLIGENCE</h4>
+                    <p style="color: var(--text-gray); line-height: 1.6;">
+                        Diepgaande marktanalyses en performance dashboards om data-driven 
+                        pricing decisions te maken en je ROI te maximaliseren.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>priceelephant</h3>
+                    <div class="footer-tagline">E-COMMERCE SCALING COMPANY</div>
+                    <p class="footer-description">
+                        Wij schalen je e-commerce business op met intelligente pricing strategieën. 
+                        Door AI en data-analyse te combineren versnellen we groei en maximaliseren we marges.
+                    </p>
+                    <p class="footer-powered">Powered by <strong>Webelephant</strong></p>
+                </div>
+
+                <div class="footer-column">
+                    <h4>PLATFORM</h4>
+                    <div class="footer-links">
+                        <a href="#">Dashboard</a>
+                        <a href="#">Pricing Analytics</a>
+                        <a href="#">Competitor Monitoring</a>
+                        <a href="#">API Documentatie</a>
+                        <a href="#">Integraties</a>
+                    </div>
+                </div>
+
+                <div class="footer-column">
+                    <h4>OVER ONS SUPPORT</h4>
+                    <div class="footer-links">
+                        <a href="#">Help Center</a>
+                        <a href="#">Implementatie</a>
+                        <a href="#">Training</a>
+                        <a href="#">Technical Support</a>
+                        <a href="#">Account Management</a>
+                    </div>
+                </div>
+
+                <div class="footer-column">
+                    <h4>Over ons</h4>
+                    <div class="footer-links">
+                        <a href="#">Aanpak</a>
+                        <a href="#">Cases</a>
+                        <a href="#">Blog</a>
+                        <a href="#">Contact</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2025 PriceElephant. Alle rechten voorbehouden. E-commerce scaling company by Webelephant.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Webelephant-style interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add smooth scrolling
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+
+            // Power card hover effects
+            const powerCards = document.querySelectorAll('.power-card');
+            powerCards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-8px)';
+                    this.style.boxShadow = '0 25px 50px rgba(0,0,0,0.15)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+
+            // Metric counter animation
+            const metrics = document.querySelectorAll('.metric-value');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const metric = entry.target;
+                        const text = metric.textContent;
+                        if (text.includes('%') || text.includes('K') || text.includes('€')) {
+                            metric.style.transform = 'scale(1.1)';
+                            setTimeout(() => {
+                                metric.style.transform = 'scale(1)';
+                            }, 200);
+                        }
+                        observer.unobserve(metric);
+                    }
+                });
+            });
+
+            metrics.forEach(metric => {
+                observer.observe(metric);
+            });
+        });
+    </script>
+</body>
+</html>

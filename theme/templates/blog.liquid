@@ -1,0 +1,252 @@
+{% layout 'theme' %}
+
+<div class="blog-page">
+  <div class="container">
+    <header class="blog-page__header">
+      <h1>{{ blog.title }}</h1>
+      {% if blog.summary != blank %}
+        <p class="blog-page__summary">{{ blog.summary }}</p>
+      {% endif %}
+    </header>
+
+    <div class="blog-page__content">
+      {% paginate blog.articles by 6 %}
+        <div class="articles-grid">
+          {% for article in blog.articles %}
+            <article class="article-card">
+              {% if article.image %}
+                <a href="{{ article.url }}" class="article-card__image">
+                  <img src="{{ article.image | img_url: '400x250' }}" alt="{{ article.image.alt | escape }}" loading="lazy">
+                </a>
+              {% endif %}
+              
+              <div class="article-card__content">
+                <div class="article-card__meta">
+                  <time datetime="{{ article.published_at | date: '%Y-%m-%d' }}">
+                    {{ article.published_at | date: format: 'abbreviated_date' }}
+                  </time>
+                  {% if article.author != blank %}
+                    <span class="article-card__author">by {{ article.author }}</span>
+                  {% endif %}
+                </div>
+                
+                <h2 class="article-card__title">
+                  <a href="{{ article.url }}">{{ article.title }}</a>
+                </h2>
+                
+                {% if article.excerpt != blank %}
+                  <p class="article-card__excerpt">{{ article.excerpt | strip_html | truncate: 150 }}</p>
+                {% else %}
+                  <p class="article-card__excerpt">{{ article.content | strip_html | truncate: 150 }}</p>
+                {% endif %}
+                
+                <a href="{{ article.url }}" class="article-card__read-more">
+                  Read more
+                </a>
+              </div>
+            </article>
+          {% else %}
+            <div class="blog-empty">
+              <h2>No articles found</h2>
+              <p>This blog doesn't have any articles yet.</p>
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if paginate.pages > 1 %}
+          <nav class="blog-pagination">
+            {{ paginate | default_pagination }}
+          </nav>
+        {% endif %}
+      {% endpaginate %}
+    </div>
+  </div>
+</div>
+
+<style>
+  .blog-page {
+    padding: 2rem 0;
+  }
+  
+  .blog-page__header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  
+  .blog-page__header h1 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--primary-color, #FF6B00);
+    margin-bottom: 1rem;
+  }
+  
+  .blog-page__summary {
+    font-size: 1.1rem;
+    color: #666;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .articles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+  
+  .article-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .article-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  
+  .article-card__image {
+    display: block;
+    overflow: hidden;
+  }
+  
+  .article-card__image img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  
+  .article-card:hover .article-card__image img {
+    transform: scale(1.05);
+  }
+  
+  .article-card__content {
+    padding: 1.5rem;
+  }
+  
+  .article-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+  }
+  
+  .article-card__author {
+    font-style: italic;
+  }
+  
+  .article-card__title {
+    margin: 0 0 1rem 0;
+    font-size: 1.3rem;
+    line-height: 1.4;
+  }
+  
+  .article-card__title a {
+    text-decoration: none;
+    color: var(--secondary-color, #1C1C1C);
+    transition: color 0.2s ease;
+  }
+  
+  .article-card__title a:hover {
+    color: var(--primary-color, #FF6B00);
+  }
+  
+  .article-card__excerpt {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+  
+  .article-card__read-more {
+    color: var(--primary-color, #FF6B00);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: gap 0.2s ease;
+  }
+  
+  .article-card__read-more::after {
+    content: '→';
+    transition: transform 0.2s ease;
+  }
+  
+  .article-card__read-more:hover {
+    gap: 0.75rem;
+  }
+  
+  .article-card__read-more:hover::after {
+    transform: translateX(2px);
+  }
+  
+  .blog-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 0;
+  }
+  
+  .blog-empty h2 {
+    color: #666;
+    margin-bottom: 1rem;
+  }
+  
+  .blog-pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+  }
+  
+  .blog-pagination .pagination {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .blog-pagination .pagination a,
+  .blog-pagination .pagination span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--secondary-color, #1C1C1C);
+    transition: all 0.2s ease;
+  }
+  
+  .blog-pagination .pagination a:hover {
+    background: var(--primary-color, #FF6B00);
+    color: white;
+    border-color: var(--primary-color, #FF6B00);
+  }
+  
+  .blog-pagination .pagination .current {
+    background: var(--primary-color, #FF6B00);
+    color: white;
+    border-color: var(--primary-color, #FF6B00);
+  }
+  
+  @media (max-width: 768px) {
+    .articles-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .blog-page__header h1 {
+      font-size: 2rem;
+    }
+    
+    .article-card__meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+</style>
