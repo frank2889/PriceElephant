@@ -1,0 +1,57 @@
+{
+  "name": "priceelephant-backend",
+  "version": "1.0.0",
+  "description": "PriceElephant - Backend API | B2B SaaS Price Intelligence Platform",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "db:migrate": "knex migrate:latest --knexfile knexfile.js",
+    "db:rollback": "knex migrate:rollback --knexfile knexfile.js",
+    "db:seed": "knex seed:run --knexfile knexfile.js",
+    "db:reset": "npm run db:rollback && npm run db:migrate && npm run db:seed",
+    "test": "jest --coverage",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "price-intelligence",
+    "shopify",
+    "channable",
+    "competitor-pricing",
+    "saas",
+    "b2b",
+    "webelephant"
+  ],
+  "author": "Webelephant",
+  "license": "MIT",
+  "dependencies": {
+    "@sentry/node": "^7.85.0",
+    "axios": "^1.6.0",
+    "bcrypt": "^5.1.1",
+    "bull": "^4.11.5",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "csv-parse": "^6.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.0.1",
+    "morgan": "^1.10.0",
+    "openai": "^6.7.0",
+    "pg": "^8.11.3",
+    "playwright": "^1.40.0",
+    "redis": "^4.6.10",
+    "stripe": "^14.5.0",
+    "winston": "^3.11.0",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.54.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3"
+  }
+}

@@ -44,7 +44,7 @@ venv.bak/
 
 # Data files
 *.csv
-*.json
+scraped_data/*.json
 *.sqlite
 *.db
 
@@ -65,3 +65,7 @@ Thumbs.db
 scraped_data/
 reports/
 output/
+
+# Node
+node_modules/
+package-lock.json
