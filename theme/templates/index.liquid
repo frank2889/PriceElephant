@@ -1,0 +1,27 @@
+{% layout 'theme' %}
+
+<div class="home-content">
+  <div class="container">
+    <div class="hero-section" style="text-align: center; padding: 4rem 0;">
+      <h1 style="font-size: 3rem; margin-bottom: 1rem;">Welcome to PriceElephant</h1>
+      <p style="font-size: 1.25rem; color: var(--text-medium); margin-bottom: 2rem;">
+        Your intelligent price monitoring solution
+      </p>
+      
+      {% if customer %}
+        <a href="/pages/priceelephant-dashboard" class="btn btn-primary" style="display: inline-block; padding: 1rem 2rem; background: var(--primary-purple); color: white; border-radius: 8px; font-weight: 600; text-decoration: none;">
+          Go to Dashboard
+        </a>
+      {% else %}
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+          <a href="/account/login" class="btn btn-primary" style="display: inline-block; padding: 1rem 2rem; background: var(--primary-purple); color: white; border-radius: 8px; font-weight: 600; text-decoration: none;">
+            Login
+          </a>
+          <a href="/account/register" class="btn btn-secondary" style="display: inline-block; padding: 1rem 2rem; background: white; color: var(--primary-purple); border: 2px solid var(--primary-purple); border-radius: 8px; font-weight: 600; text-decoration: none;">
+            Get Started
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
