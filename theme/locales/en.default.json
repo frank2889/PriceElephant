@@ -1,0 +1,27 @@
+{
+  "general": {
+    "404": {
+      "title": "Page not found",
+      "subtext": "The page you're looking for doesn't exist."
+    }
+  },
+  "customer": {
+    "account": {
+      "title": "Account"
+    },
+    "login": {
+      "title": "Login",
+      "email": "Email",
+      "password": "Password",
+      "sign_in": "Sign In"
+    }
+  },
+  "priceelephant": {
+    "dashboard": {
+      "title": "Price Intelligence Dashboard",
+      "loading": "Loading...",
+      "error": "Error loading data",
+      "no_products": "No products found"
+    }
+  }
+}

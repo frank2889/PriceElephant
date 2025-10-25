@@ -1,0 +1,59 @@
+<header class="site-header">
+  <div class="container">
+    <a href="/" class="logo">{{ shop.name }}</a>
+    
+    {% if customer %}
+      <nav class="customer-nav">
+        <a href="/account">My Account</a>
+        <a href="/pages/priceelephant-dashboard">Dashboard</a>
+        <a href="/account/logout">Logout</a>
+      </nav>
+    {% else %}
+      <nav class="customer-nav">
+        <a href="/account/login">Login</a>
+        <a href="/account/register">Register</a>
+      </nav>
+    {% endif %}
+  </div>
+</header>
+
+<style>
+  .site-header {
+    background: var(--primary-purple);
+    color: var(--text-white);
+    padding: 1rem 0;
+  }
+  .site-header .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .site-header .logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-white);
+    text-decoration: none;
+  }
+  .site-header .customer-nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+  .site-header .customer-nav a {
+    color: var(--text-white);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .site-header .customer-nav a:hover {
+    opacity: 0.8;
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": []
+}
+{% endschema %}
