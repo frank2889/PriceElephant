@@ -18,6 +18,7 @@ class ShopifySyncService {
   async syncProductsToShopify(customerId, limit = 10) {
     console.log(`\n🔄 Starting Shopify sync for customer ${customerId}...\n`);
 
+    const startedAt = Date.now();
     try {
       // Get products that haven't been synced yet
       const products = await db('products')
@@ -84,6 +85,8 @@ class ShopifySyncService {
       console.log(`\n📊 SYNC RESULTS:`);
       console.log(`   Synced: ${results.synced}`);
       console.log(`   Failed: ${results.failed}`);
+
+      await this.logSyncMetrics(customerId, results, Date.now() - startedAt);
 
       return results;
 
@@ -169,6 +172,36 @@ class ShopifySyncService {
       totalSynced,
       totalFailed
     };
+  }
+
+  async logSyncMetrics(customerId, results, durationMs) {
+    try {
+      const entries = [
+        {
+          metric_name: 'shopify_sync_success',
+          metric_value: results.synced,
+          recorded_at: db.fn.now()
+        },
+        {
+          metric_name: 'shopify_sync_failed',
+          metric_value: results.failed,
+          recorded_at: db.fn.now()
+        },
+        {
+          metric_name: 'shopify_sync_duration_ms',
+          metric_value: durationMs,
+          recorded_at: db.fn.now()
+        }
+      ];
+
+      await db('system_metrics').insert(entries.map((entry) => ({
+        metric_name: entry.metric_name,
+        metric_value: entry.metric_value,
+        recorded_at: entry.recorded_at
+      })));
+    } catch (error) {
+      console.warn('⚠️  Unable to persist Shopify sync metrics:', error.message);
+    }
   }
 
   /**

@@ -4,14 +4,14 @@
  */
 
 require('dotenv').config();
-const { shopifyApi, LATEST_API_VERSION } = require('@shopify/shopify-api');
+const { shopifyApi } = require('@shopify/shopify-api');
+const { restResources } = require('@shopify/shopify-api/rest/admin/2024-10');
 require('@shopify/shopify-api/adapters/node');
 
 class ShopifyIntegration {
   constructor(config = {}) {
     this.shopDomain = config.shopDomain || process.env.SHOPIFY_SHOP_DOMAIN;
     this.accessToken = config.accessToken || process.env.SHOPIFY_ACCESS_TOKEN;
-    this.apiVersion = LATEST_API_VERSION;
     
     // Initialize Shopify API client
     this.shopify = shopifyApi({
@@ -19,14 +19,64 @@ class ShopifyIntegration {
       apiSecretKey: process.env.SHOPIFY_API_SECRET,
       scopes: ['read_products', 'write_products', 'read_customers', 'write_customers'],
       hostName: process.env.HOST || 'localhost',
-      apiVersion: this.apiVersion,
+      apiVersion: '2024-10',
       isEmbeddedApp: false,
+      restResources,
     });
 
     this.session = {
       shop: this.shopDomain,
       accessToken: this.accessToken,
     };
+  }
+
+  getHeader(headers, key) {
+    if (!headers) {
+      return null;
+    }
+
+    if (typeof headers.get === 'function') {
+      return headers.get(key);
+    }
+
+    return headers[key] || headers[key?.toLowerCase?.()] || headers[key?.toUpperCase?.()];
+  }
+
+  async applyRateLimitDelay(headers) {
+    const limitHeader = this.getHeader(headers, 'x-shopify-shop-api-call-limit');
+    if (!limitHeader) {
+      return;
+    }
+
+    const [used, maximum] = limitHeader.split('/').map(Number);
+    if (!Number.isFinite(used) || !Number.isFinite(maximum)) {
+      return;
+    }
+
+    // When the call bucket is over 80% full, pause briefly to avoid 429 errors.
+    if (used >= maximum * 0.8) {
+      const delayMs = used >= maximum - 2 ? 2000 : 1000;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  wrapShopifyError(context, error) {
+    const status = error?.response?.status || error?.response?.code;
+    if (status === 429) {
+      const retryAfter = Number(this.getHeader(error.response?.headers, 'retry-after')) || 2;
+      return new Error(
+        `Shopify rate limit bereikt tijdens ${context}. Probeer het opnieuw over ${retryAfter} seconden.`
+      );
+    }
+
+    if (error?.response?.errors) {
+      const details = Array.isArray(error.response.errors)
+        ? error.response.errors.join(', ')
+        : JSON.stringify(error.response.errors);
+      return new Error(`Shopify fout tijdens ${context}: ${details}`);
+    }
+
+    return new Error(`Shopify fout tijdens ${context}: ${error.message}`);
   }
 
   /**
@@ -75,11 +125,12 @@ class ShopifyIntegration {
       });
 
       console.log(`✅ Created Shopify product: ${productData.title}`);
+      await this.applyRateLimitDelay(response.headers);
       return response.body.product;
 
     } catch (error) {
       console.error('❌ Shopify product creation failed:', error.message);
-      throw error;
+      throw this.wrapShopifyError('product aanmaken', error);
     }
   }
 
@@ -109,11 +160,12 @@ class ShopifyIntegration {
       });
 
       console.log(`♻️  Updated Shopify product: ${updateData.title}`);
+      await this.applyRateLimitDelay(response.headers);
       return response.body.product;
 
     } catch (error) {
       console.error('❌ Shopify product update failed:', error.message);
-      throw error;
+      throw this.wrapShopifyError('product bijwerken', error);
     }
   }
 
@@ -128,11 +180,12 @@ class ShopifyIntegration {
         path: `products/${shopifyProductId}`
       });
 
+      await this.applyRateLimitDelay(response.headers);
       return response.body.product;
 
     } catch (error) {
       console.error('❌ Failed to fetch product:', error.message);
-      throw error;
+      throw this.wrapShopifyError('product ophalen', error);
     }
   }
 
@@ -155,11 +208,12 @@ class ShopifyIntegration {
         }
       });
 
+      await this.applyRateLimitDelay(response.headers);
       return response.body.metafield;
 
     } catch (error) {
       console.error('❌ Failed to add metafield:', error.message);
-      throw error;
+      throw this.wrapShopifyError('metafield toevoegen', error);
     }
   }
 
@@ -175,6 +229,7 @@ class ShopifyIntegration {
         path: `products/${shopifyProductId}/metafields`,
         query: { namespace: 'priceelephant' }
       });
+      await this.applyRateLimitDelay(existingMetafields.headers);
 
       const competitorMetafield = existingMetafields.body.metafields.find(
         m => m.key === 'competitor_prices'
@@ -184,7 +239,7 @@ class ShopifyIntegration {
 
       if (competitorMetafield) {
         // Update existing metafield
-        await client.put({
+        const updateResponse = await client.put({
           path: `products/${shopifyProductId}/metafields/${competitorMetafield.id}`,
           data: {
             metafield: {
@@ -194,6 +249,7 @@ class ShopifyIntegration {
             }
           }
         });
+        await this.applyRateLimitDelay(updateResponse.headers);
       } else {
         // Create new metafield
         await this.addProductMetafield(
@@ -209,7 +265,7 @@ class ShopifyIntegration {
 
     } catch (error) {
       console.error('❌ Failed to update competitor prices:', error.message);
-      throw error;
+      throw this.wrapShopifyError('competitorprijzen bijwerken', error);
     }
   }
 
@@ -225,11 +281,12 @@ class ShopifyIntegration {
         query: { query: `email:${email}` }
       });
 
+      await this.applyRateLimitDelay(response.headers);
       return response.body.customers[0] || null;
 
     } catch (error) {
       console.error('❌ Failed to fetch customer:', error.message);
-      throw error;
+      throw this.wrapShopifyError('klant zoeken', error);
     }
   }
 
@@ -252,11 +309,12 @@ class ShopifyIntegration {
         }
       });
 
+      await this.applyRateLimitDelay(response.headers);
       return response.body.metafield;
 
     } catch (error) {
       console.error('❌ Failed to add customer metafield:', error.message);
-      throw error;
+      throw this.wrapShopifyError('klant-metafield toevoegen', error);
     }
   }
 
@@ -301,6 +359,7 @@ class ShopifyIntegration {
         path: 'shop'
       });
 
+      await this.applyRateLimitDelay(response.headers);
       return {
         success: true,
         shop: response.body.shop.name,
@@ -311,7 +370,7 @@ class ShopifyIntegration {
     } catch (error) {
       return {
         success: false,
-        error: error.message
+        error: this.wrapShopifyError('verbindingstest', error).message
       };
     }
   }

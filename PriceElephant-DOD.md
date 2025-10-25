@@ -230,6 +230,14 @@ SELECT name, price, max_competitors, max_products FROM subscription_plans;
 4. **Playwright** werkt excellent voor scraping infrastructure, maar commerciële proxies zijn must-have
 5. **Mock data POC** is effectief voor infrastructure validatie zonder externe dependencies
 
+**Jest integratietests (PostgreSQL):**
+
+- Exporteren van de Homebrew PostgreSQL bin map is verplicht voor lokale scripts: `export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"`
+- Eenmalig een dedicated testdatabase aanmaken: `createdb priceelephant_test`
+- Test runner start de backend in `NODE_ENV=test`, draait migraties en seeds automatisch en truncates tabellen tussen specs.
+- Standaard verbinding: `postgres://$USER@localhost:5432/priceelephant_test`; overschrijven kan via `TEST_DATABASE_URL` of losse `TEST_DATABASE_*` variabelen.
+- Test suite draaien vanuit `backend/`: `npm test` (serial execution via `--runInBand`).
+
 ### **Update: Hybrid Scraper Implementatie (25 oktober 2025)**
 
 **Aanleiding:** Coolblue anti-bot detectie blokkeerde traditional scraping volledig. User vroeg "moeten we dit gelijk niet op een bepaalde manier gaan oplossen dan?" - geadviseerd om direct hybrid approach te implementeren.

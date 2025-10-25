@@ -1,0 +1,144 @@
+{{ 'priceelephant-dashboard.css' | asset_url | stylesheet_tag }}
+{{ 'priceelephant-dashboard.js' | asset_url | script_tag }}
+
+{% if customer %}
+  <div
+    class="pe-dashboard"
+    id="priceelephant-dashboard-root"
+    data-api-base-url="{{ section.settings.api_base_url | escape }}"
+    data-customer-id="{{ customer.id }}"
+  >
+    <div class="pe-dashboard__grid">
+      <section class="pe-card" id="pe-channable-card">
+        <h2>Channable integratie</h2>
+        <p>Configureer een feed-URL of API credentials om producten automatisch in te lezen.</p>
+        <div id="pe-channable-status" class="pe-alert" hidden></div>
+        <form id="pe-channable-form" novalidate>
+          <div class="pe-field">
+            <label for="pe-feed-url">Feed URL (XML/CSV)</label>
+            <input type="url" id="pe-feed-url" name="feedUrl" placeholder="https://example.com/channable-feed.xml">
+          </div>
+          <div class="pe-field-group">
+            <div class="pe-field">
+              <label for="pe-company-id">Company ID</label>
+              <input type="text" id="pe-company-id" name="companyId" placeholder="12345">
+            </div>
+            <div class="pe-field">
+              <label for="pe-project-id">Project ID</label>
+              <input type="text" id="pe-project-id" name="projectId" placeholder="67890">
+            </div>
+            <div class="pe-field">
+              <label for="pe-api-token">API token</label>
+              <input type="password" id="pe-api-token" name="apiToken" placeholder="••••••">
+            </div>
+          </div>
+          <div class="pe-field">
+            <label for="pe-feed-format">Feed formaat</label>
+            <select id="pe-feed-format" name="feedFormat">
+              <option value="xml" selected>XML (Google Shopping)</option>
+              <option value="csv">CSV</option>
+            </select>
+          </div>
+          <div class="pe-card__footer">
+            <button type="submit" class="pe-button pe-button--primary" id="pe-channable-save">Instellingen opslaan</button>
+            <button type="button" class="pe-button pe-button--secondary" id="pe-channable-import">Nu importeren</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="pe-card" id="pe-shopify-card">
+        <h2>Shopify catalogus sync</h2>
+        <p>Push PriceElephant-producten naar de Shopify catalogus van deze klant.</p>
+        <div id="pe-shopify-status" class="pe-alert" hidden></div>
+        <div id="pe-shopify-stats" class="pe-card__content">
+          <div class="pe-badges" id="pe-shopify-metrics"></div>
+        </div>
+        <div class="pe-card__footer">
+          <div class="pe-field">
+            <label for="pe-sync-limit">Aantal producten per batch</label>
+            <input type="number" id="pe-sync-limit" name="syncLimit" min="1" max="200" value="10">
+          </div>
+          <div class="pe-field-group">
+            <button type="button" class="pe-button pe-button--primary" id="pe-shopify-sync">Sync batch</button>
+            <button type="button" class="pe-button pe-button--secondary" id="pe-shopify-sync-all">Sync alles</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="pe-card" id="pe-products-card">
+      <h2>Producten</h2>
+      <p>Overzicht van geïmporteerde producten inclusief concurrentinformatie.</p>
+      <div class="pe-field" style="max-width: 320px;">
+        <label for="pe-product-search">Zoek op naam, EAN of merk</label>
+        <input type="search" id="pe-product-search" placeholder="Bijv. ThinkPad of 8719...">
+      </div>
+      <div class="pe-table-wrapper" aria-live="polite">
+        <table class="pe-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>EAN</th>
+              <th>Eigen prijs</th>
+              <th>Concurrenten</th>
+              <th>Sync status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pe-products-body"></tbody>
+        </table>
+      </div>
+      <div id="pe-products-empty" class="pe-empty-state" hidden>
+        Nog geen producten gevonden. Importeer via Channable en refresh.
+      </div>
+    </section>
+
+    <section class="pe-card" id="pe-competitors-card" hidden>
+      <h2>Concurrenten voor <span id="pe-selected-product-name"></span></h2>
+      <div class="pe-badges" style="margin-bottom: 12px;">
+        <span class="pe-badge" id="pe-selected-product-sku"></span>
+        <span class="pe-badge" id="pe-selected-product-ean"></span>
+        <span class="pe-badge" id="pe-selected-product-own-price"></span>
+      </div>
+      <div id="pe-competitors-status" class="pe-alert" hidden></div>
+      <div id="pe-competitors-empty" class="pe-empty-state" hidden>
+        Geen handmatige concurrenten toegevoegd voor dit product.
+      </div>
+      <div class="pe-competitors__list" id="pe-competitors-list"></div>
+      <form id="pe-competitor-form" style="margin-top: 16px;" novalidate>
+        <div class="pe-field-group">
+          <div class="pe-field">
+            <label for="pe-competitor-retailer">Retailer</label>
+            <input type="text" id="pe-competitor-retailer" name="retailer" placeholder="coolblue">
+          </div>
+          <div class="pe-field" style="flex: 2 1 260px;">
+            <label for="pe-competitor-url">Product URL</label>
+            <input type="url" id="pe-competitor-url" name="competitorUrl" placeholder="https://www.coolblue.nl/product/...">
+          </div>
+        </div>
+        <button type="submit" class="pe-button pe-button--primary">Concurrent toevoegen</button>
+      </form>
+    </section>
+  </div>
+{% else %}
+  <div class="pe-card" style="max-width: 480px; margin: 48px auto; text-align: center;">
+    <h2>Log eerst in</h2>
+    <p>Deze dashboardpagina is alleen beschikbaar voor ingelogde PriceElephant-klanten.</p>
+    <a href="/account/login" class="pe-button pe-button--primary" style="margin-top: 12px; display: inline-flex;">Naar login</a>
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "PriceElephant dashboard",
+  "settings": [
+    {
+      "type": "text",
+      "id": "api_base_url",
+      "label": "API basis URL",
+      "default": "http://localhost:3000",
+      "info": "Root URL van de PriceElephant backend (zonder trailing slash)."
+    }
+  ]
+}
+{% endschema %}
