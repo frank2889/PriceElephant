@@ -33,8 +33,10 @@ app.use('/api/', limiter);
 
 // Routes
 const channableRoutes = require('./routes/channable-routes');
+const shopifyRoutes = require('./routes/shopify-routes');
 
 app.use('/api/v1/channable', channableRoutes);
+app.use('/api/v1/shopify', shopifyRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
