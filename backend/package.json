@@ -1,6 +1,6 @@
 {
   "name": "priceelephant-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PriceElephant - Backend API | B2B SaaS Price Intelligence Platform",
   "main": "server.js",
   "type": "commonjs",
