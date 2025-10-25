@@ -1,18 +1,5 @@
 {
-  "phases": {
-    "setup": {
-      "nixPkgs": ["nodejs-18_x", "postgresql"]
-    },
-    "install": {
-      "cmds": [
-        "cd backend && npm ci"
-      ]
-    },
-    "build": {
-      "cmds": []
-    }
-  },
-  "start": {
-    "cmd": "cd backend && npm run db:migrate && npm start"
+  "variables": {
+    "NIXPACKS_BUILD_DIR": "backend"
   }
 }
