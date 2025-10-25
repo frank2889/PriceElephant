@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",
+    "start": "npx knex migrate:latest --knexfile knexfile.js && node server.js",
     "db:migrate": "knex migrate:latest --knexfile knexfile.js",
     "db:rollback": "knex migrate:rollback --knexfile knexfile.js",
     "db:seed": "knex seed:run --knexfile knexfile.js",
