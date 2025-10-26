@@ -562,6 +562,8 @@
 
   async function init() {
     console.log('[PriceElephant] Initializing dashboard...');
+    updateDebug('script', '✅ Script geladen');
+    
     try {
       setupEventListeners();
       console.log('[PriceElephant] Loading initial data...');
@@ -573,8 +575,14 @@
       console.log('[PriceElephant] Dashboard initialized successfully');
     } catch (error) {
       console.error('[PriceElephant] Fout bij initialisatie:', error);
+      updateDebug('error', error.message);
     }
   }
 
-  init();
+  // Wait for DOM before initializing
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
