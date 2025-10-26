@@ -4,9 +4,15 @@
  */
 
 require('dotenv').config();
+const crypto = require('crypto'); // Add crypto polyfill
 const { shopifyApi } = require('@shopify/shopify-api');
 const { restResources } = require('@shopify/shopify-api/rest/admin/2024-10');
 require('@shopify/shopify-api/adapters/node');
+
+// Make crypto globally available for Shopify API
+if (typeof global.crypto === 'undefined') {
+  global.crypto = crypto;
+}
 
 class ShopifyIntegration {
   constructor(config = {}) {
