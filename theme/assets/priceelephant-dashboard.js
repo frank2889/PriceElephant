@@ -74,39 +74,37 @@
     }
   }
 
-  async function apiFetch(path, options) {
-    if (!apiBaseUrl) {
-      throw new Error('API basis URL ontbreekt in sectie-instellingen.');
-    }
+    async function apiFetch(endpoint, options = {}) {
+    console.log('[apiFetch] START', { endpoint, method: options.method || 'GET' });
+    updateDebug('action', `📡 API: ${endpoint}`);
+    
+    const url = `${apiBaseUrl}${endpoint}`;
+    console.log('[apiFetch] Full URL:', url);
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    };
 
-    const response = await fetch(`${apiBaseUrl}${path}`, Object.assign({
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }, options));
-
-    if (response.status === 204) {
-      return null;
-    }
-
-    let payload = null;
-    const text = await response.text();
-    if (text) {
-      try {
-        payload = JSON.parse(text);
-      } catch (error) {
-        throw new Error(`Ongeldig antwoord van server: ${text}`);
+    try {
+      const response = await fetch(url, { ...options, headers });
+      console.log('[apiFetch] Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[apiFetch] Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-    }
 
-    if (!response.ok) {
-      const message = payload?.error || payload?.message || response.statusText;
-      const error = new Error(message);
-      error.status = response.status;
+      const data = await response.json();
+      console.log('[apiFetch] Success data:', data);
+      updateDebug('action', `✅ API response OK`);
+      return data;
+    } catch (error) {
+      console.error('[apiFetch] CATCH ERROR:', error);
+      updateDebug('error', `❌ ${error.message}`);
       throw error;
     }
-
-    return payload;
   }
 
   async function apiGet(path) {
@@ -328,83 +326,83 @@
     }
   }
 
-  async function handleChannableSubmit(event) {
+    async function handleChannableSubmit(event) {
     event.preventDefault();
-    console.log('[PriceElephant] Channable form submit triggered');
-    updateDebug('action', '📝 Channable config opslaan...');
+    console.log('[handleChannableSubmit] STARTED');
+    updateDebug('action', '� Saving Channable config');
     
-    showStatus(channableStatus, '', null);
-
     const formData = new FormData(channableForm);
-    const payload = {
-      customerId,
-      feedUrl: formData.get('feedUrl')?.trim() || undefined,
-      companyId: formData.get('companyId')?.trim() || undefined,
-      projectId: formData.get('projectId')?.trim() || undefined,
-      apiToken: formData.get('apiToken')?.trim() || undefined,
-      feedFormat: formData.get('feedFormat') || 'xml',
-    };
+    const feedUrl = formData.get('feedUrl')?.trim();
+    const feedFormat = formData.get('feedFormat');
     
-    console.log('[PriceElephant] Channable config payload:', payload);
+    console.log('[handleChannableSubmit] Form data:', { feedUrl, feedFormat });
 
-    if (!payload.feedUrl && !(payload.companyId && payload.projectId && payload.apiToken)) {
-      showStatus(channableStatus, 'Vul een feed URL in of alle API-velden.', 'error');
-      updateDebug('error', 'Validatie fout: ontbrekende velden');
+    if (!feedUrl) {
+      const msg = 'Feed URL is verplicht.';
+      console.warn('[handleChannableSubmit]', msg);
+      showStatus(channableStatus, msg, 'error');
+      updateDebug('error', '❌ No feed URL');
       return;
     }
 
     setLoading(channableForm.querySelector('button[type="submit"]'), true);
+
     try {
-      console.log('[PriceElephant] Posting to /api/v1/channable/configure...');
-      await apiFetch('/api/v1/channable/configure', {
+      console.log('[handleChannableSubmit] Calling API...');
+      const response = await apiFetch('/api/v1/channable/configure', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ customerId, feedUrl, feedFormat }),
       });
-      console.log('[PriceElephant] Channable config saved successfully');
-      showStatus(channableStatus, 'Channable-configuratie opgeslagen.', 'success');
-      updateDebug('action', '✅ Config opgeslagen');
-      updateDebug('error', 'Geen');
+      console.log('[handleChannableSubmit] Success:', response);
+      showStatus(channableStatus, response.message || 'Instellingen opgeslagen.', 'success');
+      updateDebug('action', '✅ Config saved');
     } catch (error) {
-      console.error('[PriceElephant] Channable config error:', error);
+      console.error('[handleChannableSubmit] ERROR:', error);
       showStatus(channableStatus, `Opslaan mislukt: ${error.message}`, 'error');
-      updateDebug('error', error.message);
+      updateDebug('error', `❌ ${error.message}`);
     } finally {
       setLoading(channableForm.querySelector('button[type="submit"]'), false);
     }
   }
 
-  async function handleChannableImport() {
-    console.log('[PriceElephant] Channable import button clicked');
-    updateDebug('action', '📥 Channable import starten...');
+    async function handleChannableImport() {
+    console.log('[handleChannableImport] STARTED');
+    updateDebug('action', '📥 Importing products');
     
     showStatus(channableStatus, '', null);
     setLoading(channableImportBtn, true);
 
     try {
-      console.log('[PriceElephant] Posting to /api/v1/channable/import...');
+      console.log('[handleChannableImport] Calling import API...');
       const response = await apiFetch('/api/v1/channable/import', {
         method: 'POST',
         body: JSON.stringify({ customerId }),
       });
-      console.log('[PriceElephant] Import response:', response);
-      const created = response?.results?.created || 0;
-      const updated = response?.results?.updated || 0;
-      showStatus(
-        channableStatus,
-        `Import gestart. ${created} nieuw · ${updated} bijgewerkt.`,
-        'success'
-      );
+      console.log('[handleChannableImport] Success:', response);
+      
+      const message = response?.message || 'Import uitgevoerd.';
+      const stats = response?.stats;
+      const detail = stats ? ` (${stats.created || 0} nieuw / ${stats.updated || 0} bijgewerkt / ${stats.errors || 0} fouten)` : '';
+      showStatus(channableStatus, `${message}${detail}`, stats?.errors ? 'error' : 'success');
+      updateDebug('action', `✅ Import: ${stats?.created || 0} created`);
+      
       await loadProducts(productSearchInput.value.trim());
     } catch (error) {
+      console.error('[handleChannableImport] ERROR:', error);
       showStatus(channableStatus, `Import mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ Import: ${error.message}`);
     } finally {
       setLoading(channableImportBtn, false);
     }
   }
 
   async function handleShopifySync(all = false) {
+    console.log('[handleShopifySync] STARTED', { all, customerId });
+    updateDebug('action', `🔄 Shopify sync ${all ? 'all' : 'batch'}`);
+    
     showStatus(shopifyStatus, '', null);
     const button = all ? shopifySyncAllBtn : shopifySyncBtn;
+    console.log('[handleShopifySync] Button found:', !!button);
     setLoading(button, true);
 
     const limitValue = parseInt(shopifyLimitInput.value, 10);
@@ -412,21 +410,30 @@
     if (!all && Number.isInteger(limitValue) && limitValue > 0) {
       payload.limit = limitValue;
     }
+    console.log('[handleShopifySync] Payload:', payload);
 
     try {
       const endpoint = all ? '/api/v1/shopify/sync-all' : '/api/v1/shopify/sync';
+      console.log('[handleShopifySync] Calling endpoint:', endpoint);
+      
       const response = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      
+      console.log('[handleShopifySync] Response:', response);
       const message = response?.message || 'Sync uitgevoerd.';
       const results = response?.results;
       const detail = results ? ` (${results.synced || 0} synced / ${results.failed || 0} fouten)` : '';
       showStatus(shopifyStatus, `${message}${detail}`, 'success');
+      updateDebug('action', `✅ Sync: ${results?.synced || 0} synced`);
+      
       await loadShopifyStatus();
       await loadProducts(productSearchInput.value.trim());
     } catch (error) {
+      console.error('[handleShopifySync] ERROR:', error);
       showStatus(shopifyStatus, `Sync mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ Sync: ${error.message}`);
     } finally {
       setLoading(button, false);
     }
@@ -507,15 +514,25 @@
     }
     
     if (shopifySyncBtn) {
-      shopifySyncBtn.addEventListener('click', () => handleShopifySync(false));
+      shopifySyncBtn.addEventListener('click', () => {
+        console.log('[EVENT] Shopify sync batch button clicked!');
+        handleShopifySync(false);
+      });
       console.log('[PriceElephant] Shopify sync button listener attached');
       listenersCount++;
+    } else {
+      console.warn('[PriceElephant] Shopify sync button NOT FOUND: #pe-shopify-sync');
     }
     
     if (shopifySyncAllBtn) {
-      shopifySyncAllBtn.addEventListener('click', () => handleShopifySync(true));
+      shopifySyncAllBtn.addEventListener('click', () => {
+        console.log('[EVENT] Shopify sync ALL button clicked!');
+        handleShopifySync(true);
+      });
       console.log('[PriceElephant] Shopify sync all button listener attached');
       listenersCount++;
+    } else {
+      console.warn('[PriceElephant] Shopify sync all button NOT FOUND: #pe-shopify-sync-all');
     }
     
     if (competitorForm) {
