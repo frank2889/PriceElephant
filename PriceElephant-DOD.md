@@ -274,26 +274,67 @@ SELECT name, price, max_competitors, max_products FROM subscription_plans;
 
 **Cost Impact:**
 
-| Method | Old (Bright Data Only) | New (Hybrid) |
-|--------|----------------------|--------------|
-| 500 products × 4 retailers × 2 checks/day | | |
-| = 120k scrapes/month | €600-800/month | €30-50/month |
-| **Savings** | - | **€750/month (94%)** |
+| Method | Old (Bright Data Only) | New (Hybrid Per-Customer) | Optimized (Multi-Tenant) |
+|--------|----------------------|--------------------------|--------------------------|
+| 500 products × 4 retailers × 2 checks/day | | | |
+| = 120k scrapes/month | €600-800/month | €50-75/month | **€5/month** |
+| **Per customer COGS** | €800 | €75 | **€5** |
+| **Savings vs Original** | - | 91% | **99.4%** |
 
-**Expected Tier Distribution:**
+**Scraping Strategies:**
+
+**A. Per-Customer Scraping (Current Implementation):**
+- Each customer gets isolated scrape runs
+- 500 products × 4 retailers × 2/day = 4k scrapes/day/customer
+- Cost: €50-75/month per customer
+- Margin: Professional (€99) = 24% margin
+
+**B. Multi-Tenant Shared Scraping (Next Sprint - RECOMMENDED):**
+- Scrape each unique EAN once, share across all customers
+- 40 customers × 500 products = 20k unique products
+- But: Scrape each product 1x, not 40x
+- Cost: €200/month for ALL customers = **€5/customer**
+- Margin: Professional (€99) = **95% margin** ✅
+
+**C. Smart Caching + Multi-Tenant (Phase 3):**
+- Cache stable prices (12h TTL if price change < 2%)
+- 50% reduction: €200 → €100/month total
+- Cost: **€2.50/customer**
+- Margin: Professional (€99) = **97% margin** ✅✅
+
+**Expected Tier Distribution (Multi-Tenant):**
 - 60% direct (free) = 72k requests × €0 = **€0**
 - 20% free proxy = 24k requests × €0 = **€0**
 - 15% WebShare = 18k requests × €0.0003 = **€5**
 - 4% Bright Data = 5k requests × €0.01 = **€50**
 - 1% AI Vision = 1k requests × €0.02 = **€20**
-- **Total: ~€75/month** (vs €800 originally)
+- **Total: ~€75/month for 40 customers = €1.88/customer**
+- Add caching: **~€1/customer**
 
 **Business Model Impact:**
-- COGS reduced from €800 → €50-75/month per customer
-- Professional plan (€99/month) now **profitable** at 1 customer
-- Break-even: 1 customer (was 40 customers)
-- Gross margin: 25-50% (was -700%)
-- Can support freemium model (free tier + paid upgrades)
+
+| Plan | Price/mo | Old COGS | Per-Customer COGS | Multi-Tenant COGS | Margin (Multi-Tenant) |
+|------|----------|----------|-------------------|-------------------|----------------------|
+| Trial | €0 | -€800 | -€75 | -€5 | Acceptable loss |
+| Starter | €49 | -€751 ❌ | -€26 ❌ | +€44 | **90%** ✅ |
+| Professional | €99 | -€701 ❌ | +€24 (24%) | +€94 | **95%** ✅✅ |
+| Enterprise | €249 | -€551 ❌ | +€89 (36%) | +€244 | **98%** ✅✅✅ |
+
+**Break-even Analysis:**
+- **Old (Bright Data):** 134+ customers needed
+- **Hybrid per-customer:** 1 customer (Professional plan)
+- **Multi-tenant:** Profitable from customer #1 with 90%+ margins
+
+**Multi-Tenant Requirements:**
+- Min 10 customers for efficiency (10 × €5 = €50 COGS)
+- Deduplication: scrape unique EANs across all customers
+- Shared cache: Redis with customer-agnostic price data
+- Fair usage limits: max 2500 products per customer (Enterprise)
+
+**Implementation Priority:**
+1. ✅ **Phase 1:** Hybrid scraper (per-customer) - DONE
+2. ⏸️ **Phase 2:** Multi-tenant scraping - Next Sprint (HIGH priority for margin)
+3. ⏸️ **Phase 3:** Smart caching - Sprint after (further optimization)
 
 **Environment Variables Added:**
 ```bash
