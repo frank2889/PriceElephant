@@ -1113,8 +1113,9 @@ CREATE INDEX idx_email_notifications_customer ON email_notifications(shopify_cus
 - [x] Railway Postgres en Redis plugins gekoppeld aan de nieuwe service (DATABASE_URL/REDIS_URL refs geactiveerd).
 - [x] Alle vereiste environment variables ingesteld (`DATABASE_URL`, `REDIS_URL`, `NODE_ENV=production`, Shopify secrets, JWT secret) via Railway Variables tab.
 - [x] Startcommand draait automatisch `npm run db:migrate`; eerste boot bevestigt Batch 1 migraties. Seeding optioneel (`railway run "npm run db:seed"`) blijft als handmatige stap.
-- [ ] Nieuwe publieke Railway URL invullen in de Shopify sectie-instellingen (`api_base_url`).
+- [x] Nieuwe publieke Railway URL invullen in de Shopify sectie-instellingen (`api_base_url`).
 - [x] Smoke-test via `/health` bevestigd (`status":"ok"` op 26 oktober 2025).
+- [ ] End-to-end dashboard test: login als customer, test Channable/Shopify sync flows, verifieer API calls naar Railway.
 
 ---
 
