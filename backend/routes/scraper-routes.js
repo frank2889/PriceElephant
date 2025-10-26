@@ -1,11 +1,13 @@
 /**
- * Scraper API Routes
+ * Scraper API Routes - Cost-Optimized Hybrid Scraping
  * POST /api/v1/scraper/run - Trigger scrape for products
+ * Uses multi-tier fallback: Direct → Free Proxy → WebShare → Bright Data → AI Vision
+ * Target cost: €30-50/maand instead of €800/maand
  */
 
 const express = require('express');
 const router = express.Router();
-const ProductionScraper = require('../crawlers/production-scraper');
+const HybridScraper = require('../crawlers/hybrid-scraper');
 const db = require('../config/database');
 
 /**
@@ -39,14 +41,14 @@ router.post('/run', async (req, res) => {
       });
     }
 
-    // Initialize scraper
-    const scraper = new ProductionScraper();
-    await scraper.initBrowser();
+    // Initialize hybrid scraper
+    const scraper = new HybridScraper();
 
     const results = {
       total: products.length,
       scraped: 0,
       failed: 0,
+      totalCost: 0,
       products: []
     };
 
@@ -55,21 +57,36 @@ router.post('/run', async (req, res) => {
       try {
         console.log(`\n🔍 Scraping: ${product.product_name}`);
         
-        const scrapeResult = await scraper.scrapeAllRetailers(
+        // Build retailer URLs (you need to add these to products table)
+        const urls = {
+          coolblue: product.coolblue_url,
+          bol: product.bol_url,
+          amazon: product.amazon_url,
+          mediamarkt: product.mediamarkt_url
+        };
+
+        const scrapeResults = await scraper.scrapeAllRetailers(
           product.id,
-          product.product_ean
+          product.product_ean,
+          urls
         );
+
+        const successCount = scrapeResults.filter(r => !r.error).length;
+        const productCost = scrapeResults.reduce((sum, r) => sum + (r.cost || 0), 0);
 
         results.products.push({
           id: product.id,
           name: product.product_name,
           ean: product.product_ean,
-          success_count: scrapeResult.success_count,
-          failed_count: scrapeResult.failed_count,
-          retailers: scrapeResult.retailers
+          success_count: successCount,
+          failed_count: scrapeResults.length - successCount,
+          cost: productCost,
+          retailers: scrapeResults
         });
 
-        if (scrapeResult.success_count > 0) {
+        results.totalCost += productCost;
+
+        if (successCount > 0) {
           results.scraped++;
         } else {
           results.failed++;
@@ -87,12 +104,15 @@ router.post('/run', async (req, res) => {
       }
     }
 
-    // Cleanup
-    await scraper.close();
+    // Get scraper stats
+    const stats = scraper.getStats();
 
     res.json({
       success: true,
-      results
+      ...results,
+      cost: `€${results.totalCost.toFixed(2)}`,
+      avgCostPerProduct: `€${(results.totalCost / products.length).toFixed(4)}`,
+      stats: stats
     });
 
   } catch (error) {
@@ -117,7 +137,7 @@ router.get('/status/:productId', async (req, res) => {
       .orderBy('scraped_at', 'desc')
       .limit(20);
 
-    // Group by retailer
+    // Group by retailer with cost info
     const byRetailer = {};
     for (const snap of snapshots) {
       if (!byRetailer[snap.retailer]) {
@@ -126,8 +146,9 @@ router.get('/status/:productId', async (req, res) => {
       byRetailer[snap.retailer].push({
         price: parseFloat(snap.price),
         in_stock: snap.in_stock,
-        url: snap.competitor_url,
-        scraped_at: snap.scraped_at
+        scraped_at: snap.scraped_at,
+        method: snap.scraping_method,
+        cost: snap.scraping_cost
       });
     }
 
@@ -149,39 +170,42 @@ router.get('/status/:productId', async (req, res) => {
 
 /**
  * POST /api/v1/scraper/test
- * Test Bright Data connection
+ * Test proxy pool and scraping
  */
 router.post('/test', async (req, res) => {
   try {
-    const ProductionScraper = require('../crawlers/production-scraper');
-    const scraper = new ProductionScraper();
+    const scraper = new HybridScraper();
     
-    // Test proxy connection
-    const testResult = await scraper.proxy.testConnection();
+    // Test URL: Coolblue product
+    const testUrl = 'https://www.coolblue.nl/product/942019/apple-airpods-pro-2e-generatie-usb-c.html';
     
-    if (!testResult.success) {
-      return res.status(500).json({
-        success: false,
-        error: 'Bright Data connection failed',
-        details: testResult.error
-      });
-    }
+    const testResult = await scraper.scrapeProduct(
+      testUrl,
+      null,
+      'coolblue',
+      null
+    );
+    
+    const stats = scraper.getStats();
 
     res.json({
       success: true,
-      message: 'Bright Data connected successfully',
-      proxy: {
-        ip: testResult.ip,
-        country: testResult.country,
-        isp: testResult.isp
-      }
+      message: 'Scraping test successful',
+      test: {
+        url: testUrl,
+        price: testResult.price,
+        tier: testResult.tier,
+        cost: testResult.cost,
+        inStock: testResult.inStock
+      },
+      stats: stats
     });
 
   } catch (error) {
     console.error('Test endpoint error:', error);
     res.status(500).json({
       success: false,
-      error: 'Connection test failed',
+      error: 'Test failed',
       message: error.message
     });
   }
