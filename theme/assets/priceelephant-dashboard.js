@@ -1,11 +1,20 @@
 (function () {
+  console.log('[PriceElephant] Dashboard script gestart');
+  
   const root = document.getElementById('priceelephant-dashboard-root');
   if (!root) {
+    console.error('[PriceElephant] Root element niet gevonden: #priceelephant-dashboard-root');
     return;
   }
 
   const customerId = root.dataset.customerId;
   const apiBaseUrl = (root.dataset.apiBaseUrl || '').replace(/\/$/, '');
+  
+  console.log('[PriceElephant] Configuratie:', {
+    customerId,
+    apiBaseUrl,
+    rootFound: !!root
+  });
 
   const channableForm = document.getElementById('pe-channable-form');
   const channableStatus = document.getElementById('pe-channable-status');
@@ -312,6 +321,8 @@
 
   async function handleChannableSubmit(event) {
     event.preventDefault();
+    console.log('[PriceElephant] Channable form submit triggered');
+    
     showStatus(channableStatus, '', null);
 
     const formData = new FormData(channableForm);
@@ -323,6 +334,8 @@
       apiToken: formData.get('apiToken')?.trim() || undefined,
       feedFormat: formData.get('feedFormat') || 'xml',
     };
+    
+    console.log('[PriceElephant] Channable config payload:', payload);
 
     if (!payload.feedUrl && !(payload.companyId && payload.projectId && payload.apiToken)) {
       showStatus(channableStatus, 'Vul een feed URL in of alle API-velden.', 'error');
@@ -331,12 +344,15 @@
 
     setLoading(channableForm.querySelector('button[type="submit"]'), true);
     try {
+      console.log('[PriceElephant] Posting to /api/v1/channable/configure...');
       await apiFetch('/api/v1/channable/configure', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      console.log('[PriceElephant] Channable config saved successfully');
       showStatus(channableStatus, 'Channable-configuratie opgeslagen.', 'success');
     } catch (error) {
+      console.error('[PriceElephant] Channable config error:', error);
       showStatus(channableStatus, `Opslaan mislukt: ${error.message}`, 'error');
     } finally {
       setLoading(channableForm.querySelector('button[type="submit"]'), false);
@@ -344,14 +360,18 @@
   }
 
   async function handleChannableImport() {
+    console.log('[PriceElephant] Channable import button clicked');
+    
     showStatus(channableStatus, '', null);
     setLoading(channableImportBtn, true);
 
     try {
+      console.log('[PriceElephant] Posting to /api/v1/channable/import...');
       const response = await apiFetch('/api/v1/channable/import', {
         method: 'POST',
         body: JSON.stringify({ customerId }),
       });
+      console.log('[PriceElephant] Import response:', response);
       const created = response?.results?.created || 0;
       const updated = response?.results?.updated || 0;
       showStatus(
@@ -448,11 +468,39 @@
   }
 
   function setupEventListeners() {
-    channableForm.addEventListener('submit', handleChannableSubmit);
-    channableImportBtn.addEventListener('click', handleChannableImport);
-    shopifySyncBtn.addEventListener('click', () => handleShopifySync(false));
-    shopifySyncAllBtn.addEventListener('click', () => handleShopifySync(true));
-    competitorForm.addEventListener('submit', handleCompetitorSubmit);
+    console.log('[PriceElephant] Setup event listeners');
+    console.log('[PriceElephant] Elements check:', {
+      channableForm: !!channableForm,
+      channableImportBtn: !!channableImportBtn,
+      shopifySyncBtn: !!shopifySyncBtn,
+      shopifySyncAllBtn: !!shopifySyncAllBtn,
+      competitorForm: !!competitorForm
+    });
+    
+    if (channableForm) {
+      channableForm.addEventListener('submit', handleChannableSubmit);
+      console.log('[PriceElephant] Channable form listener attached');
+    }
+    
+    if (channableImportBtn) {
+      channableImportBtn.addEventListener('click', handleChannableImport);
+      console.log('[PriceElephant] Channable import button listener attached');
+    }
+    
+    if (shopifySyncBtn) {
+      shopifySyncBtn.addEventListener('click', () => handleShopifySync(false));
+      console.log('[PriceElephant] Shopify sync button listener attached');
+    }
+    
+    if (shopifySyncAllBtn) {
+      shopifySyncAllBtn.addEventListener('click', () => handleShopifySync(true));
+      console.log('[PriceElephant] Shopify sync all button listener attached');
+    }
+    
+    if (competitorForm) {
+      competitorForm.addEventListener('submit', handleCompetitorSubmit);
+      console.log('[PriceElephant] Competitor form listener attached');
+    }
 
     productsBody.addEventListener('click', (event) => {
       const target = event.target;
@@ -488,15 +536,18 @@
   }
 
   async function init() {
+    console.log('[PriceElephant] Initializing dashboard...');
     try {
       setupEventListeners();
+      console.log('[PriceElephant] Loading initial data...');
       await Promise.all([
         loadChannableConfig(),
         loadShopifyStatus(),
         loadProducts(),
       ]);
+      console.log('[PriceElephant] Dashboard initialized successfully');
     } catch (error) {
-      console.error('Fout bij initialisatie PriceElephant dashboard:', error);
+      console.error('[PriceElephant] Fout bij initialisatie:', error);
     }
   }
 
