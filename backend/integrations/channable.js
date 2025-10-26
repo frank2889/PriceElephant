@@ -130,13 +130,8 @@ class ChannableIntegration {
      * Helper to extract value from XML object
      */
     getXMLValue(obj, key) {
-        const keys = key.split(':');
-        let value = obj;
-        
-        for (const k of keys) {
-            value = value?.[k];
-        }
-        
+        // XML namespace fields are stored as 'g:title' (one key), not obj.g.title
+        const value = obj?.[key];
         return Array.isArray(value) ? value[0] : value;
     }
 
