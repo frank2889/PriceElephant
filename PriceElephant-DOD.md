@@ -783,9 +783,9 @@ Overall success rate: 100.0%
 
 ---
 
-### **📋 Sprint 4 Status: Marketing Site**
+### **📋 Sprint 4 Status: Marketing Site + Multi-Language Setup**
 
-**Status:** ✅ **Homepage & Features COMPLEET** (26 oktober 2025)
+**Status:** ✅ **Homepage & Features & i18n COMPLEET** (26 oktober 2025)
 
 **Gerealiseerd:**
 
@@ -798,6 +798,7 @@ Overall success rate: 100.0%
    - Social proof stats (10K+ products, 99.9% success, 24/7 monitoring)
    - Fully responsive design
    - Purple design system (#7C3AED)
+   - Hero background: Retail shopping street photo (Unsplash) met purple gradient overlay
 
 2. **Features Page (page.features.liquid)** ✅
    - Hero: "Krachtige features voor slimme prijzen"
@@ -881,9 +882,72 @@ Overall success rate: 100.0%
 2. **Why locales over hardcoded strings?**
    - Single source of truth for all copy
    - Easy content updates without touching code
-   - Multi-language ready (add en.json)
+   - **Multi-language ready for worldwide expansion**
    - Reusable across templates
    - Client can edit via Shopify admin
+   
+   **🌍 Worldwide Expansion Strategy:**
+   - **Current:** Netherlands (NL) at `priceelephant.com/nl-nl/` + International (EN) at `priceelephant.com/`
+   - **Phase 1 (Q1 2026):** Belgium markets
+     - `/nl-be/` - Dutch (Belgium) - Flemish market
+     - `/fr-be/` - French (Belgium) - Walloon market
+   - **Phase 2 (Q2 2026):** DACH region
+     - `/de-de/` - German (Germany)
+     - `/de-at/` - German (Austria)
+     - `/de-ch/` - German (Switzerland)
+     - `/fr-ch/` - French (Switzerland)
+     - `/it-ch/` - Italian (Switzerland)
+   - **Phase 3 (Q3 2026):** France + Southern Europe
+     - `/fr-fr/` - French (France)
+     - `/es-es/` - Spanish (Spain)
+     - `/it-it/` - Italian (Italy)
+     - `/pt-pt/` - Portuguese (Portugal)
+   - **Phase 4 (Q4 2026):** Nordic + Eastern Europe
+     - `/sv-se/` - Swedish (Sweden)
+     - `/da-dk/` - Danish (Denmark)
+     - `/fi-fi/` - Finnish (Finland)
+     - `/no-no/` - Norwegian (Norway)
+     - `/pl-pl/` - Polish (Poland)
+   - **Phase 5 (2027):** UK + Ireland
+     - `/en-gb/` - English (United Kingdom)
+     - `/en-ie/` - English (Ireland)
+   
+   **URL Structure:** Shopify Markets native subpath structure
+   - Format: `/{language-code}-{country-code}/` (ISO 639-1 + ISO 3166-1)
+   - Example: `priceelephant.com/nl-be/` for Dutch speakers in Belgium
+   - SEO-friendly: hreflang tags for each market
+   - Locale files: `theme/locales/{language-code}.json` (shared) or `theme/locales/{language-code}-{country-code}.json` (market-specific)
+   
+   **Implementation:**
+   - Each market = Shopify Market (currency, shipping, taxes per country)
+   - Each language = locale file (translations reusable across similar markets)
+   - Base template: Same `index.liquid`, dynamic content via `{{ 'key' | t }}`
+   - Country-specific: Pricing tiers in local currency, compliance (GDPR, BTW, VAT)
+   
+   **Business Impact:**
+   - TAM expansion: Netherlands (17M) → Europe (450M+)
+   - Local pricing: EUR for Eurozone, GBP for UK, SEK/DKK/NOK for Nordics
+   - Local payment: iDEAL (NL), Bancontact (BE), SEPA Direct Debit (EU-wide)
+   - Compliance: GDPR (all), BTW (NL/BE), MwSt (DE/AT), TVA (FR/BE), IVA (ES/IT)
+   
+   **Example Market Setup (Belgium):**
+   ```
+   Market: Belgium
+   - Regions: Belgium (BE)
+   - Languages: Dutch (nl-be), French (fr-be)
+   - Currency: EUR (€)
+   - Payment: Bancontact, SEPA, iDEAL (cross-border)
+   - Tax: 21% BTW
+   - URL: priceelephant.com/nl-be/ or /fr-be/
+   - Locale files: nl.json (shared with NL) + fr.json (new)
+   ```
+   
+   **Scalability:**
+   - Current: 2 locales (nl.json, en.default.json) = 2 markets covered
+   - Target: 20+ locales by end 2026 = 25+ markets covered
+   - Cost: €0 technical overhead (Shopify Markets included)
+   - Effort: ~4 hours per new language (translation + QA)
+   - Maintenance: Shopify "Translate & adapt" per language
 
 3. **Why emoji icons vs icon library?**
    - No external dependencies
@@ -900,6 +964,8 @@ Overall success rate: 100.0%
 
 **Next Steps:**
 
+- [ ] Deploy theme to Shopify (via GitHub Actions workflow)
+- [ ] Test multi-language URLs: / (EN) and /nl-nl/ (NL)
 - [ ] Create standalone Pricing page (/pages/pricing)
 - [ ] FAQ page with accordion components
 - [ ] Contact form (Shopify form or Klaviyo integration)
@@ -921,6 +987,7 @@ Overall success rate: 100.0%
 - [ ] Check translations render correctly (no missing keys)
 - [ ] Test with long customer names (UI breaks?)
 - [ ] Cross-browser: Chrome, Safari, Firefox, Edge
+- [ ] Test multi-language switching: EN ↔ NL
 
 **Performance:**
 
@@ -928,6 +995,82 @@ Overall success rate: 100.0%
 - Lighthouse score: Target 90+ (mobile)
 - i18n overhead: Minimal (Liquid is fast)
 - Images: Need to optimize/compress (use Shopify CDN)
+
+**Multi-Language Setup (26 oktober 2025):** ✅
+
+1. **Locale Files Created:**
+   - `theme/locales/nl.json` (300+ lines) - Nederlands voor NL market
+   - `theme/locales/en.default.json` (280+ lines) - English als default/fallback
+   - Identical structure voor consistency
+   - Complete translations: homepage, features, header, dashboard strings
+
+2. **Theme Configuration:**
+   - `theme/layout/theme.liquid` updated:
+     - Dynamic `<html lang="{{ request.locale.iso_code | default: 'en' }}">"`
+     - hreflang SEO tags toegevoegd:
+       ```liquid
+       <link rel="alternate" hreflang="en" href="{{ base_url }}{{ request.path }}" />
+       <link rel="alternate" hreflang="nl-NL" href="{{ base_url }}/nl-nl{{ request.path }}" />
+       <link rel="alternate" hreflang="x-default" href="{{ base_url }}{{ request.path }}" />
+       ```
+
+3. **Shopify Markets Setup (Manual - Pending):**
+   - Markets → Add "Netherlands" market (✅ Done per screenshot)
+   - Languages → Add Dutch (nl) at `/nl-nl/` subpath
+   - Currency: EUR (€) voor beide markets
+   - URL structure: Subpath (priceelephant.com/nl-nl/)
+   - Domain: Currently `priceelephant.myshopify.com` (dev)
+   - Production: `priceelephant.com` (custom domain setup pending)
+
+4. **Deployment Infrastructure:**
+   - GitHub Actions workflow: `.github/workflows/shopify-theme-deploy.yml`
+   - Triggers on push to `main` branch with `theme/**` changes
+   - Uses Shopify CLI: `shopify theme push --path theme --nodelete --allow-live`
+   - Requires secrets: `SHOPIFY_CLI_THEME_TOKEN`, `SHOPIFY_SHOP`, `SHOPIFY_THEME_ID`
+   - Last deployment: Commit `7194615` (deployment trigger pushed)
+
+5. **Documentation Created:**
+   - `SHOPIFY_LOCALES.md` (280 lines): Complete multi-language setup guide
+     - Shopify Admin configuration steps
+     - URL structure options (subpath/subdomain/domain)
+     - Template usage examples
+     - JavaScript i18n patterns
+     - Testing checklist
+     - Roadmap: NL ✅, EN ✅, DE/FR/ES planned Q1-Q3 2026
+   
+   - `DOMAIN_SETUP.md` (complete custom domain guide):
+     - DNS configuration (A record: 23.227.38.65)
+     - SSL certificate setup
+     - Primary domain configuration
+     - Redirect setup (www, .myshopify.com)
+     - Troubleshooting section
+
+6. **Git Commits (Session Summary):**
+   ```
+   7194615 - trigger: Force theme deployment to Shopify
+   191ba67 - feat: Add hreflang SEO tags + domain setup guide
+   0027cf1 - feat: Complete marketing site with i18n + AI-first scraper
+   ```
+   - Total files changed: 23 files
+   - Insertions: 4,400+ lines
+   - Theme files: 8 files (templates, locales, assets)
+   - Documentation: 2 new files (SHOPIFY_LOCALES.md, DOMAIN_SETUP.md)
+   - Backend: AI scraper + price alerts + routes (earlier session)
+
+7. **Known Issues:**
+   - GitHub Actions workflow may need secrets verification
+   - Shopify theme not auto-synced (deployment pending manual check)
+   - Translation keys show "Translation missing" on live site (needs deployment)
+   - Custom domain `priceelephant.com` not yet configured (DNS setup pending)
+
+8. **Next Manual Steps Required:**
+   - Verify GitHub Actions secrets are configured:
+     - SHOPIFY_CLI_THEME_TOKEN (from Shopify Admin → Apps → Theme Access)
+     - SHOPIFY_SHOP (priceelephant.myshopify.com)
+     - SHOPIFY_THEME_ID (theme ID from Shopify Admin)
+   - Or manually upload theme via Shopify Admin → Edit code
+   - Configure custom domain when ready (DOMAIN_SETUP.md has instructions)
+   - Activate Shopify "Translate & adapt" for visual translation editing
 
 ---
 
