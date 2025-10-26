@@ -14,14 +14,226 @@
       "email": "Email",
       "password": "Password",
       "sign_in": "Sign In"
+    },
+    "register": {
+      "title": "Register",
+      "first_name": "First name",
+      "last_name": "Last name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create account"
     }
   },
   "priceelephant": {
+    "homepage": {
+      "hero": {
+        "title": "Never lose on price again",
+        "subtitle": "Monitor competitors. Track trends. Optimize your pricing.",
+        "cta_trial": "Start free trial",
+        "cta_pricing": "See pricing",
+        "welcome_back": "Welcome back, {{ name }}!",
+        "welcome_subtitle": "Check your dashboard for the latest price insights",
+        "cta_dashboard": "Go to Dashboard →"
+      },
+      "features": {
+        "monitoring": {
+          "title": "Real-time monitoring",
+          "description": "Track competitors 24/7. Get instant alerts on price changes. AI-powered scraping works on any e-commerce site."
+        },
+        "intelligence": {
+          "title": "Price intelligence",
+          "description": "Understand market trends. See historical price changes. Know exactly when to adjust prices for maximum profit."
+        },
+        "alerts": {
+          "title": "Smart alerts",
+          "description": "Get SMS alerts when competitors undercut you. Email notifications for price drops and opportunities. Never miss a pricing opportunity."
+        },
+        "ai_scraping": {
+          "title": "AI-powered scraping",
+          "description": "Our intelligent scraper adapts to any website. No manual setup. Just add competitor URLs. Works even when websites change."
+        },
+        "integration": {
+          "title": "Easy integration",
+          "description": "Import products via Channable feed. Add competitor URLs with one click. Self-service. No technical knowledge required."
+        },
+        "insights": {
+          "title": "Actionable insights",
+          "description": "See which products are overpriced or underpriced. Identify opportunities to increase margins. Data-driven pricing decisions."
+        }
+      },
+      "pricing": {
+        "title": "Simple and transparent",
+        "subtitle": "Start free. Scale as you grow.",
+        "trial": {
+          "name": "Trial",
+          "price": "€0",
+          "period": "14 days free",
+          "features": "1 competitor||Max 50 products||Manual import||Email alerts||Basic analytics",
+          "cta": "Start free trial"
+        },
+        "starter": {
+          "name": "Starter",
+          "price": "€49",
+          "period": "per month",
+          "features": "3 competitors||500 products||Channable feed sync||Email alerts||Basic analytics||Priority support",
+          "cta": "Get started"
+        },
+        "professional": {
+          "name": "Professional",
+          "price": "€99",
+          "period": "per month",
+          "badge": "Most popular",
+          "features": "5 competitors||2,500 products||Channable feed sync||SMS + Email alerts||Advanced analytics||Weekly reports||Priority support",
+          "cta": "Get started"
+        },
+        "enterprise": {
+          "name": "Enterprise",
+          "price": "€249",
+          "period": "per month",
+          "features": "Unlimited competitors||Unlimited products||API access||White-label option||Dedicated support||Custom reports||SLA guarantee",
+          "cta": "Contact sales"
+        }
+      },
+      "social_proof": {
+        "title": "Trusted by European e-commerce businesses",
+        "stats": {
+          "products": "Products monitored",
+          "success_rate": "Scrape success rate",
+          "monitoring": "Price monitoring"
+        }
+      }
+    },
+    "features_page": {
+      "hero": {
+        "title": "Powerful features for smart pricing",
+        "subtitle": "Everything you need to stay competitive and maximize profits"
+      },
+      "monitoring": {
+        "title": "🔍 Real-time price monitoring",
+        "description": "Our AI-powered scraper monitors competitor prices 24/7, so you never miss a price change. Get instant updates when competitors adjust their pricing.",
+        "features": [
+          "Monitor unlimited competitors (Enterprise)",
+          "12-hour refresh cycles keep data fresh",
+          "Works on any e-commerce website",
+          "AI adapts when websites change structure",
+          "99.9% scraping success rate"
+        ]
+      },
+      "alerts": {
+        "title": "🚨 Intelligent price alerts",
+        "description": "Never get caught off-guard by competitor price changes. Receive SMS and email alerts when action is needed.",
+        "features": [
+          "SMS alerts for critical price drops (>15%)",
+          "Email notifications for competitor undercuts",
+          "Stock-out alerts reveal opportunities",
+          "Customizable alert thresholds",
+          "Integrated with Klaviyo for automation"
+        ]
+      },
+      "ai_scraping": {
+        "title": "🤖 AI-powered scraping",
+        "description": "Traditional scrapers break when websites change. Ours learns and adapts. Our intelligent scraper uses GPT-4 to understand any product page.",
+        "features": [
+          "AI analyzes HTML to find prices intelligently",
+          "Learns from successful scrapes (caching)",
+          "Vision fallback for 100% reliability",
+          "No manual selector configuration needed",
+          "Works on Coolblue, Bol.com, Amazon, MediaMarkt, etc."
+        ]
+      },
+      "integration": {
+        "title": "⚡ Seamless integration",
+        "description": "Connect your product catalog in minutes, not hours. Import via Channable feed or add products manually.",
+        "features": [
+          "One-click Channable feed import",
+          "Self-service competitor URL management",
+          "Automatic product sync",
+          "No technical knowledge required",
+          "Works with any e-commerce platform"
+        ]
+      },
+      "insights": {
+        "title": "📊 Actionable insights",
+        "description": "See the full picture. Understand market trends and make data-driven pricing decisions.",
+        "features": [
+          "Historical price charts",
+          "Competitor positioning analysis",
+          "Identify overpriced products",
+          "Find margin improvement opportunities",
+          "Weekly performance reports (Professional+)"
+        ]
+      },
+      "self_service": {
+        "title": "🎯 Self-service management",
+        "description": "You know your competitors best. Add and manage competitor URLs yourself—no waiting.",
+        "features": [
+          "Add competitor URLs with one click",
+          "Instant scraping when you add a URL",
+          "Manual refresh anytime",
+          "Remove competitors when no longer relevant",
+          "Full transparency (see scrape costs & methods)"
+        ]
+      },
+      "cta": {
+        "title": "Ready to win on price?",
+        "subtitle": "Start your 14-day free trial. No credit card required.",
+        "button": "Start free trial →"
+      }
+    },
+    "header": {
+      "nav": {
+        "pricing": "Pricing",
+        "features": "Features",
+        "dashboard": "Dashboard"
+      },
+      "auth": {
+        "login": "Login",
+        "register": "Start free trial"
+      },
+      "account_menu": {
+        "my_account": "My account",
+        "dashboard": "Dashboard",
+        "addresses": "Addresses",
+        "logout": "Logout"
+      }
+    },
     "dashboard": {
       "title": "Price Intelligence Dashboard",
       "loading": "Loading...",
       "error": "Error loading data",
-      "no_products": "No products found"
+      "no_products": "No products found",
+      "competitor_manager": {
+        "title": "Competitor Tracking",
+        "add_button": "Add competitor URL",
+        "limit_info": "competitors",
+        "upgrade_link": "Upgrade for more →",
+        "empty_state": "No competitors added yet. Click \"Add competitor URL\" to get started.",
+        "modal": {
+          "title": "Add competitor URL",
+          "description": "Paste the URL of your competitor's product page",
+          "url_label": "Competitor product URL",
+          "url_placeholder": "https://www.coolblue.nl/product/123456/...",
+          "url_hint": "Examples: Coolblue, Bol.com, Amazon.nl, MediaMarkt, etc.",
+          "cancel": "Cancel",
+          "submit": "Add & scrape now",
+          "loading": "⏳ Scraping..."
+        },
+        "card": {
+          "in_stock": "✓ In stock",
+          "out_stock": "✗ Out of stock",
+          "view_link": "View →",
+          "last_check": "Last check:",
+          "refresh": "Refresh",
+          "delete": "Delete"
+        },
+        "alerts": {
+          "limit_reached": "Competitor limit reached ({{ max }} max). Upgrade your plan for more.",
+          "confirm_delete": "Remove {{ retailer }} from tracking?",
+          "delete_failed": "Failed to remove: {{ error }}",
+          "add_success": "✅ Competitor added!",
+          "add_error": "❌ {{ error }}"
+        }
+      }
     }
   }
 }

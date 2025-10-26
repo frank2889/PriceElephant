@@ -1,10 +1,17 @@
 <!doctype html>
-<html lang="nl-NL">
+<html lang="{{ request.locale.iso_code | default: 'en' }}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} - {{ shop.name }}</title>
     {{ content_for_header }}
+    
+    <!-- SEO: Multi-language hreflang tags -->
+    {% assign base_url = shop.url %}
+    <link rel="alternate" hreflang="en" href="{{ base_url }}{{ request.path }}" />
+    <link rel="alternate" hreflang="nl-NL" href="{{ base_url }}/nl-nl{{ request.path }}" />
+    <link rel="alternate" hreflang="x-default" href="{{ base_url }}{{ request.path }}" />
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
