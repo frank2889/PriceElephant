@@ -1,5 +1,4 @@
 {{ 'priceelephant-dashboard.css' | asset_url | stylesheet_tag }}
-{{ 'priceelephant-dashboard.js' | asset_url | script_tag }}
 
 {% if customer %}
   <div
@@ -140,6 +139,8 @@
     <a href="/account/login" class="pe-button pe-button--primary" style="margin-top: 12px; display: inline-flex;">Naar login</a>
   </div>
 {% endif %}
+
+<script src="{{ 'priceelephant-dashboard.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
