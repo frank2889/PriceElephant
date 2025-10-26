@@ -372,6 +372,14 @@ Overall success rate: 100.0%
 
 **Rollout:** Internal beta voor Hobo.nl team (5 users)
 
+### **Sprint 1 Progress Update (25 oktober 2025)**
+
+- Shopify theme verplaatst naar `theme/` in de root en gekoppeld via bestaande `main` + `shopify-theme` branches zodat GitHub ↔ Shopify integratie actief blijft.
+- Nieuwe `priceelephant-dashboard` section, template en assets live (Liquid + JS + CSS) met login-gating (`{% if customer %}`) en customer context (`data-customer-id`).
+- Dashboard-UI bevat Channable-configuratieformulier, Shopify sync-acties en concurrentbeheer; JavaScript roept placeholder endpoints aan (`/api/v1/channable/*`, `/api/v1/products/*`, `/api/v1/shopify/*`).
+- Thema getest en gepusht naar Shopify; branch validatie verwijderd “is geen theme” fout.
+- Blokkerend: live backend URL ontbreekt nog; zodra Railway deployment rond is kunnen API-calls en metrics geverifieerd worden.
+
 ---
 
 ### **Sprint 2: Scraping at Scale - P1 Launch**
@@ -1096,6 +1104,19 @@ CREATE INDEX idx_email_notifications_customer ON email_notifications(shopify_cus
 
 ---
 
+### **3.4 Railway Deployment Prep (25 oktober 2025)**
+
+- [x] `nixpacks.json` gezet naar `backend` build dir en `NPM_CONFIG_PRODUCTION=false` zodat dev dependencies (Knex CLI) meekomen.
+- [x] `backend/package.json` `start` script vereenvoudigd naar `node server.js` (geen automatische migrations meer).
+- [x] `backend/railway.json` toegevoegd met Nixpacks builder + `npm run start` als `startCommand`.
+- [ ] Oude mislukte Railway service verwijderen en nieuwe service deployen vanuit GitHub (`backend/` directory selecteren).
+- [ ] Railway Postgres en Redis plugins koppelen aan de nieuwe service.
+- [ ] Alle vereiste environment variables instellen (`DATABASE_URL`, `REDIS_URL`, `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SHOPIFY_SCOPES`, `SHOPIFY_ADMIN_URL`, `JWT_SECRET`, etc.).
+- [ ] Na succesvolle deployment handmatig draaien: `railway run "npm run db:migrate"` en optioneel `railway run "npm run db:seed"`.
+- [ ] Nieuwe publieke Railway URL invullen in de Shopify sectie-instellingen (`api_base_url`) en smoke-testen via `/health`.
+
+---
+
 ## 4. B2B SaaS Platform Development ✅
 
 ### **4.1 Shopify-Hosted Dashboard**
@@ -1103,22 +1124,22 @@ CREATE INDEX idx_email_notifications_customer ON email_notifications(shopify_cus
 **Acceptance Criteria:**
 
 - [ ] Shopify store (priceelephant.com) met Customer Accounts enabled
-- [ ] Custom Shopify pages/sections voor dashboard interface (Liquid + JavaScript)
-- [ ] **Dashboard access control**: `/pages/dashboard` alleen voor logged-in customers (`{% if customer %}`)
+- [x] Custom Shopify pages/sections voor dashboard interface (Liquid + JavaScript)
+- [x] **Dashboard access control**: `/pages/dashboard` alleen voor logged-in customers (`{% if customer %}`)
 - [ ] **Subscription status check**: Display trial status, days remaining, upgrade prompts
 - [ ] **Subscription limits enforcement**: Block actions when limits reached (max competitors, max products)
 - [ ] **Stripe Checkout integration**: Embedded upgrade flow in dashboard
 - [ ] Shopify Customer Login voor authenticatie (geen separate login systeem)
 - [ ] **Shopify Products** aangemaakt via Channable feed import (shared products met customer tags)
 - [ ] Platform-agnostic via Channable integration (klanten kunnen elk e-commerce platform gebruiken)
-- [ ] Channable feed configuratie UI in dashboard (Shopify section met form)
+- [x] Channable feed configuratie UI in dashboard (Shopify section met form)
 - [ ] **Native Shopify product data**: titel, prijs, afbeelding, EAN, voorraad via Channable sync
 - [ ] **Metafields alleen voor competitor data**: concurrent prijzen, price history, scraped data
 - [ ] **Product filtering**: Dashboard toont alleen producten met customer tag (`customer-{{ customer.id }}`)
 - [ ] **EAN-based competitor matching**: Scraper zoekt concurrent producten via EAN barcode
 - [ ] **Fallback matching**: SKU matching als EAN niet beschikbaar
-- [ ] **Manual competitor URLs**: UI om handmatig concurrent product URLs toe te voegen per product
-- [ ] **Competitor URL management**: Lijst, toevoegen, verwijderen van handmatige URLs
+- [x] **Manual competitor URLs**: UI om handmatig concurrent product URLs toe te voegen per product
+- [x] **Competitor URL management**: Lijst, toevoegen, verwijderen van handmatige URLs
 - [ ] Real-time competitor pricing dashboard (Nederlandse markt)
 - [ ] Business intelligence widgets en KPI charts (Chart.js in Liquid templates)
 - [ ] Nederlandse interface (taal: NL, valuta: EUR, BTW compliance)
