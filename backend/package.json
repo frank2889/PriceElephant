@@ -11,7 +11,6 @@
     "db:rollback": "knex migrate:rollback --knexfile knexfile.js",
     "db:seed": "knex seed:run --knexfile knexfile.js",
     "db:reset": "npm run db:rollback && npm run db:migrate && npm run db:seed",
-    "postinstall": "npm run db:migrate",
     "test": "NODE_ENV=test jest --coverage --runInBand",
     "lint": "eslint ."
   },
