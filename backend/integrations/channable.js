@@ -101,13 +101,13 @@ class ChannableIntegration {
             externalId: this.getXMLValue(item, 'g:id'),
             ean: this.getXMLValue(item, 'g:gtin') || this.getXMLValue(item, 'g:ean'),
             sku: this.getXMLValue(item, 'g:id'),
-            title: this.getXMLValue(item, 'title'),
+            title: this.getXMLValue(item, 'g:title') || this.getXMLValue(item, 'title'),
             brand: this.getXMLValue(item, 'g:brand'),
             price: parseFloat(this.getXMLValue(item, 'g:price')?.replace(/[^0-9.]/g, '') || 0),
-            url: this.getXMLValue(item, 'link'),
+            url: this.getXMLValue(item, 'g:link') || this.getXMLValue(item, 'link'),
             imageUrl: this.getXMLValue(item, 'g:image_link'),
             category: this.getXMLValue(item, 'g:product_type'),
-            description: this.getXMLValue(item, 'description'),
+            description: this.getXMLValue(item, 'g:description') || this.getXMLValue(item, 'description'),
             inStock: this.getXMLValue(item, 'g:availability') === 'in stock'
         }));
     }
