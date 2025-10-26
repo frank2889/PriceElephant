@@ -20,6 +20,11 @@ class ShopifySyncService {
 
     const startedAt = Date.now();
     try {
+      // Get or create customer collection
+      console.log('📁 Setting up customer collection...');
+      const collectionId = await this.shopify.getOrCreateCustomerCollection(customerId);
+      console.log(`✅ Collection ID: ${collectionId}\n`);
+
       // Get products that haven't been synced yet
       const products = await db('products')
         .where({
@@ -55,8 +60,11 @@ class ShopifySyncService {
             ean: product.product_ean,
             imageUrl: product.image_url,
             channableId: product.channable_product_id,
-            tags: ['PriceElephant', product.brand, product.category].filter(Boolean)
+            tags: ['PriceElephant', `customer-${customerId}`, product.brand, product.category].filter(Boolean)
           });
+
+          // Add product to customer collection
+          await this.shopify.addProductToCollection(shopifyProduct.id, collectionId);
 
           // Update database with Shopify product ID
           await db('products')

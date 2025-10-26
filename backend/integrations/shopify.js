@@ -325,7 +325,92 @@ class ShopifyIntegration {
   }
 
   /**
-   * Bulk create products (for Channable import)
+   * Get or create customer collection
+   * Returns collection ID for the customer
+   */
+  async getOrCreateCustomerCollection(customerId, customerName) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+      const collectionTitle = `PriceElephant - Customer ${customerId}`;
+
+      // Check if collection already exists
+      const searchResponse = await client.get({
+        path: 'custom_collections',
+        query: { title: collectionTitle }
+      });
+
+      if (searchResponse.body.custom_collections && searchResponse.body.custom_collections.length > 0) {
+        const collection = searchResponse.body.custom_collections[0];
+        console.log(`✅ Found existing collection: ${collection.title} (ID: ${collection.id})`);
+        await this.applyRateLimitDelay(searchResponse.headers);
+        return collection.id;
+      }
+
+      // Create new collection
+      const createResponse = await client.post({
+        path: 'custom_collections',
+        data: {
+          custom_collection: {
+            title: collectionTitle,
+            body_html: `Price monitoring products for customer ${customerId}${customerName ? ` (${customerName})` : ''}`,
+            published: false, // Keep private
+            metafields: [
+              {
+                namespace: 'priceelephant',
+                key: 'customer_id',
+                value: String(customerId),
+                type: 'single_line_text_field'
+              }
+            ]
+          }
+        }
+      });
+
+      const collection = createResponse.body.custom_collection;
+      console.log(`✨ Created new collection: ${collection.title} (ID: ${collection.id})`);
+      await this.applyRateLimitDelay(createResponse.headers);
+      return collection.id;
+
+    } catch (error) {
+      console.error('❌ Collection creation/retrieval failed:', error.message);
+      throw this.wrapShopifyError('collection aanmaken', error);
+    }
+  }
+
+  /**
+   * Add product to collection
+   */
+  async addProductToCollection(productId, collectionId) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.post({
+        path: 'collects',
+        data: {
+          collect: {
+            product_id: productId,
+            collection_id: collectionId
+          }
+        }
+      });
+
+      console.log(`✅ Added product ${productId} to collection ${collectionId}`);
+      await this.applyRateLimitDelay(response.headers);
+      return response.body.collect;
+
+    } catch (error) {
+      // Ignore duplicate errors (product already in collection)
+      if (error.message && error.message.includes('already exists')) {
+        console.log(`ℹ️  Product ${productId} already in collection ${collectionId}`);
+        return null;
+      }
+      console.error('❌ Add to collection failed:', error.message);
+      throw this.wrapShopifyError('product toevoegen aan collection', error);
+    }
+  }
+
+  /**
+   * Bulk create products with collection assignment
    */
   async bulkCreateProducts(productsArray) {
     const results = {
