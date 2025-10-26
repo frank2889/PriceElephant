@@ -124,6 +124,24 @@ class ShopifyIntegration {
                 key: 'ean',
                 value: productData.ean || '',
                 type: 'single_line_text_field'
+              },
+              {
+                namespace: 'priceelephant',
+                key: 'competitor_prices',
+                value: JSON.stringify(productData.competitorPrices || []),
+                type: 'json'
+              },
+              {
+                namespace: 'priceelephant',
+                key: 'price_history',
+                value: JSON.stringify(productData.priceHistory || []),
+                type: 'json'
+              },
+              {
+                namespace: 'priceelephant',
+                key: 'last_scraped',
+                value: productData.lastScraped || new Date().toISOString(),
+                type: 'date_time'
               }
             ]
           }

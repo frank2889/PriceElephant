@@ -3,7 +3,7 @@
 ## Project Overview
 
 **Project:** PriceElephant - Webelephant's B2B price intelligence platform  
-**Mission:** Intern voor marketing klanten (Hobo) + extern als white-label B2B SaaS  
+**Mission:** Intern voor marketing klanten + extern als white-label B2B SaaS  
 **Target Market:** Nederlandse e-commerce bedrijven die pricing optimization nodig hebben (internationale uitbreiding volgt later)  
 **Platform:** Shopify-hosted SaaS (priceelephant.com als Shopify store)
 **Frontend & Auth:** Shopify Customer Accounts + Custom Pages/Sections voor dashboard  
@@ -198,7 +198,7 @@ backend/
 │       └── 02_retailer_configs.js
 ├── models/                  # (empty, Sprint 1)
 ├── middleware/              # (empty, Sprint 1)
-├── routes/                  # hobo-routes.js (legacy)
+├── routes/                  # client-routes.js (per-customer endpoints)
 ├── services/                # (empty, Sprint 1)
 ├── utils/                   # (empty, Sprint 1)
 ├── jobs/                    # (empty, Sprint 1)
@@ -327,7 +327,7 @@ Overall success rate: 100.0%
 
 ### **Sprint 1: MVP Core Features - P0 MVP**
 
-**Doel:** Minimaal werkend product voor Hobo.nl internal testing
+**Doel:** Minimaal werkend product voor first customer internal testing
 
 **Team:** 2 backend devs, 1 frontend dev
 
@@ -342,7 +342,7 @@ Overall success rate: 100.0%
   - Product import flow: Channable → Shopify Products
   - EAN-based duplicate detection
   - Customer tags voor multi-tenancy
-  - Test met Hobo.nl Channable feed (500 producten)
+  - Test met pilot customer Channable feed (500 producten)
   
 - [ ] **Shopify Integration**
   - Shopify Admin API authentication (Private App)
@@ -368,9 +368,9 @@ Overall success rate: 100.0%
   - Trigger scraper voor dat product
   - Display results in dashboard
 
-**Success Criteria:** Hobo.nl kan inloggen, Channable products importeren, concurrent prijzen zien
+**Success Criteria:** First customer can login, import Channable products, view competitor prices
 
-**Rollout:** Internal beta voor Hobo.nl team (5 users)
+**Rollout:** Internal beta with pilot customer team (5 users)
 
 ### **Sprint 1 Progress Update (25 oktober 2025)**
 
@@ -419,7 +419,7 @@ Overall success rate: 100.0%
 
 **Success Criteria:** 1000+ producten per dag gescraped, 95%+ success rate, price changes gedetecteerd
 
-**Rollout:** Hobo.nl production scraping starts (500 producten)
+**Rollout:** Pilot customer production scraping starts (500 producten)
 
 ---
 
@@ -1151,7 +1151,7 @@ CREATE INDEX idx_email_notifications_customer ON email_notifications(shopify_cus
 **Acceptance Criteria:**
 
 - [ ] AI-driven pricing optimization engine voor enterprise klanten
-- [ ] Interne klanten (Hobo) krijgen full-service pricing consultancy
+- [ ] Pilot customers krijgen full-service pricing consultancy
 - [ ] White-label deployment voor Webelephant partners
 - [ ] AI-powered pricing recommendations (externe klanten)
 - [ ] Market intelligence dashboard (alle klanten)
@@ -1404,7 +1404,7 @@ class MLPipeline:
 
 ### **8.3 Go-to-Market (Intern + Extern)**
 
-- Interne marketingklanten (zoals Hobo) krijgen priority onboarding en dedicated support.
+- Interne marketingklanten (such as pilot customers) krijgen priority onboarding en dedicated support.
 - Externe SaaS klanten kunnen zich via een self-service funnel aanmelden en direct activeren.
 - White-label partners ontvangen branding kits, documentatie en reseller tooling.
 - Webelephant sales benut bestaande relaties; marketing richt zich op vergelijkbare retailers.
@@ -2171,7 +2171,7 @@ class PricePredictionEngine:
 
 ---
 
-**PROJECT SUCCESS:** PriceElephant als Webelephant B2B service - direct waarde voor interne marketing klanten (Hobo), schaalt extern als white-label enterprise SaaS met AI-first approach zonder externe financiering.
+**PROJECT SUCCESS:** PriceElephant als Webelephant B2B service - direct waarde voor pilot customers, schaalt extern als white-label enterprise SaaS met AI-first approach zonder externe financiering.
 
 **WEBELEPHANT ADVANTAGE:** Directe toegang tot bestaande enterprise klanten, gevestigde B2B infrastructuur, en client vertrouwen zorgt voor immediate ROI en accelerated growth zonder customer acquisition costs voor de enterprise market.
 
@@ -5396,7 +5396,7 @@ Customer mentions competitor
 - [ ] **Marketing**
   - [ ] Landing page live
   - [ ] Demo video recorded (2-3 min)
-  - [ ] Case study ready (Hobo.nl as founding customer)
+  - [ ] Case study ready (Pilot customer as case study)
   - [ ] Shopify App Store listing prepared
   - [ ] Social media accounts created
 

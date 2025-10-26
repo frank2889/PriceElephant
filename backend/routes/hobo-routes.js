@@ -1,7 +1,7 @@
 /**
- * Hobo.nl Dedicated API Routes
+ * Client API Routes (Legacy: previously hobo-routes.js)
  * 
- * Protected routes voor Hobo.nl admin dashboard
+ * Protected routes voor client admin dashboard
  * Vereist API key authenticatie
  */
 
@@ -14,12 +14,12 @@ const authenticateClient = (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
   
   // In productie: check database
-  // Voor nu: hardcoded Hobo.nl key
-  if (apiKey === 'hobo_demo_key' || apiKey?.startsWith('hobo_')) {
+  // Voor nu: demo key voor testing
+  if (apiKey === 'client_demo_key' || apiKey?.startsWith('client_')) {
     req.client = {
       id: 1,
-      name: 'Hobo.nl',
-      shopifyDomain: 'hobo-nl.myshopify.com'
+      name: 'Demo Client',
+      shopifyDomain: 'demo-client.myshopify.com'
     };
     next();
   } else {
@@ -27,7 +27,7 @@ const authenticateClient = (req, res, next) => {
   }
 };
 
-// GET /api/hobo/products - Alle producten van Hobo.nl
+// GET /api/hobo/products - Alle producten voor deze client
 router.get('/products', authenticateClient, async (req, res) => {
   try {
     // TODO: Query database voor Hobo.nl producten
@@ -36,31 +36,31 @@ router.get('/products', authenticateClient, async (req, res) => {
     const products = [
       {
         id: 1,
-        name: 'Hobo Leren Tas - Cognac',
-        sku: 'HOBO-LT-COG-001',
-        ean: '8719327031001',
-        price: 129.95,
+        name: 'Apple AirPods Pro (2nd generation)',
+        sku: 'MTJV3',
+        ean: '194253398578',
+        price: 279.00,
         shopifyProductId: 123456789,
         image: 'https://cdn.shopify.com/...',
         active: true,
         competitors: [
-          { retailer: 'Bol.com', price: 134.99, url: 'https://bol.com/...', lastChecked: new Date() },
-          { retailer: 'Amazon.nl', price: 124.50, url: 'https://amazon.nl/...', lastChecked: new Date() }
+          { retailer: 'Bol.com', price: 284.99, url: 'https://bol.com/...', lastChecked: new Date() },
+          { retailer: 'Coolblue', price: 274.50, url: 'https://coolblue.nl/...', lastChecked: new Date() }
         ],
         lastScraped: new Date()
       },
       {
         id: 2,
-        name: 'Hobo Canvas Rugzak - Navy',
-        sku: 'HOBO-RZ-NAV-002',
-        ean: '8719327031002',
-        price: 89.95,
+        name: 'Samsung Odyssey G9',
+        sku: 'LC49G95TSSUXEN',
+        ean: '8806092613577',
+        price: 1399.00,
         shopifyProductId: 123456790,
         image: 'https://cdn.shopify.com/...',
         active: true,
         competitors: [
-          { retailer: 'Coolblue', price: 94.99, url: 'https://coolblue.nl/...', lastChecked: new Date() },
-          { retailer: 'MediaMarkt', price: 87.50, url: 'https://mediamarkt.nl/...', lastChecked: new Date() }
+          { retailer: 'Coolblue', price: 1449.99, url: 'https://coolblue.nl/...', lastChecked: new Date() },
+          { retailer: 'MediaMarkt', price: 1389.00, url: 'https://mediamarkt.nl/...', lastChecked: new Date() }
         ],
         lastScraped: new Date()
       }
@@ -92,23 +92,23 @@ router.get('/products/:id', authenticateClient, async (req, res) => {
     // TODO: Database query
     const product = {
       id: productId,
-      name: 'Hobo Leren Tas - Cognac',
-      sku: 'HOBO-LT-COG-001',
-      ean: '8719327031001',
-      currentPrice: 129.95,
-      priceHistory: generatePriceHistory(30, 129.95),
+      name: 'Apple AirPods Pro (2nd generation)',
+      sku: 'MTJV3',
+      ean: '194253398578',
+      currentPrice: 279.00,
+      priceHistory: generatePriceHistory(30, 279.00),
       competitors: [
         {
           retailer: 'Bol.com',
-          currentPrice: 134.99,
-          priceHistory: generatePriceHistory(30, 134.99),
+          currentPrice: 284.99,
+          priceHistory: generatePriceHistory(30, 284.99),
           url: 'https://www.bol.com/nl/...'
         },
         {
-          retailer: 'Amazon.nl',
-          currentPrice: 124.50,
-          priceHistory: generatePriceHistory(30, 124.50),
-          url: 'https://www.amazon.nl/...'
+          retailer: 'Coolblue',
+          currentPrice: 274.50,
+          priceHistory: generatePriceHistory(30, 274.50),
+          url: 'https://www.coolblue.nl/...'
         }
       ]
     };
@@ -170,16 +170,16 @@ router.get('/alerts', authenticateClient, async (req, res) => {
     const alerts = [
       {
         id: 1,
-        productName: 'Hobo Leren Tas - Cognac',
+        productName: 'Apple AirPods Pro (2nd generation)',
         type: 'competitor_lower',
-        message: 'Amazon.nl is €5,45 goedkoper',
+        message: 'Coolblue is €4,50 goedkoper',
         createdAt: new Date()
       },
       {
         id: 2,
-        productName: 'Hobo Canvas Rugzak - Navy',
+        productName: 'Samsung Odyssey G9',
         type: 'price_drop',
-        message: 'MediaMarkt heeft prijs verlaagd naar €87,50',
+        message: 'MediaMarkt heeft prijs verlaagd naar €1.389,00',
         createdAt: new Date()
       }
     ];
