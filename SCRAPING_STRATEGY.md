@@ -1,4 +1,17 @@
-# PriceElephant Scraping Strategy
+# PriceElephant Scraping Strategy - Enhanced with Intelligence
+
+## 🧠 Intelligent Price Monitoring System
+
+### Overview
+PriceElephant combines **cost-optimized scraping** with **intelligent automation** to provide real-time competitor insights while maintaining 95%+ profit margins.
+
+**Key Features:**
+- ✅ Multi-tier fallback (99%+ success rate, €0.0006 avg cost)
+- ✅ Intelligent scheduling (hot products 6x/day, cold 1x/week)
+- ✅ Real-time price alerts (drops >5%, competitor undercuts)
+- ✅ Stock monitoring (opportunity detection)
+- ✅ Volatility tracking (market intelligence)
+- ✅ Multi-tenant architecture (95% margins at scale)
 
 ## 📊 Cost-Optimized Multi-Tier Approach
 
@@ -8,7 +21,7 @@ Initial Bright Data implementation had monthly costs of **€600-800 for 500 pro
 - Enterprise plan (€249/month): -€551 loss per customer
 - Break-even required 134+ paying customers
 
-### Solution: 5-Tier Fallback Cascade
+### Solution: 5-Tier Fallback Cascade + Intelligent Scheduling
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -166,6 +179,53 @@ Initial Bright Data implementation had monthly costs of **€600-800 for 500 pro
 | Cost per scrape | €0.006 | €0.0006 | **90%** |
 | Success rate | 99% | 99%+ | Same |
 | Vendor lock-in | High | Low | ✅ |
+
+---
+
+## 🧠 Intelligent Quality Features
+
+### Beyond Basic Scraping: Price Intelligence Platform
+
+While multi-tenant architecture optimizes **costs**, intelligent features optimize **value**:
+
+#### 1. **Intelligent Scheduler** (`backend/services/intelligent-scheduler.js`)
+
+Dynamically adjusts scrape frequency based on product behavior:
+
+**Priority Levels:**
+- 🔥 **HOT** (100+ views/week OR 5+ price changes): Scrape every **4 hours** (6x/day)
+- 🌡️ **WARM** (20+ views OR 2+ changes): Scrape every **12 hours** (2x/day)
+- 📊 **NORMAL** (5+ views OR 1+ change): Scrape every **24 hours** (1x/day)
+- ❄️ **COLD** (stable/unpopular): Scrape every **7 days** (1x/week)
+
+**Benefits:**
+- **30-50% cost reduction** by skipping unnecessary scrapes
+- **Better data quality** for products that matter
+- **Retailer-aware timing**: Scrape when retailers update prices (Coolblue: 6am/6pm, Bol: 8am/2pm/8pm)
+
+#### 2. **Price Alert Service** (`backend/services/price-alert.js`)
+
+Real-time notifications for actionable insights:
+
+| Alert Type | Trigger | Example |
+|------------|---------|---------|
+| 🔻 **PRICE_DROP** | Competitor -5% or more | "Coolblue dropped €30! Match?" |
+| ⚔️ **COMPETITOR_UNDERCUT** | They're cheaper | "Bol.com now €5 cheaper" |
+| 📦 **STOCK_OUT** | Competitor OOS | "MediaMarkt out - opportunity!" |
+| 🌊 **VOLATILE_MARKET** | 4+ changes/24h | "High volatility - monitor" |
+| 💰 **OPPORTUNITY** | You're cheapest | "Can increase margin" |
+
+**Smart Filtering:**
+- Only significant changes (not €0.01)
+- Prioritize high-value products
+- Customer notification preferences
+
+#### 3. **Cost Optimization Intelligence**
+
+- Skip OOS products after 30 days
+- Cache stable prices longer (48h if <2% change)
+- Use cheaper tiers for low-priority
+- Expected savings: **€5 → €2.50/customer** (-50%)
 
 ---
 

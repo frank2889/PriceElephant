@@ -68,10 +68,12 @@ router.post('/run', async (req, res) => {
         const scrapeResults = await scraper.scrapeAllRetailers(
           product.id,
           product.product_ean,
-          urls
+          urls,
+          customerId // Pass customerId for intelligent scheduling and alerts
         );
 
-        const successCount = scrapeResults.filter(r => !r.error).length;
+        const successCount = scrapeResults.filter(r => !r.error && !r.skipped).length;
+        const skippedCount = scrapeResults.filter(r => r.skipped).length;
         const productCost = scrapeResults.reduce((sum, r) => sum + (r.cost || 0), 0);
 
         results.products.push({
@@ -79,7 +81,8 @@ router.post('/run', async (req, res) => {
           name: product.product_name,
           ean: product.product_ean,
           success_count: successCount,
-          failed_count: scrapeResults.length - successCount,
+          skipped_count: skippedCount,
+          failed_count: scrapeResults.length - successCount - skippedCount,
           cost: productCost,
           retailers: scrapeResults
         });
@@ -88,7 +91,7 @@ router.post('/run', async (req, res) => {
 
         if (successCount > 0) {
           results.scraped++;
-        } else {
+        } else if (skippedCount === 0) {
           results.failed++;
         }
 

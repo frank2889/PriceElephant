@@ -721,14 +721,34 @@ Overall success rate: 100.0%
 
 **Deliverables:**
 
-- [ ] **Marketing Site**
-  - Homepage (priceelephant.com)
-  - Pricing page met tier comparison
-  - Features page
-  - FAQ page
-  - Contact form
-  - Privacy policy + Terms of Service
-  - Cookie consent banner (GDPR)
+- [x] **Marketing Site**
+  - [x] Homepage (priceelephant.com)
+    - Hero: "Win altijd op prijs" met CTA buttons
+    - 6 feature cards (monitoring, intelligence, alerts, AI, integration, insights)
+    - Pricing tabel (Trial €0 → Enterprise €249)
+    - Social proof sectie (10K+ products, 99.9% success, 24/7)
+    - Personalized voor logged-in users
+  - [x] Features page (page.features.liquid)
+    - 6 gedetailleerde feature blokken met uitleg
+    - Alternerende layout (visual links/rechts)
+    - CTA sectie onderaan
+  - [x] Header met dropdown menu
+    - Logo met 🐘 emoji
+    - Main nav: Tarieven, Features, Dashboard
+    - Customer dropdown: Mijn account, Dashboard, Adressen, Uitloggen
+    - Avatar met eerste letter naam
+    - "Start gratis trial" button voor guests
+  - [x] **i18n Localization (nl.json)**
+    - Alle content via Shopify locales (theme/locales/nl.json)
+    - Structured keys: priceelephant.homepage.hero.title, etc.
+    - Template gebruik: `{{ 'key' | t }}` en `{{ 'key' | t: name: value }}`
+    - JavaScript i18n: translations passed via JSON filter
+    - Future-proof: easy to add en.json, de.json
+  - [ ] Pricing page (standalone /pages/pricing)
+  - [ ] FAQ page
+  - [ ] Contact form
+  - [ ] Privacy policy + Terms of Service
+  - [ ] Cookie consent banner (GDPR)
   
 - [ ] **Onboarding Flow**
   - Sign up form (Shopify Customer Accounts)
@@ -760,6 +780,154 @@ Overall success rate: 100.0%
 **Success Criteria:** New user kan binnen 10 min account maken + first insights zien, security passed
 
 **Rollout:** Public beta launch (50 trial users via Webelephant network)
+
+---
+
+### **📋 Sprint 4 Status: Marketing Site**
+
+**Status:** ✅ **Homepage & Features COMPLEET** (26 oktober 2025)
+
+**Gerealiseerd:**
+
+1. **Homepage (index.liquid)** ✅
+   - Hero sectie met dynamic content:
+     - Logged-in: "Welkom terug, {{ name }}!" + dashboard CTA
+     - Guest: "Win altijd op prijs" + trial/pricing CTAs
+   - 6 Feature cards met emoji icons
+   - Pricing grid (4 plans: Trial, Starter, Professional, Enterprise)
+   - Social proof stats (10K+ products, 99.9% success, 24/7 monitoring)
+   - Fully responsive design
+   - Purple design system (#7C3AED)
+
+2. **Features Page (page.features.liquid)** ✅
+   - Hero: "Krachtige features voor slimme prijzen"
+   - 6 Feature blocks met alternerende layout:
+     - 🔍 Real-time prijsmonitoring (24/7, 99.9% success rate)
+     - 🚨 Intelligente prijsalerts (SMS + email via Klaviyo)
+     - 🤖 AI-aangedreven scraping (GPT-4, learns & adapts)
+     - ⚡ Naadloze integratie (Channable feed, self-service)
+     - 📊 Actiegerichte inzichten (charts, trends, reports)
+     - 🎯 Self-service beheer (add competitor URLs zelf)
+   - Each block: title, description, 5 bullet points
+   - CTA sectie: "Klaar om te winnen op prijs?"
+
+3. **Header (sections/header.liquid)** ✅
+   - Logo: 🐘 + shop name
+   - Main navigation:
+     - Tarieven (scroll to #pricing)
+     - Features (/pages/features)
+     - Dashboard (/pages/dashboard - for customers)
+   - Auth navigation (not logged in):
+     - "Inloggen" link
+     - "Start gratis trial" button (primary CTA)
+   - Customer dropdown (logged in):
+     - Avatar circle met eerste letter naam
+     - Dropdown menu (hover):
+       - 👤 Mijn account
+       - 📊 Dashboard
+       - 📍 Adressen
+       - 🚪 Uitloggen
+   - Fully responsive (mobile: hide main nav, show avatar only)
+
+4. **Internationalization (i18n)** ✅
+   - File: `theme/locales/nl.json` (300+ lines)
+   - Structured namespaces:
+     ```
+     priceelephant.
+       ├── homepage (hero, features, pricing, social_proof)
+       ├── features_page (monitoring, alerts, ai_scraping, etc.)
+       ├── header (nav, auth, account_menu)
+       └── dashboard (competitor_manager - ready for future)
+     ```
+   - Template usage:
+     - Simple: `{{ 'priceelephant.homepage.hero.title' | t }}`
+     - With variables: `{{ 'priceelephant.homepage.hero.welcome_back' | t: name: customer.first_name }}`
+     - Arrays in pricing: `features: "item1||item2||item3"` split in template
+   - JavaScript i18n:
+     - Translations passed via `{{ 'key' | t | json }}` filter
+     - Safe JSON output for use in JS
+     - Example: CompetitorManager accepts translations object
+   - HTML lang tag: `<html lang="nl-NL">`
+   - Future-ready: easy to add `en.default.json`, `de.json`
+
+5. **Self-Service Competitor Manager** ✅
+   - File: `theme/assets/competitor-manager.js` (updated)
+   - Constructor accepts `translations` param
+   - Dynamic UI text from locales
+   - Modal, buttons, alerts all translatable
+   - Example dashboard: `page.dashboard-simple.liquid`
+   - Shows how to pass Shopify translations to JavaScript
+
+6. **Design System** ✅
+   - Purple theme: #7C3AED (primary), #A78BFA (light), #2E1065 (dark)
+   - Typography: Inter font family
+   - Components:
+     - `.btn-large` (hero CTAs)
+     - `.feature-card` (hover lift effect)
+     - `.pricing-card` (with featured badge)
+     - `.customer-dropdown` (hover menu)
+   - Consistent spacing, shadows, border-radius
+   - Mobile-first responsive grid
+
+**Architecture Decisions:**
+
+1. **Why Liquid templates over React/Vue?**
+   - Shopify native = no build step
+   - SEO-friendly (server-rendered)
+   - Fast page loads
+   - Easy for marketers to edit
+   - Can add JS components where needed (CompetitorManager)
+
+2. **Why locales over hardcoded strings?**
+   - Single source of truth for all copy
+   - Easy content updates without touching code
+   - Multi-language ready (add en.json)
+   - Reusable across templates
+   - Client can edit via Shopify admin
+
+3. **Why emoji icons vs icon library?**
+   - No external dependencies
+   - Instant load (no HTTP requests)
+   - Universal (work everywhere)
+   - Easy to change
+   - Personality + playfulness
+
+4. **Why inline styles in some places?**
+   - Scoped to template (no CSS conflicts)
+   - Shopify theme editor can't edit external CSS easily
+   - Quick prototyping
+   - Production: move to .css asset files
+
+**Next Steps:**
+
+- [ ] Create standalone Pricing page (/pages/pricing)
+- [ ] FAQ page with accordion components
+- [ ] Contact form (Shopify form or Klaviyo integration)
+- [ ] Privacy Policy + Terms of Service (legal templates)
+- [ ] Cookie consent (GDPR compliant - CookieYes or similar)
+- [ ] Add meta descriptions for SEO
+- [ ] Open Graph tags (social sharing)
+- [ ] Favicon + apple-touch-icon
+- [ ] Google Analytics / Plausible integration
+
+**Testing Checklist:**
+
+- [ ] Test homepage logged in vs logged out
+- [ ] Test all navigation links work
+- [ ] Test customer dropdown menu (hover + click)
+- [ ] Test mobile responsive (320px, 768px, 1024px)
+- [ ] Test all CTA buttons go to correct pages
+- [ ] Verify pricing numbers match subscription_plans table
+- [ ] Check translations render correctly (no missing keys)
+- [ ] Test with long customer names (UI breaks?)
+- [ ] Cross-browser: Chrome, Safari, Firefox, Edge
+
+**Performance:**
+
+- Homepage load: Target <1s (no external JS yet)
+- Lighthouse score: Target 90+ (mobile)
+- i18n overhead: Minimal (Liquid is fast)
+- Images: Need to optimize/compress (use Shopify CDN)
 
 ---
 
@@ -811,16 +979,60 @@ Overall success rate: 100.0%
 
 ---
 
+### **Scale Phase: Intelligence Features - P3 (Phase 2+)**
+
+**Focus:** Premium differentiation, USP features, competitive advantage
+
+**⚠️ IMPORTANT:** Deze features worden ALLEEN gebouwd als klanten erom vragen. Focus eerst op solid basics.
+
+**Phase 1 (NOW - Sprint 1-2):**
+- ✅ Simple 4-tier scraper (Direct → Free Proxy → WebShare → AI Vision emergency)
+- ✅ Basic price alerts via Klaviyo (price drop >5%, competitor undercut, stock changes)
+- ✅ 12h caching (simple timestamp check)
+- **Target:** €30-50/month scraping costs, 95%+ margins, solid foundation
+
+**Phase 2 (Sprint 7-9 - IF customers need it):**
+- [ ] **Multi-tenant scraping** - EAN deduplication across customers (€5/customer vs €50)
+- [ ] **Smart caching** - Cache stable prices 24-48h, skip OOS products
+- [ ] **Intelligent scheduler** - Hot products 4x/day, cold 1x/week
+- [ ] **Advanced alerts** - Volatility tracking, pricing opportunities, market intelligence
+- **Target:** €2.50/customer costs, 97.5%+ margins, premium features justify €99+ plans
+
+**Phase 3 (Sprint 10-12 - IF proven demand):**
+- [ ] **Predictive AI** - Price forecasting met 90%+ accuracy
+  - [ ] Basic demand forecasting (competitive parity met Competera/Wiser)
+  - [ ] Price elasticity modeling
+  - [ ] Predictive alerts ("concurrent gaat waarschijnlijk prijs verlagen")
+- [ ] **Automatic repricing** - Rule-based price adjustments
+- [ ] **ML-powered insights** - Pattern detection, seasonality, competitor behavior
+- **Target:** Premium add-on €49/month, Enterprise USP
+
+**Why this phasing?**
+- ✅ MVP first: Solid basics beat fancy features nobody uses
+- ✅ Learn from customers: Build what they actually need
+- ✅ Cost control: Don't over-engineer before product-market fit
+- ✅ Speed to market: Launch faster, iterate based on real usage
+
+**Decision triggers for Phase 2:**
+- 20+ paying customers requesting "real-time" updates
+- Customer churn due to "data not fresh enough"
+- Competitors launching similar features
+- Scraping costs >€100/customer (multi-tenant becomes ROI positive)
+
+**Decision triggers for Phase 3:**
+- 50+ Enterprise customers (€249/month)
+- Direct requests for price prediction from 10+ customers
+- Market research shows AI = #1 competitor differentiator
+- Budget for ML engineer (€80K+ salary)
+
+---
+
 ### **Scale Phase: Enterprise Features - P3**
 
 **Focus:** Enterprise differentiation, vendor lock-in, international expansion, competitive parity
 
 **Deliverables:**
 
-- [ ] **Predictive AI (Sprint 10-12)** - Price forecasting met 90%+ accuracy
-  - [ ] Basic demand forecasting (competitive parity met Competera/Wiser)
-  - [ ] Price elasticity modeling
-  - [ ] Predictive alerts ("concurrent gaat waarschijnlijk prijs verlagen")
 - [ ] Brand protection monitoring
 - [ ] Advanced analytics dashboard
 - [ ] International expansion (DE, BE markets)

@@ -1,6 +1,13 @@
 /**
- * AI Vision Scraper - GPT-4 Vision fallback for failed selector-based scraping
- * Selector-free scraping using computer vision
+ * AI Vision Scraper - GPT-4 Vision emergency fallback
+ * 
+ * ONLY used when all other tiers fail:
+ * - Direct scraping failed
+ * - Free proxies failed
+ * - WebShare failed
+ * 
+ * Cost: ~€0.02/request (expensive!)
+ * Use case: Emergency backup to guarantee 99.9%+ success rate
  */
 
 require('dotenv').config();
@@ -8,45 +15,49 @@ const OpenAI = require('openai');
 
 class AIVisionScraper {
   constructor() {
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('⚠️  OPENAI_API_KEY not set - AI Vision fallback disabled');
+      this.enabled = false;
+      return;
+    }
+    
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     });
+    this.enabled = true;
   }
 
   /**
    * Extract product data from screenshot using GPT-4 Vision
    */
   async extractFromScreenshot(screenshotBase64, productUrl) {
+    if (!this.enabled) {
+      throw new Error('AI Vision is disabled - OPENAI_API_KEY not configured');
+    }
+
     try {
-      console.log('🤖 Using AI Vision fallback...');
+      console.log('🤖 AI Vision emergency fallback (€0.02 cost)...');
 
       const response = await this.client.chat.completions.create({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o',  // Latest model with vision
         messages: [{
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `Extract product information from this e-commerce page screenshot.
+              text: `Extract product price from this Dutch e-commerce page screenshot.
               
-              Return ONLY valid JSON with this exact structure:
+              Return ONLY valid JSON:
               {
                 "title": "Product name",
                 "price": 99.99,
-                "currency": "EUR",
-                "in_stock": true,
-                "promotional_price": null,
-                "original_price": null,
-                "shipping_cost": null,
-                "confidence": 0.95
+                "in_stock": true
               }
               
               Rules:
-              - price must be a number (use decimal point, not comma)
-              - in_stock is boolean (true if "op voorraad", "in stock", green indicator)
-              - promotional_price if there's a sale/discount badge
-              - confidence between 0-1 based on text clarity
-              - Return null for fields you cannot determine
+              - price as number (decimal point)
+              - in_stock is boolean (check for "op voorraad", green indicator, "bestel" button)
+              - Return null if you cannot find the price
               
               NO explanations, ONLY JSON.`
             },
@@ -58,8 +69,8 @@ class AIVisionScraper {
             }
           ]
         }],
-        max_tokens: 500,
-        temperature: 0.1 // Low temperature for consistent extraction
+        max_tokens: 300,
+        temperature: 0
       });
 
       const content = response.choices[0].message.content;
@@ -72,15 +83,19 @@ class AIVisionScraper {
 
       const data = JSON.parse(jsonMatch[0]);
 
-      console.log(`✅ AI Vision extracted: ${data.title} - €${data.price} (confidence: ${data.confidence})`);
+      if (!data.price || data.price <= 0) {
+        throw new Error('AI could not extract valid price');
+      }
+
+      console.log(`✅ AI Vision: ${data.title} - €${data.price}`);
 
       return {
         title: data.title,
         price: parseFloat(data.price),
-        inStock: data.in_stock,
-        promotionalPrice: data.promotional_price ? parseFloat(data.promotional_price) : null,
-        confidence: data.confidence,
-        extractedBy: 'ai-vision'
+        inStock: data.in_stock !== false, // Default to true if unclear
+        currency: 'EUR',
+        extractedBy: 'ai-vision',
+        scrapedAt: new Date().toISOString()
       };
 
     } catch (error) {

@@ -1,27 +1,425 @@
 {% layout 'theme' %}
 
-<div class="home-content">
+<style>
+  .homepage-hero {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95) 0%, rgba(167, 139, 250, 0.9) 100%),
+                url('https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1920&q=80') center/cover;
+    color: white;
+    padding: 8rem 2rem 6rem;
+    text-align: center;
+    position: relative;
+  }
+  
+  .homepage-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.85) 0%, rgba(167, 139, 250, 0.75) 100%);
+    z-index: 1;
+  }
+  
+  .homepage-hero .container {
+    position: relative;
+    z-index: 2;
+  }
+  
+  .homepage-hero h1 {
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .homepage-hero .subtitle {
+    font-size: 1.5rem;
+    font-weight: 300;
+    margin-bottom: 3rem;
+    opacity: 0.95;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+  
+  .cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .btn-large {
+    padding: 1.25rem 2.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .btn-large:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  }
+  
+  .btn-white {
+    background: white;
+    color: #7C3AED;
+  }
+  
+  .btn-outline {
+    background: transparent;
+    color: white;
+    border: 2px solid white;
+  }
+  
+  .features-section {
+    padding: 5rem 2rem;
+    background: #F9FAFB;
+  }
+  
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .feature-card {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+  }
+  
+  .feature-icon {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .feature-card h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1F2937;
+  }
+  
+  .feature-card p {
+    color: #6B7280;
+    line-height: 1.6;
+  }
+  
+  .pricing-section {
+    padding: 5rem 2rem;
+    background: white;
+  }
+  
+  .pricing-header {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+  
+  .pricing-header h2 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    color: #1F2937;
+  }
+  
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .pricing-card {
+    background: white;
+    border: 2px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 2.5rem;
+    text-align: center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  
+  .pricing-card:hover {
+    border-color: #7C3AED;
+    box-shadow: 0 8px 16px rgba(124, 58, 237, 0.1);
+  }
+  
+  .pricing-card.featured {
+    border-color: #7C3AED;
+    border-width: 3px;
+    position: relative;
+  }
+  
+  .pricing-badge {
+    background: #7C3AED;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 1rem;
+  }
+  
+  .pricing-card h3 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1F2937;
+  }
+  
+  .pricing-amount {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #7C3AED;
+    margin-bottom: 0.5rem;
+  }
+  
+  .pricing-period {
+    color: #6B7280;
+    margin-bottom: 2rem;
+  }
+  
+  .pricing-features {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0;
+    text-align: left;
+  }
+  
+  .pricing-features li {
+    padding: 0.75rem 0;
+    color: #374151;
+    display: flex;
+    align-items: start;
+    gap: 0.75rem;
+  }
+  
+  .pricing-features li:before {
+    content: "✓";
+    color: #10B981;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  
+  .social-proof {
+    background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+  
+  .social-proof h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 3rem;
+    color: #1F2937;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 3rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  
+  .stat-item {
+    text-align: center;
+  }
+  
+  .stat-number {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #7C3AED;
+    margin-bottom: 0.5rem;
+  }
+  
+  .stat-label {
+    color: #6B7280;
+    font-size: 1.125rem;
+  }
+  
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+</style>
+
+<!-- Hero Section -->
+<section class="homepage-hero">
   <div class="container">
-    <div class="hero-section" style="text-align: center; padding: 4rem 0;">
-      <h1 style="font-size: 3rem; margin-bottom: 1rem;">Welcome to PriceElephant</h1>
-      <p style="font-size: 1.25rem; color: var(--text-medium); margin-bottom: 2rem;">
-        Your intelligent price monitoring solution
-      </p>
-      
-      {% if customer %}
-        <a href="/pages/dashboard" class="btn btn-primary" style="display: inline-block; padding: 1rem 2rem; background: var(--primary-purple); color: white; border-radius: 8px; font-weight: 600; text-decoration: none;">
-          Go to Dashboard
+    {% if customer %}
+      <h1>{{ 'priceelephant.homepage.hero.welcome_back' | t: name: customer.first_name }}</h1>
+      <p class="subtitle">{{ 'priceelephant.homepage.hero.welcome_subtitle' | t }}</p>
+      <div class="cta-buttons">
+        <a href="/pages/dashboard" class="btn-large btn-white">
+          {{ 'priceelephant.homepage.hero.cta_dashboard' | t }}
         </a>
-      {% else %}
-        <div style="display: flex; gap: 1rem; justify-content: center;">
-          <a href="/account/login" class="btn btn-primary" style="display: inline-block; padding: 1rem 2rem; background: var(--primary-purple); color: white; border-radius: 8px; font-weight: 600; text-decoration: none;">
-            Login
-          </a>
-          <a href="/account/register" class="btn btn-secondary" style="display: inline-block; padding: 1rem 2rem; background: white; color: var(--primary-purple); border: 2px solid var(--primary-purple); border-radius: 8px; font-weight: 600; text-decoration: none;">
-            Get Started
-          </a>
-        </div>
-      {% endif %}
+      </div>
+    {% else %}
+      <h1>{{ 'priceelephant.homepage.hero.title' | t }}</h1>
+      <p class="subtitle">
+        {{ 'priceelephant.homepage.hero.subtitle' | t }}
+      </p>
+      <div class="cta-buttons">
+        <a href="/account/register" class="btn-large btn-white">
+          {{ 'priceelephant.homepage.hero.cta_trial' | t }}
+        </a>
+        <a href="#pricing" class="btn-large btn-outline">
+          {{ 'priceelephant.homepage.hero.cta_pricing' | t }}
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+  <div class="container">
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>{{ 'priceelephant.homepage.features.monitoring.title' | t }}</h3>
+        <p>{{ 'priceelephant.homepage.features.monitoring.description' | t }}</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>{{ 'priceelephant.homepage.features.intelligence.title' | t }}</h3>
+        <p>{{ 'priceelephant.homepage.features.intelligence.description' | t }}</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🚨</div>
+        <h3>{{ 'priceelephant.homepage.features.alerts.title' | t }}</h3>
+        <p>{{ 'priceelephant.homepage.features.alerts.description' | t }}</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>{{ 'priceelephant.homepage.features.ai_scraping.title' | t }}</h3>
+        <p>{{ 'priceelephant.homepage.features.ai_scraping.description' | t }}</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>{{ 'priceelephant.homepage.features.integration.title' | t }}</h3>
+        <p>{{ 'priceelephant.homepage.features.integration.description' | t }}</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">📈</div>
+        <h3>{{ 'priceelephant.homepage.features.insights.title' | t }}</h3>
+        <p>{{ 'priceelephant.homepage.features.insights.description' | t }}</p>
+      </div>
     </div>
   </div>
-</div>
+</section>
+
+<!-- Pricing Section -->
+<section id="pricing" class="pricing-section">
+  <div class="container">
+    <div class="pricing-header">
+      <h2>{{ 'priceelephant.homepage.pricing.title' | t }}</h2>
+      <p style="color: #6B7280; font-size: 1.125rem;">{{ 'priceelephant.homepage.pricing.subtitle' | t }}</p>
+    </div>
+    
+    <div class="pricing-grid">
+      <!-- Trial Plan -->
+      <div class="pricing-card">
+        <h3>{{ 'priceelephant.homepage.pricing.trial.name' | t }}</h3>
+        <div class="pricing-amount">{{ 'priceelephant.homepage.pricing.trial.price' | t }}</div>
+        <div class="pricing-period">{{ 'priceelephant.homepage.pricing.trial.period' | t }}</div>
+        <ul class="pricing-features">
+          {% for feature in (0..4) %}
+            <li>{{ 'priceelephant.homepage.pricing.trial.features' | t | split: '||' | slice: feature }}</li>
+          {% endfor %}
+        </ul>
+        <a href="/account/register" class="btn-large btn-outline" style="width: 100%; color: #7C3AED; border-color: #7C3AED;">
+          {{ 'priceelephant.homepage.pricing.trial.cta' | t }}
+        </a>
+      </div>
+      
+      <!-- Starter Plan -->
+      <div class="pricing-card">
+        <h3>{{ 'priceelephant.homepage.pricing.starter.name' | t }}</h3>
+        <div class="pricing-amount">{{ 'priceelephant.homepage.pricing.starter.price' | t }}</div>
+        <div class="pricing-period">{{ 'priceelephant.homepage.pricing.starter.period' | t }}</div>
+        <ul class="pricing-features">
+          {% for feature in (0..5) %}
+            <li>{{ 'priceelephant.homepage.pricing.starter.features' | t | split: '||' | slice: feature }}</li>
+          {% endfor %}
+        </ul>
+        <a href="/account/register" class="btn-large" style="background: #7C3AED; color: white; width: 100%;">
+          {{ 'priceelephant.homepage.pricing.starter.cta' | t }}
+        </a>
+      </div>
+      
+      <!-- Professional Plan (Featured) -->
+      <div class="pricing-card featured">
+        <span class="pricing-badge">{{ 'priceelephant.homepage.pricing.professional.badge' | t }}</span>
+        <h3>{{ 'priceelephant.homepage.pricing.professional.name' | t }}</h3>
+        <div class="pricing-amount">{{ 'priceelephant.homepage.pricing.professional.price' | t }}</div>
+        <div class="pricing-period">{{ 'priceelephant.homepage.pricing.professional.period' | t }}</div>
+        <ul class="pricing-features">
+          {% for feature in (0..6) %}
+            <li>{{ 'priceelephant.homepage.pricing.professional.features' | t | split: '||' | slice: feature }}</li>
+          {% endfor %}
+        </ul>
+        <a href="/account/register" class="btn-large" style="background: #7C3AED; color: white; width: 100%;">
+          {{ 'priceelephant.homepage.pricing.professional.cta' | t }}
+        </a>
+      </div>
+      
+      <!-- Enterprise Plan -->
+      <div class="pricing-card">
+        <h3>{{ 'priceelephant.homepage.pricing.enterprise.name' | t }}</h3>
+        <div class="pricing-amount">{{ 'priceelephant.homepage.pricing.enterprise.price' | t }}</div>
+        <div class="pricing-period">{{ 'priceelephant.homepage.pricing.enterprise.period' | t }}</div>
+        <ul class="pricing-features">
+          {% for feature in (0..6) %}
+            <li>{{ 'priceelephant.homepage.pricing.enterprise.features' | t | split: '||' | slice: feature }}</li>
+          {% endfor %}
+        </ul>
+        <a href="/pages/contact" class="btn-large btn-outline" style="width: 100%; color: #7C3AED; border-color: #7C3AED;">
+          {{ 'priceelephant.homepage.pricing.enterprise.cta' | t }}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Social Proof -->
+<section class="social-proof">
+  <div class="container">
+    <h2>{{ 'priceelephant.homepage.social_proof.title' | t }}</h2>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-number">10K+</div>
+        <div class="stat-label">{{ 'priceelephant.homepage.social_proof.stats.products' | t }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">99.9%</div>
+        <div class="stat-label">{{ 'priceelephant.homepage.social_proof.stats.success_rate' | t }}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">24/7</div>
+        <div class="stat-label">{{ 'priceelephant.homepage.social_proof.stats.monitoring' | t }}</div>
+      </div>
+    </div>
+  </div>
+</section>
