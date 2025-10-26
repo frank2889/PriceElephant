@@ -1109,11 +1109,12 @@ CREATE INDEX idx_email_notifications_customer ON email_notifications(shopify_cus
 - [x] `nixpacks.json` gezet naar `backend` build dir en `NPM_CONFIG_PRODUCTION=false` zodat dev dependencies (Knex CLI) meekomen.
 - [x] `backend/package.json` `start` script vereenvoudigd naar `node server.js` (geen automatische migrations meer).
 - [x] `backend/railway.json` toegevoegd met Nixpacks builder + `npm run start` als `startCommand`.
-- [ ] Oude mislukte Railway service verwijderen en nieuwe service deployen vanuit GitHub (`backend/` directory selecteren).
-- [ ] Railway Postgres en Redis plugins koppelen aan de nieuwe service.
-- [ ] Alle vereiste environment variables instellen (`DATABASE_URL`, `REDIS_URL`, `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SHOPIFY_SCOPES`, `SHOPIFY_ADMIN_URL`, `JWT_SECRET`, etc.).
-- [ ] Na succesvolle deployment handmatig draaien: `railway run "npm run db:migrate"` en optioneel `railway run "npm run db:seed"`.
-- [ ] Nieuwe publieke Railway URL invullen in de Shopify sectie-instellingen (`api_base_url`) en smoke-testen via `/health`.
+- [x] Oude mislukte Railway service verwijderd en nieuwe service gedeployed vanuit GitHub (`backend/` directory selecteren) → live sinds 26 oktober 2025.
+- [x] Railway Postgres en Redis plugins gekoppeld aan de nieuwe service (DATABASE_URL/REDIS_URL refs geactiveerd).
+- [x] Alle vereiste environment variables ingesteld (`DATABASE_URL`, `REDIS_URL`, `NODE_ENV=production`, Shopify secrets, JWT secret) via Railway Variables tab.
+- [x] Startcommand draait automatisch `npm run db:migrate`; eerste boot bevestigt Batch 1 migraties. Seeding optioneel (`railway run "npm run db:seed"`) blijft als handmatige stap.
+- [ ] Nieuwe publieke Railway URL invullen in de Shopify sectie-instellingen (`api_base_url`).
+- [x] Smoke-test via `/health` bevestigd (`status":"ok"` op 26 oktober 2025).
 
 ---
 
