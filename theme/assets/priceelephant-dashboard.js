@@ -1,12 +1,21 @@
 (function () {
   console.log('[PriceElephant] Dashboard script gestart');
   
+  // Debug helpers
+  function updateDebug(key, value) {
+    const el = document.getElementById(`pe-debug-${key}`);
+    if (el) el.textContent = value;
+  }
+  
   const root = document.getElementById('priceelephant-dashboard-root');
   if (!root) {
     console.error('[PriceElephant] Root element niet gevonden: #priceelephant-dashboard-root');
+    updateDebug('script', '❌ Root niet gevonden');
     return;
   }
 
+  updateDebug('script', '✅ Script geladen');
+  
   const customerId = root.dataset.customerId;
   const apiBaseUrl = (root.dataset.apiBaseUrl || '').replace(/\/$/, '');
   
@@ -322,6 +331,7 @@
   async function handleChannableSubmit(event) {
     event.preventDefault();
     console.log('[PriceElephant] Channable form submit triggered');
+    updateDebug('action', '📝 Channable config opslaan...');
     
     showStatus(channableStatus, '', null);
 
@@ -339,6 +349,7 @@
 
     if (!payload.feedUrl && !(payload.companyId && payload.projectId && payload.apiToken)) {
       showStatus(channableStatus, 'Vul een feed URL in of alle API-velden.', 'error');
+      updateDebug('error', 'Validatie fout: ontbrekende velden');
       return;
     }
 
@@ -351,9 +362,12 @@
       });
       console.log('[PriceElephant] Channable config saved successfully');
       showStatus(channableStatus, 'Channable-configuratie opgeslagen.', 'success');
+      updateDebug('action', '✅ Config opgeslagen');
+      updateDebug('error', 'Geen');
     } catch (error) {
       console.error('[PriceElephant] Channable config error:', error);
       showStatus(channableStatus, `Opslaan mislukt: ${error.message}`, 'error');
+      updateDebug('error', error.message);
     } finally {
       setLoading(channableForm.querySelector('button[type="submit"]'), false);
     }
@@ -361,6 +375,7 @@
 
   async function handleChannableImport() {
     console.log('[PriceElephant] Channable import button clicked');
+    updateDebug('action', '📥 Channable import starten...');
     
     showStatus(channableStatus, '', null);
     setLoading(channableImportBtn, true);
@@ -477,30 +492,40 @@
       competitorForm: !!competitorForm
     });
     
+    let listenersCount = 0;
+    
     if (channableForm) {
       channableForm.addEventListener('submit', handleChannableSubmit);
       console.log('[PriceElephant] Channable form listener attached');
+      listenersCount++;
     }
     
     if (channableImportBtn) {
       channableImportBtn.addEventListener('click', handleChannableImport);
       console.log('[PriceElephant] Channable import button listener attached');
+      listenersCount++;
     }
     
     if (shopifySyncBtn) {
       shopifySyncBtn.addEventListener('click', () => handleShopifySync(false));
       console.log('[PriceElephant] Shopify sync button listener attached');
+      listenersCount++;
     }
     
     if (shopifySyncAllBtn) {
       shopifySyncAllBtn.addEventListener('click', () => handleShopifySync(true));
       console.log('[PriceElephant] Shopify sync all button listener attached');
+      listenersCount++;
     }
     
     if (competitorForm) {
       competitorForm.addEventListener('submit', handleCompetitorSubmit);
       console.log('[PriceElephant] Competitor form listener attached');
+      listenersCount++;
     }
+    
+    updateDebug('listeners', `✅ ${listenersCount} listeners`);
+  
 
     productsBody.addEventListener('click', (event) => {
       const target = event.target;
