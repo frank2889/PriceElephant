@@ -157,68 +157,32 @@
       "monitoring": {
         "title": "🔍 Real-time prijsmonitoring",
         "description": "Onze AI-scraper monitort concurrent prijzen 24/7, zodat je nooit een prijswijziging mist. Ontvang directe updates wanneer concurrenten hun prijzen aanpassen.",
-        "features": [
-          "Monitor onbeperkt concurrenten (Enterprise)",
-          "12-uurs refresh cycles houden data actueel",
-          "Werkt op elke e-commerce website",
-          "AI past zich aan wanneer websites wijzigen",
-          "99.9% scraping success rate"
-        ]
+        "features": "Monitor onbeperkt concurrenten (Enterprise)||12-uurs refresh cycles houden data actueel||Werkt op elke e-commerce website||AI past zich aan wanneer websites wijzigen||99.9% scraping success rate"
       },
       "alerts": {
         "title": "🚨 Intelligente prijsalerts",
         "description": "Word nooit verrast door prijswijzigingen van concurrenten. Ontvang SMS en email alerts wanneer actie vereist is.",
-        "features": [
-          "SMS alerts bij kritieke prijsdalingen (>15%)",
-          "Email notificaties bij concurrent undercutting",
-          "Voorraad alerts onthullen kansen",
-          "Aanpasbare alert drempels",
-          "Geïntegreerd met Klaviyo voor automatisering"
-        ]
+        "features": "SMS alerts bij kritieke prijsdalingen (>15%)||Email notificaties bij concurrent undercutting||Voorraad alerts onthullen kansen||Aanpasbare alert drempels||Geïntegreerd met Klaviyo voor automatisering"
       },
       "ai_scraping": {
         "title": "🤖 AI-aangedreven scraping",
         "description": "Traditionele scrapers breken wanneer websites wijzigen. De onze leert en past zich aan. Onze intelligente scraper gebruikt GPT-4 om elke productpagina te begrijpen.",
-        "features": [
-          "AI analyseert HTML om prijzen intelligent te vinden",
-          "Leert van succesvolle scrapes (caching)",
-          "Vision fallback voor 100% betrouwbaarheid",
-          "Geen handmatige selector configuratie nodig",
-          "Werkt op Coolblue, Bol.com, Amazon, MediaMarkt, etc."
-        ]
+        "features": "AI analyseert HTML om prijzen intelligent te vinden||Leert van succesvolle scrapes (caching)||Vision fallback voor 100% betrouwbaarheid||Geen handmatige selector configuratie nodig||Werkt op Coolblue, Bol.com, Amazon, MediaMarkt, etc."
       },
       "integration": {
         "title": "⚡ Naadloze integratie",
         "description": "Koppel je productcatalogus in minuten, niet uren. Importeer via Channable feed of voeg producten handmatig toe.",
-        "features": [
-          "One-click Channable feed import",
-          "Self-service concurrent URL beheer",
-          "Automatische product sync",
-          "Geen technische kennis vereist",
-          "Werkt met elk e-commerce platform"
-        ]
+        "features": "One-click Channable feed import||Self-service concurrent URL beheer||Automatische product sync||Geen technische kennis vereist||Werkt met elk e-commerce platform"
       },
       "insights": {
         "title": "📊 Actiegerichte inzichten",
         "description": "Zie het volledige plaatje. Begrijp markttrends en neem data-gedreven prijsbeslissingen.",
-        "features": [
-          "Historische prijsgrafieken",
-          "Concurrent positioning analyse",
-          "Identificeer te dure producten",
-          "Vind marge verbeteringskansen",
-          "Wekelijkse performance rapporten (Professional+)"
-        ]
+        "features": "Historische prijsgrafieken||Concurrent positioning analyse||Identificeer te dure producten||Vind marge verbeteringskansen||Wekelijkse performance rapporten (Professional+)"
       },
       "self_service": {
         "title": "🎯 Self-service beheer",
         "description": "Jij kent je concurrenten het beste. Voeg en beheer concurrent URLs zelf—geen wachten.",
-        "features": [
-          "Voeg concurrent URLs toe met één klik",
-          "Direct scrapen wanneer je een URL toevoegt",
-          "Handmatig verversen wanneer je wilt",
-          "Verwijder concurrenten als ze niet meer relevant zijn",
-          "Volledige transparantie (zie scrape kosten & methodes)"
-        ]
+        "features": "Voeg concurrent URLs toe met één klik||Direct scrapen wanneer je een URL toevoegt||Handmatig verversen wanneer je wilt||Verwijder concurrenten als ze niet meer relevant zijn||Volledige transparantie (zie scrape kosten & methodes)"
       },
       "cta": {
         "title": "Klaar om te winnen op prijs?",
