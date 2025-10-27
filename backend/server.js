@@ -13,7 +13,8 @@ if (process.env.NODE_ENV !== 'test') {
       console.log('✅ Database migrations complete');
       
       server = app.listen(PORT, () => {
-        console.log('🐘 PriceElephant Backend - Port ' + PORT);
+        const env = process.env.NODE_ENV || 'development';
+        console.log(`🐘 PriceElephant Backend - Port ${PORT} (${env})`);
         console.log('Sprint 0: Foundation ✅');
       });
     })
