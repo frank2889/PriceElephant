@@ -3,7 +3,14 @@
  * Adds brand, rating, review count, stock level, delivery time, and bundle info
  */
 
-exports.up = function(knex) {
+exports.up = async function(knex) {
+  const hasColumns = await knex.schema.hasColumn('products', 'brand');
+  
+  if (hasColumns) {
+    console.log('⏭️  Metadata columns already exist, skipping migration');
+    return;
+  }
+  
   return knex.schema.table('products', (table) => {
     table.string('brand', 255);
     table.decimal('rating', 3, 2); // e.g., 4.75

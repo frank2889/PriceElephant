@@ -8,7 +8,14 @@
  * - Enhanced pricing data
  */
 
-exports.up = function(knex) {
+exports.up = async function(knex) {
+  const hasColumns = await knex.schema.hasColumn('products', 'discount_percentage');
+  
+  if (hasColumns) {
+    console.log('⏭️  Pricing metadata columns already exist, skipping migration');
+    return;
+  }
+  
   return knex.schema.table('products', (table) => {
     table.integer('discount_percentage').nullable();
     table.string('discount_badge', 100).nullable();
