@@ -17,7 +17,17 @@
   updateDebug('script', '✅ Script geladen');
   
   const customerId = root.dataset.customerId;
-  const apiBaseUrl = (root.dataset.apiBaseUrl || '').replace(/\/$/, '');
+  let apiBaseUrl = (root.dataset.apiBaseUrl || '').replace(/\/$/, '');
+  
+  // Fallback to Railway URL if not configured in theme settings
+  if (!apiBaseUrl) {
+    // TODO: Update this with your actual Railway URL from Railway dashboard
+    apiBaseUrl = 'https://web-production-2568.up.railway.app';
+    console.warn('[PriceElephant] ⚠️  API Base URL niet geconfigureerd in theme settings');
+    console.warn('[PriceElephant] Gebruik fallback:', apiBaseUrl);
+    console.warn('[PriceElephant] Configureer dit in: Theme Editor → PriceElephant Dashboard → API Base URL');
+    updateDebug('error', '⚠️  API URL gebruikt fallback - configureer in theme settings');
+  }
   
   console.log('[PriceElephant] Configuratie:', {
     customerId,
@@ -307,7 +317,10 @@
   async function loadSitemapConfig() {
     showStatus(sitemapStatus, '', null);
     try {
+      console.log('[loadSitemapConfig] Fetching config for customer:', customerId);
       const config = await apiGet(`/api/v1/sitemap/config/${customerId}`);
+      console.log('[loadSitemapConfig] Config loaded:', config);
+      
       if (config?.sitemapUrl) {
         sitemapForm.sitemapUrl.value = config.sitemapUrl;
         if (config.productUrlPattern) {
@@ -316,6 +329,7 @@
         showStatus(sitemapStatus, 'Sitemap configuratie geladen.', 'success');
       }
     } catch (error) {
+      console.error('[loadSitemapConfig] Error:', error);
       // 404 is OK - no config yet
       if (error.message && !error.message.includes('404')) {
         showStatus(sitemapStatus, `Kon sitemap-configuratie niet laden: ${error.message}`, 'error');
