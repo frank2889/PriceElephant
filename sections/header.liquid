@@ -1,0 +1,253 @@
+<header class="site-header">
+  <div class="container">
+    <a href="/" class="logo">
+      <span style="font-size: 1.75rem;">🐘</span>
+      {{ shop.name }}
+    </a>
+    
+    <nav class="main-nav">
+      <a href="/#pricing">{{ 'priceelephant.header.nav.pricing' | t }}</a>
+      <a href="/pages/features">{{ 'priceelephant.header.nav.features' | t }}</a>
+      {% if customer %}
+        <a href="/pages/dashboard" class="nav-dashboard">{{ 'priceelephant.header.nav.dashboard' | t }}</a>
+      {% endif %}
+    </nav>
+    
+    {% if customer %}
+      <div class="customer-nav">
+        <div class="customer-dropdown">
+          <button class="customer-dropdown-toggle">
+            <span class="customer-avatar">{{ customer.first_name | slice: 0 }}</span>
+            <span class="customer-name">{{ customer.first_name }}</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div class="customer-dropdown-menu">
+            <a href="/account" class="dropdown-item">
+              <span>👤</span> {{ 'priceelephant.header.account_menu.my_account' | t }}
+            </a>
+            <a href="/pages/dashboard" class="dropdown-item">
+              <span>📊</span> {{ 'priceelephant.header.account_menu.dashboard' | t }}
+            </a>
+            <a href="/account/addresses" class="dropdown-item">
+              <span>📍</span> {{ 'priceelephant.header.account_menu.addresses' | t }}
+            </a>
+            <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
+            <a href="/account/logout" class="dropdown-item">
+              <span>🚪</span> {{ 'priceelephant.header.account_menu.logout' | t }}
+            </a>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="auth-nav">
+        <a href="/account/login" class="btn-login">{{ 'priceelephant.header.auth.login' | t }}</a>
+        <a href="/account/register" class="btn-register">{{ 'priceelephant.header.auth.register' | t }}</a>
+      </div>
+    {% endif %}
+  </div>
+</header>
+
+<style>
+  .site-header {
+    background: var(--primary-purple);
+    color: var(--text-white);
+    padding: 1rem 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .site-header .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+  }
+  
+  .site-header .logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-white);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .site-header .main-nav {
+    display: flex;
+    gap: 2rem;
+    flex: 1;
+    margin-left: 3rem;
+  }
+  
+  .site-header .main-nav a {
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  
+  .site-header .main-nav a:hover {
+    color: white;
+  }
+  
+  .site-header .main-nav .nav-dashboard {
+    color: white;
+    font-weight: 600;
+  }
+  
+  /* Auth Navigation (Not logged in) */
+  .auth-nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  
+  .btn-login {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+  }
+  
+  .btn-login:hover {
+    opacity: 0.9;
+  }
+  
+  .btn-register {
+    background: white;
+    color: var(--primary-purple);
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .btn-register:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  
+  /* Customer Dropdown */
+  .customer-dropdown {
+    position: relative;
+  }
+  
+  .customer-dropdown-toggle {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 500;
+    transition: background 0.2s;
+  }
+  
+  .customer-dropdown-toggle:hover {
+    background: rgba(255,255,255,0.15);
+  }
+  
+  .customer-avatar {
+    background: white;
+    color: var(--primary-purple);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  
+  .dropdown-arrow {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+  
+  .customer-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    min-width: 200px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+    z-index: 1000;
+  }
+  
+  .customer-dropdown:hover .customer-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+  
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    color: #374151;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+  
+  .dropdown-item:first-child {
+    border-radius: 8px 8px 0 0;
+  }
+  
+  .dropdown-item:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+  
+  .dropdown-item:hover {
+    background: #F3F4F6;
+  }
+  
+  .dropdown-item span:first-child {
+    font-size: 1.125rem;
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .site-header .container {
+      padding: 0 1rem;
+    }
+    
+    .site-header .main-nav {
+      display: none;
+    }
+    
+    .customer-name {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(event) {
+    const dropdown = document.querySelector('.customer-dropdown');
+    if (dropdown && !dropdown.contains(event.target)) {
+      // Dropdown will close automatically via CSS :hover
+    }
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Header",
+  "settings": []
+}
+{% endschema %}
