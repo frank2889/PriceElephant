@@ -201,8 +201,21 @@ class ChannableIntegration {
     async testConnection() {
         try {
             if (this.feedUrl) {
-                const response = await axios.head(this.feedUrl);
-                return { success: true, method: 'feed', status: response.status };
+                try {
+                    const response = await axios.head(this.feedUrl, { timeout: 5000 });
+                    return { success: true, method: 'feed', status: response.status };
+                } catch (error) {
+                    // 403 means feed exists but is protected - that's OK
+                    if (error.response && error.response.status === 403) {
+                        return { 
+                            success: true, 
+                            method: 'feed', 
+                            status: 403,
+                            note: 'Feed is protected (403) but URL is valid. Will attempt import with credentials.'
+                        };
+                    }
+                    throw error;
+                }
             } else {
                 const url = `${this.baseUrl}/companies/${this.companyId}`;
                 const response = await axios.get(url, {
