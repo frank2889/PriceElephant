@@ -164,10 +164,26 @@
     productsEmptyState.hidden = true;
     state.products.forEach((product) => {
       const row = document.createElement('tr');
+      
+      // Determine if product is parent or has parent
+      const isParent = product.is_parent_product;
+      const hasParent = product.parent_product_id;
+      const variantBadge = isParent 
+        ? '<span class="pe-badge" style="background: #7c3aed; color: white;">PARENT</span>'
+        : hasParent 
+        ? '<span class="pe-badge" style="background: #a78bfa; color: white;">VARIANT</span>'
+        : '';
+      
       row.innerHTML = `
         <td>
-          <strong>${product.product_name || 'Naam onbekend'}</strong>
-          <div class="pe-text-muted">${product.brand || '—'}${product.category ? ` · ${product.category}` : ''}</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div>
+              <strong>${product.product_name || 'Naam onbekend'}</strong>
+              ${product.variant_title ? `<div class="pe-text-muted" style="font-size: 12px;">${product.variant_title}</div>` : ''}
+              <div class="pe-text-muted">${product.brand || '—'}${product.category ? ` · ${product.category}` : ''}</div>
+            </div>
+            ${variantBadge}
+          </div>
         </td>
         <td>${product.product_ean || '—'}</td>
         <td>${formatPrice(product.own_price)}</td>
@@ -182,11 +198,28 @@
           </span>
         </td>
         <td style="text-align: right;">
-          <button
-            class="pe-button pe-button--secondary"
-            data-action="manage-competitors"
-            data-product-id="${product.id}"
-          >Beheer</button>
+          <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            ${isParent ? `
+              <button
+                class="pe-button pe-button--primary pe-button--small"
+                data-action="manage-variants"
+                data-product-id="${product.id}"
+                title="Beheer varianten"
+              >Varianten</button>
+            ` : !hasParent ? `
+              <button
+                class="pe-button pe-button--secondary pe-button--small"
+                data-action="convert-to-parent"
+                data-product-id="${product.id}"
+                title="Omzetten naar parent product"
+              >→ Parent</button>
+            ` : ''}
+            <button
+              class="pe-button pe-button--secondary pe-button--small"
+              data-action="manage-competitors"
+              data-product-id="${product.id}"
+            >Beheer</button>
+          </div>
         </td>
       `;
       productsBody.appendChild(row);
@@ -553,6 +586,12 @@
       if (action === 'manage-competitors') {
         const productId = target.dataset.productId;
         openCompetitorManager(productId);
+      } else if (action === 'manage-variants') {
+        const productId = target.dataset.productId;
+        openVariantManager(productId);
+      } else if (action === 'convert-to-parent') {
+        const productId = target.dataset.productId;
+        convertToParent(productId);
       }
     });
 
@@ -567,6 +606,25 @@
         handleDeleteCompetitor(competitorId);
       }
     });
+
+    // Variant management event listeners
+    const variantModal = document.getElementById('pe-variant-modal');
+    if (variantModal) {
+      const closeBtn = variantModal.querySelector('[data-action="close-variant-modal"]');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', closeVariantModal);
+      }
+      
+      const addVariantForm = document.getElementById('pe-add-variant-form');
+      if (addVariantForm) {
+        addVariantForm.addEventListener('submit', handleAddVariant);
+      }
+      
+      const variantsList = document.getElementById('pe-variants-list');
+      if (variantsList) {
+        variantsList.addEventListener('click', handleVariantAction);
+      }
+    }
 
     let searchTimeout = null;
     productSearchInput.addEventListener('input', () => {
@@ -593,6 +651,269 @@
     } catch (error) {
       console.error('[PriceElephant] Fout bij initialisatie:', error);
       updateDebug('error', error.message);
+    }
+  }
+
+  // ===== VARIANT MANAGEMENT FUNCTIONS =====
+  
+  async function openVariantManager(productId) {
+    console.log('[Variants] Opening manager for product:', productId);
+    
+    const modal = document.getElementById('pe-variant-modal');
+    const variantsList = document.getElementById('pe-variants-list');
+    const variantStatus = document.getElementById('pe-variant-status');
+    const productNameEl = document.getElementById('pe-variant-product-name');
+    
+    if (!modal) return;
+    
+    // Find product in state
+    const product = state.products.find(p => p.id == productId);
+    if (!product) {
+      showStatus(variantStatus, 'Product niet gevonden', 'error');
+      return;
+    }
+    
+    if (productNameEl) {
+      productNameEl.textContent = product.product_name;
+    }
+    
+    // Store current product ID
+    modal.dataset.productId = productId;
+    
+    // Load variants
+    await loadVariants(productId);
+    
+    // Show modal
+    modal.classList.add('pe-modal--active');
+  }
+  
+  function closeVariantModal() {
+    const modal = document.getElementById('pe-variant-modal');
+    if (modal) {
+      modal.classList.remove('pe-modal--active');
+    }
+  }
+  
+  async function loadVariants(productId) {
+    const variantsList = document.getElementById('pe-variants-list');
+    const variantStatus = document.getElementById('pe-variant-status');
+    const variantEmpty = document.getElementById('pe-variants-empty');
+    
+    if (!variantsList) return;
+    
+    showStatus(variantStatus, 'Varianten laden...', '');
+    
+    try {
+      const data = await apiFetch(`/api/v1/products/${customerId}/${productId}/variants`);
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Laden mislukt');
+      }
+      
+      const { parent, variants, options } = data;
+      
+      if (variants.length === 0) {
+        variantsList.innerHTML = '';
+        if (variantEmpty) variantEmpty.hidden = false;
+        showStatus(variantStatus, '', '');
+        return;
+      }
+      
+      if (variantEmpty) variantEmpty.hidden = true;
+      
+      // Render variants list
+      variantsList.innerHTML = variants.map((variant, idx) => `
+        <div class="pe-variant-item">
+          <div class="pe-variant-item__header">
+            <span class="pe-variant-item__position">#${variant.variant_position}</span>
+            <strong class="pe-variant-item__title">${variant.variant_title}</strong>
+            <span class="pe-variant-item__price">${currencyFormatter.format(variant.own_price)}</span>
+          </div>
+          <div class="pe-variant-item__details">
+            ${variant.product_sku ? `<span>SKU: ${variant.product_sku}</span>` : ''}
+            ${variant.product_ean ? `<span>EAN: ${variant.product_ean}</span>` : ''}
+          </div>
+          <div class="pe-variant-item__options">
+            ${variant.option1_value ? `<span class="pe-badge">${variant.option1_name}: ${variant.option1_value}</span>` : ''}
+            ${variant.option2_value ? `<span class="pe-badge">${variant.option2_name}: ${variant.option2_value}</span>` : ''}
+            ${variant.option3_value ? `<span class="pe-badge">${variant.option3_name}: ${variant.option3_value}</span>` : ''}
+          </div>
+          <div class="pe-variant-item__actions">
+            <button class="pe-btn pe-btn--small" data-action="edit-variant" data-variant-id="${variant.id}">
+              Bewerken
+            </button>
+            <button class="pe-btn pe-btn--small pe-btn--danger" data-action="delete-variant" data-variant-id="${variant.id}">
+              Verwijderen
+            </button>
+          </div>
+        </div>
+      `).join('');
+      
+      // Show available options
+      if (options && options.length > 0) {
+        const optionsInfo = options.map(opt => 
+          `${opt.name}: ${opt.values.join(', ')}`
+        ).join(' | ');
+        showStatus(variantStatus, `Beschikbare opties: ${optionsInfo}`, 'success');
+      } else {
+        showStatus(variantStatus, '', '');
+      }
+      
+    } catch (error) {
+      console.error('[Variants] Load error:', error);
+      showStatus(variantStatus, `Fout: ${error.message}`, 'error');
+    }
+  }
+  
+  async function convertToParent(productId) {
+    if (!confirm('Dit product omzetten naar een parent product met varianten?')) {
+      return;
+    }
+    
+    const option1Name = prompt('Naam van eerste optie (bijv. "Kleur", "Maat"):', 'Kleur');
+    if (!option1Name) return;
+    
+    const option1Value = prompt(`Waarde voor ${option1Name} van dit product:`, '');
+    if (!option1Value) return;
+    
+    try {
+      const data = await apiFetch(
+        `/api/v1/products/${customerId}/${productId}/convert-to-parent`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ option1_name: option1Name, option1_value: option1Value })
+        }
+      );
+      
+      if (data.success) {
+        alert(`Product succesvol omgezet! Je kunt nu varianten toevoegen.`);
+        await loadProducts(); // Reload products list
+      } else {
+        alert(`Fout: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('[Variants] Convert error:', error);
+      alert(`Fout bij omzetten: ${error.message}`);
+    }
+  }
+  
+  async function handleAddVariant(event) {
+    event.preventDefault();
+    
+    const modal = document.getElementById('pe-variant-modal');
+    const productId = modal?.dataset.productId;
+    if (!productId) return;
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const variantData = {
+      product_sku: formData.get('variant_sku'),
+      product_ean: formData.get('variant_ean'),
+      own_price: parseFloat(formData.get('variant_price')),
+      option1_name: formData.get('option1_name'),
+      option1_value: formData.get('option1_value'),
+      option2_name: formData.get('option2_name') || null,
+      option2_value: formData.get('option2_value') || null,
+      option3_name: formData.get('option3_name') || null,
+      option3_value: formData.get('option3_value') || null,
+    };
+    
+    const variantStatus = document.getElementById('pe-variant-status');
+    showStatus(variantStatus, 'Variant toevoegen...', '');
+    
+    try {
+      const data = await apiFetch(
+        `/api/v1/products/${customerId}/${productId}/variants`,
+        {
+          method: 'POST',
+          body: JSON.stringify(variantData)
+        }
+      );
+      
+      if (data.success) {
+        showStatus(variantStatus, `Variant "${data.variant.variant_title}" toegevoegd!`, 'success');
+        form.reset();
+        await loadVariants(productId);
+        await loadProducts(); // Reload main list
+      } else {
+        showStatus(variantStatus, `Fout: ${data.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('[Variants] Add error:', error);
+      showStatus(variantStatus, `Fout: ${error.message}`, 'error');
+    }
+  }
+  
+  async function handleVariantAction(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    
+    const action = target.dataset.action;
+    const variantId = target.dataset.variantId;
+    
+    const modal = document.getElementById('pe-variant-modal');
+    const productId = modal?.dataset.productId;
+    if (!productId) return;
+    
+    if (action === 'delete-variant') {
+      await deleteVariant(productId, variantId);
+    } else if (action === 'edit-variant') {
+      await editVariant(productId, variantId);
+    }
+  }
+  
+  async function deleteVariant(productId, variantId) {
+    if (!confirm('Deze variant verwijderen?')) return;
+    
+    const variantStatus = document.getElementById('pe-variant-status');
+    showStatus(variantStatus, 'Variant verwijderen...', '');
+    
+    try {
+      const data = await apiFetch(
+        `/api/v1/products/${customerId}/${productId}/variants/${variantId}`,
+        { method: 'DELETE' }
+      );
+      
+      if (data.success) {
+        showStatus(variantStatus, 'Variant verwijderd!', 'success');
+        await loadVariants(productId);
+        await loadProducts();
+      } else {
+        showStatus(variantStatus, `Fout: ${data.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('[Variants] Delete error:', error);
+      showStatus(variantStatus, `Fout: ${error.message}`, 'error');
+    }
+  }
+  
+  async function editVariant(productId, variantId) {
+    const newPrice = prompt('Nieuwe prijs:');
+    if (!newPrice) return;
+    
+    const variantStatus = document.getElementById('pe-variant-status');
+    showStatus(variantStatus, 'Variant bijwerken...', '');
+    
+    try {
+      const data = await apiFetch(
+        `/api/v1/products/${customerId}/${productId}/variants/${variantId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ own_price: parseFloat(newPrice) })
+        }
+      );
+      
+      if (data.success) {
+        showStatus(variantStatus, 'Variant bijgewerkt!', 'success');
+        await loadVariants(productId);
+        await loadProducts();
+      } else {
+        showStatus(variantStatus, `Fout: ${data.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('[Variants] Edit error:', error);
+      showStatus(variantStatus, `Fout: ${error.message}`, 'error');
     }
   }
 

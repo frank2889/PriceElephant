@@ -131,6 +131,92 @@
         <button type="submit" class="pe-button pe-button--primary">Concurrent toevoegen</button>
       </form>
     </section>
+
+    <!-- Variant Management Modal -->
+    <div id="pe-variant-modal" class="pe-modal">
+      <div class="pe-modal__overlay" data-action="close-variant-modal"></div>
+      <div class="pe-modal__content">
+        <div class="pe-modal__header">
+          <h2>Varianten beheren</h2>
+          <button class="pe-modal__close" data-action="close-variant-modal" aria-label="Sluiten">&times;</button>
+        </div>
+        
+        <div class="pe-modal__body">
+          <div class="pe-variant-header">
+            <strong>Product:</strong> <span id="pe-variant-product-name"></span>
+          </div>
+          
+          <div id="pe-variant-status" class="pe-alert" hidden></div>
+          
+          <div class="pe-variants-section">
+            <h3>Bestaande varianten</h3>
+            <div id="pe-variants-list" class="pe-variants-list"></div>
+            <div id="pe-variants-empty" class="pe-empty-state" hidden>
+              Nog geen varianten. Voeg hieronder je eerste variant toe.
+            </div>
+          </div>
+          
+          <div class="pe-add-variant-section">
+            <h3>Nieuwe variant toevoegen</h3>
+            <form id="pe-add-variant-form" novalidate>
+              <div class="pe-field-group">
+                <div class="pe-field">
+                  <label for="variant_sku">SKU</label>
+                  <input type="text" id="variant_sku" name="variant_sku" placeholder="PROD-RED-L">
+                </div>
+                <div class="pe-field">
+                  <label for="variant_ean">EAN</label>
+                  <input type="text" id="variant_ean" name="variant_ean" placeholder="8719...">
+                </div>
+                <div class="pe-field">
+                  <label for="variant_price">Prijs (€)</label>
+                  <input type="number" id="variant_price" name="variant_price" step="0.01" placeholder="29.99" required>
+                </div>
+              </div>
+              
+              <div class="pe-field-group">
+                <div class="pe-field">
+                  <label for="option1_name">Optie 1 naam</label>
+                  <input type="text" id="option1_name" name="option1_name" placeholder="Kleur" required>
+                </div>
+                <div class="pe-field">
+                  <label for="option1_value">Optie 1 waarde</label>
+                  <input type="text" id="option1_value" name="option1_value" placeholder="Rood" required>
+                </div>
+              </div>
+              
+              <div class="pe-field-group">
+                <div class="pe-field">
+                  <label for="option2_name">Optie 2 naam (optioneel)</label>
+                  <input type="text" id="option2_name" name="option2_name" placeholder="Maat">
+                </div>
+                <div class="pe-field">
+                  <label for="option2_value">Optie 2 waarde</label>
+                  <input type="text" id="option2_value" name="option2_value" placeholder="Large">
+                </div>
+              </div>
+              
+              <div class="pe-field-group">
+                <div class="pe-field">
+                  <label for="option3_name">Optie 3 naam (optioneel)</label>
+                  <input type="text" id="option3_name" name="option3_name" placeholder="Materiaal">
+                </div>
+                <div class="pe-field">
+                  <label for="option3_value">Optie 3 waarde</label>
+                  <input type="text" id="option3_value" name="option3_value" placeholder="Katoen">
+                </div>
+              </div>
+              
+              <button type="submit" class="pe-button pe-button--primary">Variant toevoegen</button>
+            </form>
+          </div>
+        </div>
+        
+        <div class="pe-modal__footer">
+          <button class="pe-button pe-button--secondary" data-action="close-variant-modal">Sluiten</button>
+        </div>
+      </div>
+    </div>
   </div>
 {% else %}
   <div class="pe-card" style="max-width: 480px; margin: 48px auto; text-align: center;">
