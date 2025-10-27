@@ -17,7 +17,7 @@ router.post('/import', async (req, res) => {
     const { 
       customerId, 
       sitemapUrl, 
-      maxProducts = 50,
+      maxProducts = 500,
       productUrlPattern,
       selectors 
     } = req.body;
@@ -119,7 +119,7 @@ router.get('/import-stream', async (req, res) => {
 
     try {
       const results = await service.importFromSitemap(sitemapUrl, {
-        maxProducts: parseInt(maxProducts) || 50,
+        maxProducts: parseInt(maxProducts) || 500,
         productUrlPattern: productUrlPattern || null,
         onProgress
       });

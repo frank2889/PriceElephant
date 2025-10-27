@@ -33,7 +33,7 @@ class SitemapImportService {
    */
   async importFromSitemap(sitemapUrl, options = {}) {
     const {
-      maxProducts = 100,
+      maxProducts = 500,
       productUrlPattern = null,
       onProgress = null
     } = options;
