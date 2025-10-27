@@ -1,3 +1,12 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin language editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
 {
   "general": {
     "404": {
@@ -28,7 +37,7 @@
     "homepage": {
       "hero": {
         "title": "Win altijd op prijs",
-        "subtitle": "De enige Shopify-native price intelligence tool. Monitor concurrenten. Optimaliseer automatisch. Verhoog je marges.",
+        "subtitle": "Monitor concurrenten automatisch. Ontvang alerts bij prijswijzigingen. Verhoog je marges met data-gedreven beslissingen.",
         "cta_trial": "Start gratis trial - 14 dagen",
         "cta_pricing": "Bekijk tarieven",
         "welcome_back": "Welkom terug, {{ name }}!",
@@ -63,30 +72,30 @@
       },
       "usp": {
         "title": "Waarom PriceElephant?",
-        "subtitle": "De enige Shopify-native price intelligence tool voor Nederlandse webshops",
-        "shopify_native": {
-          "title": "Shopify-native",
-          "description": "Naadloos geïntegreerd in je Shopify Admin. Geen externe tools. Alles op één plek."
+        "subtitle": "Eenvoudig. Krachtig. Resultaatgericht.",
+        "easy_setup": {
+          "title": "Klaar in 5 minuten",
+          "description": "Importeer je producten via Channable. Voeg concurrent URLs toe. Start direct met monitoren. Geen technische kennis nodig."
         },
         "channable_integration": {
-          "title": "Channable integratie",
-          "description": "Hergebruik je bestaande productfeeds. Geen dubbele setup. Importeer 500+ producten in seconden."
+          "title": "Hergebruik je Channable data",
+          "description": "Al producten in Channable? Perfect. Import 500+ producten in seconden. Geen dubbele setup."
         },
-        "dutch_focus": {
-          "title": "Nederlandse focus",
-          "description": "Bol.com, Coolblue, MediaMarkt out-of-the-box. Optimized voor de Nederlandse markt."
+        "dutch_retailers": {
+          "title": "Optimized voor Nederland",
+          "description": "Bol.com, Coolblue, MediaMarkt werken out-of-the-box. Wij begrijpen de Nederlandse markt."
         },
-        "self_service": {
+        "no_onboarding": {
           "title": "Self-service platform",
-          "description": "Geen onboarding weken. Geen technische kennis vereist. Start vandaag nog."
+          "description": "Geen sales calls. Geen onboarding weken. Log in en begin. Alles is intuïtief."
         },
         "transparent_pricing": {
-          "title": "Transparante pricing",
-          "description": "Geen verrassingen. Geen verborgen kosten. Schaal mee met je groei."
+          "title": "Geen verrassingen",
+          "description": "Duidelijke prijzen. Geen verborgen kosten. Opzeggen wanneer je wilt. Nederlandse service."
         },
         "variant_support": {
-          "title": "Variant support",
-          "description": "Automatische variant detection. Beheer producten met kleuren, maten, types. Uniek in de markt."
+          "title": "Product variants ondersteuning",
+          "description": "Beheer producten met kleuren, maten, types automatisch. Uniek in de markt."
         }
       },
       "how_it_works": {
