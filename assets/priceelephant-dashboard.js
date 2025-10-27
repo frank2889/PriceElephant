@@ -778,8 +778,8 @@
     console.log('[PriceElephant] Elements check:', {
       channableForm: !!channableForm,
       channableImportBtn: !!channableImportBtn,
-      shopifySyncBtn: !!shopifySyncBtn,
-      shopifySyncAllBtn: !!shopifySyncAllBtn,
+      sitemapForm: !!sitemapForm,
+      sitemapImportBtn: !!sitemapImportBtn,
       competitorForm: !!competitorForm,
       variantForm: !!variantForm
     });
