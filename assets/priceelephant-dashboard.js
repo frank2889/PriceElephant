@@ -113,9 +113,17 @@
   // Fetch customer tier and set appropriate defaults
   async function fetchCustomerTier() {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/customers/${customerId}/tier`);
+      console.log('[PriceElephant] Fetching customer tier for:', customerId);
+      const url = `${apiBaseUrl}/api/v1/customers/${customerId}/tier`;
+      console.log('[PriceElephant] Tier API URL:', url);
+      
+      const response = await fetch(url);
+      console.log('[PriceElephant] Tier API response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[PriceElephant] Customer tier data:', data);
+        
         if (data.tier === 'enterprise') {
           // Auto-set maxProducts to 10000 for Enterprise customers and remove max limit
           const maxProductsInput = document.getElementById('pe-max-products');
@@ -124,18 +132,26 @@
           if (maxProductsInput) {
             maxProductsInput.value = '10000';
             maxProductsInput.removeAttribute('max'); // Remove max limit
-            console.log('[PriceElephant] Enterprise customer - unlimited products enabled');
+            console.log('[PriceElephant] ✅ Enterprise customer - unlimited products enabled');
           }
           
           if (maxProductsHint) {
             maxProductsHint.textContent = '✅ Enterprise: Onbeperkt scannen (10000 = alle producten)';
             maxProductsHint.style.color = '#059669';
+            console.log('[PriceElephant] ✅ Enterprise hint updated');
           }
+        } else {
+          console.log('[PriceElephant] Customer tier:', data.tier, '- using default limits');
         }
         return data;
+      } else {
+        console.error('[PriceElephant] Tier API failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('[PriceElephant] Error response:', errorText);
       }
     } catch (error) {
-      console.warn('[PriceElephant] Could not fetch customer tier:', error.message);
+      console.error('[PriceElephant] Tier API error:', error.message);
+      console.error('[PriceElephant] Error stack:', error.stack);
     }
     return null;
   }
