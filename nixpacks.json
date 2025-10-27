@@ -1,6 +1,0 @@
-{
-  "variables": {
-    "NIXPACKS_BUILD_DIR": "backend",
-    "NPM_CONFIG_PRODUCTION": "false"
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "@shopify/shopify-api": "^12.1.0"
-  },
-  "devDependencies": {
-    "@shopify/cli": "^3.86.1",
-    "@shopify/theme": "^3.58.2"
-  }
-}
