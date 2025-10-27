@@ -57,11 +57,6 @@
   const sitemapForm = document.getElementById('pe-sitemap-form');
   const sitemapStatus = document.getElementById('pe-sitemap-status');
   const sitemapImportBtn = document.getElementById('pe-sitemap-import');
-  const shopifyStatus = document.getElementById('pe-shopify-status');
-  const shopifyMetrics = document.getElementById('pe-shopify-metrics');
-  const shopifySyncBtn = document.getElementById('pe-shopify-sync');
-  const shopifySyncAllBtn = document.getElementById('pe-shopify-sync-all');
-  const shopifyLimitInput = document.getElementById('pe-sync-limit');
   const productSearchInput = document.getElementById('pe-product-search');
   const productsBody = document.getElementById('pe-products-body');
   const productsEmptyState = document.getElementById('pe-products-empty');
@@ -365,37 +360,6 @@
     }
   }
 
-  async function loadShopifyStatus() {
-    showStatus(shopifyStatus, '', null);
-    shopifyMetrics.innerHTML = '';
-    setApiStatus('shopify', 'loading');
-    try {
-      const status = await apiFetch(`/api/v1/shopify/status/${customerId}`, { method: 'GET' });
-      if (!status?.status) {
-        return;
-      }
-      const { total, synced, pending, syncPercentage } = status.status;
-
-      const metrics = [
-        { label: 'Totaal', value: total },
-        { label: 'Synced', value: synced },
-        { label: 'Pending', value: pending },
-        { label: 'Sync %', value: `${syncPercentage}%` },
-      ];
-
-      metrics.forEach((metric) => {
-        const badge = document.createElement('span');
-        badge.className = 'pe-badge';
-        badge.textContent = `${metric.label}: ${metric.value}`;
-        shopifyMetrics.appendChild(badge);
-      });
-      setApiStatus('shopify', 'success');
-    } catch (error) {
-      showStatus(shopifyStatus, `Kon Shopify-status niet ophalen: ${error.message}`, 'error');
-      setApiStatus('shopify', 'error');
-    }
-  }
-
   async function loadProducts(searchTerm) {
     setApiStatus('products', 'loading');
     const params = new URLSearchParams({ limit: '50' });
@@ -635,49 +599,6 @@
     }
   }
 
-  async function handleShopifySync(all = false) {
-    console.log('[handleShopifySync] STARTED', { all, customerId });
-    updateDebug('action', `🔄 Shopify sync ${all ? 'all' : 'batch'}`);
-    
-    showStatus(shopifyStatus, '', null);
-    const button = all ? shopifySyncAllBtn : shopifySyncBtn;
-    console.log('[handleShopifySync] Button found:', !!button);
-    setLoading(button, true);
-
-    const limitValue = parseInt(shopifyLimitInput.value, 10);
-    const payload = { customerId };
-    if (!all && Number.isInteger(limitValue) && limitValue > 0) {
-      payload.limit = limitValue;
-    }
-    console.log('[handleShopifySync] Payload:', payload);
-
-    try {
-      const endpoint = all ? '/api/v1/shopify/sync-all' : '/api/v1/shopify/sync';
-      console.log('[handleShopifySync] Calling endpoint:', endpoint);
-      
-      const response = await apiFetch(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      
-      console.log('[handleShopifySync] Response:', response);
-      const message = response?.message || 'Sync uitgevoerd.';
-      const results = response?.results;
-      const detail = results ? ` (${results.synced || 0} synced / ${results.failed || 0} fouten)` : '';
-      showStatus(shopifyStatus, `${message}${detail}`, 'success');
-      updateDebug('action', `✅ Sync: ${results?.synced || 0} synced`);
-      
-      await loadShopifyStatus();
-      await loadProducts(productSearchInput.value.trim());
-    } catch (error) {
-      console.error('[handleShopifySync] ERROR:', error);
-      showStatus(shopifyStatus, `Sync mislukt: ${error.message}`, 'error');
-      updateDebug('error', `❌ Sync: ${error.message}`);
-    } finally {
-      setLoading(button, false);
-    }
-  }
-
   async function handleCompetitorSubmit(event) {
     event.preventDefault();
     if (!state.selectedProductId) {
@@ -889,28 +810,6 @@
       listenersCount++;
     }
     
-    if (shopifySyncBtn) {
-      shopifySyncBtn.addEventListener('click', () => {
-        console.log('[EVENT] Shopify sync batch button clicked!');
-        handleShopifySync(false);
-      });
-      console.log('[PriceElephant] Shopify sync button listener attached');
-      listenersCount++;
-    } else {
-      console.warn('[PriceElephant] Shopify sync button NOT FOUND: #pe-shopify-sync');
-    }
-    
-    if (shopifySyncAllBtn) {
-      shopifySyncAllBtn.addEventListener('click', () => {
-        console.log('[EVENT] Shopify sync ALL button clicked!');
-        handleShopifySync(true);
-      });
-      console.log('[PriceElephant] Shopify sync all button listener attached');
-      listenersCount++;
-    } else {
-      console.warn('[PriceElephant] Shopify sync all button NOT FOUND: #pe-shopify-sync-all');
-    }
-    
     if (competitorForm) {
       competitorForm.addEventListener('submit', handleCompetitorSubmit);
       console.log('[PriceElephant] Competitor form listener attached');
@@ -981,7 +880,7 @@
     
     try {
       setupEventListeners();
-      updateDebug('listeners', '✅ 8 listeners');
+      updateDebug('listeners', '✅ 6 listeners');
       
       console.log('[PriceElephant] Loading initial data...');
       
@@ -990,8 +889,6 @@
       await loadChannableConfig();
       updateDebug('action', '📡 Loading Sitemap config...');
       await loadSitemapConfig();
-      updateDebug('action', '📡 Loading Shopify status...');
-      await loadShopifyStatus();
       updateDebug('action', '📡 Loading products...');
       await loadProducts();
       
