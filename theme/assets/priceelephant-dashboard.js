@@ -550,7 +550,7 @@
       
       // Use EventSource for real-time progress
       const eventSource = new EventSource(
-        `${API_BASE_URL}/api/v1/sitemap/import-stream?` + new URLSearchParams({
+        `${apiBaseUrl}/api/v1/sitemap/import-stream?` + new URLSearchParams({
           customerId,
           sitemapUrl,
           maxProducts: maxProducts.toString(),
