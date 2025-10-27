@@ -1,0 +1,36 @@
+[
+  {
+    "name": "theme_info",
+    "theme_name": "PriceElephant",
+    "theme_version": "1.0.0",
+    "theme_author": "Webelephant",
+    "theme_documentation_url": "https://priceelephant.com/docs",
+    "theme_support_url": "https://priceelephant.com/support"
+  },
+  {
+    "name": "PriceElephant Settings",
+    "settings": [
+      {
+        "type": "header",
+        "content": "API Configuration"
+      },
+      {
+        "type": "text",
+        "id": "priceelephant_api_url",
+        "label": "PriceElephant API URL",
+        "default": "https://api.priceelephant.com",
+        "info": "Backend API endpoint for price intelligence data"
+      },
+      {
+        "type": "header",
+        "content": "Customer Settings"
+      },
+      {
+        "type": "checkbox",
+        "id": "enable_customer_dashboard",
+        "label": "Enable Customer Dashboard",
+        "default": true
+      }
+    ]
+  }
+]
