@@ -6,9 +6,18 @@
  * Uses HybridScraper for intelligent, cost-optimized product detection
  */
 
-const Sitemapper = require('sitemapper');
 const HybridScraper = require('../crawlers/hybrid-scraper');
 const db = require('../config/database');
+
+// Dynamic import for ES Module compatibility
+let Sitemapper;
+async function getSitemapper() {
+  if (!Sitemapper) {
+    const module = await import('sitemapper');
+    Sitemapper = module.default;
+  }
+  return Sitemapper;
+}
 
 class SitemapImportService {
   constructor(customerId) {
@@ -32,7 +41,9 @@ class SitemapImportService {
     console.log(`[SitemapImport] Max products target: ${maxProducts}`);
 
     try {
-      const sitemap = new Sitemapper({
+      // Get Sitemapper class via dynamic import
+      const SitemapperClass = await getSitemapper();
+      const sitemap = new SitemapperClass({
         url: sitemapUrl,
         timeout: 15000
       });
