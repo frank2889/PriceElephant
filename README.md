@@ -1,51 +1,60 @@
-# PriceElephant 🐘# 🐘 PriceElephant - Price Intelligence SaaS Platform
+# 🐘 PriceElephant - Price Intelligence SaaS Platform
 
-
-
-**Competitive Price Monitoring for Dutch E-commerce****Platform-Agnostic Price Intelligence voor E-commerce**  
-
+**Platform-Agnostic Price Intelligence voor E-commerce**  
 *Powered by Webelephant - E-commerce Scaling Company*
 
-PriceElephant is a Shopify-integrated SaaS platform that automatically tracks competitor prices across major Dutch retailers (Coolblue, Bol.com, Amazon.nl, MediaMarkt, etc.) and provides real-time price intelligence.
+Een **SaaS platform** voor competitor price intelligence via Channable integratie.
+
+---
+
+## 📁 Repository Structuur
+
+⚠️ **BELANGRIJK**: Deze repository heeft 2 branches met verschillende doeleinden:
+
+- **`main` branch**: Backend API, database, scripts, documentatie (huidige branch)
+- **`shopify-theme` branch**: Shopify Liquid templates, assets, locales → [Zie THEME_README.md](THEME_README.md)
 
 ---
 
 ## 🚀 Project Status
 
-## 📦 Wat is PriceElephant?
+**Sprint 1: COMPLETED** ✅ (27 oktober 2025)
 
-**Sprint 0: Foundation** ✅ COMPLETED (25 oktober 2025)
+Zie [PriceElephant-DOD.md](PriceElephant-DOD.md) voor complete project definitie en status.
 
-Een **SaaS platform** voor competitor price intelligence via Channable integratie:
+### Deliverables:
+- ✅ Channable integration (API + Feed URL)
+- ✅ Shopify Admin API integration
+- ✅ Manual variant price tracking
+- ✅ Backend API met product & competitor routes
+- ✅ Shopify Liquid dashboard
+- ✅ Production deployment (Railway)
+- ✅ Complete documentatie
 
-- ✅ PostgreSQL 15 + Redis infrastructure
+**Code metrics**: 2,550 lines | 15 files | 3 dagen development
 
-- ✅ 15-table database schema with partitioning### 1. **Backend API**
+---
 
-- ✅ Hybrid scraper (BrightData proxy + GPT-4 Vision fallback)Express.js server die price data verzamelt en analyseert:
+## 📦 Platform Componenten
 
-- ✅ 99.9% success rate guarantee- 🔗 Channable integration (API + Feed URL)
+### 1. **Backend API**
 
-- ✅ Express API with security middleware- 🕷️ Web scraping van concurrenten (Bol.com, Amazon.nl, Coolblue, MediaMarkt)
+Express.js server die price data verzamelt en analyseert:
 
-- ✅ Channable integration (XML/CSV feed import)- 📊 Real-time prijsgeschiedenis
-
-- ✅ Product import service with subscription limits- ⚡ Price alerts systeem
-
+- 🔗 Channable integration (API + Feed URL)
+- 🕷️ Web scraping van concurrenten (Bol.com, Amazon.nl, Coolblue, MediaMarkt)
+- 📊 Real-time prijsgeschiedenis
+- ⚡ Price alerts systeem
 - 📈 Business analytics
-
-**Sprint 1: In Progress** 🔄
+- 🎯 Manual variant price tracking
 
 📁 Locatie: `/backend/`
 
-- ✅ Channable API routes (import, configure, product listing)
+### 2. **Shopify Theme**
 
-- 🔄 Shopify Admin API integration### 2. **Admin Dashboard**
+Client-specifieke dashboards voor price management:
 
-- ⏳ Backend API routes for competitor trackingClient-specifieke dashboards voor price management:
-
-- ⏳ Shopify Liquid dashboard- Product import via Channable
-
+- Product import via Channable
 - Competitor price monitoring
 
 ## 📊 Tech Stack- Price history charts
