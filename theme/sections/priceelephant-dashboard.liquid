@@ -58,6 +58,33 @@
         </form>
       </section>
 
+      <section class="pe-card" id="pe-sitemap-card">
+        <h2>Sitemap import</h2>
+        <p>Importeer producten via jouw webshop sitemap.xml (geen Channable nodig).</p>
+        <div id="pe-sitemap-status" class="pe-alert" hidden></div>
+        <form id="pe-sitemap-form" novalidate>
+          <div class="pe-field">
+            <label for="pe-sitemap-url">Sitemap URL</label>
+            <input type="url" id="pe-sitemap-url" name="sitemapUrl" placeholder="https://jouwwebshop.nl/sitemap.xml">
+          </div>
+          <div class="pe-field-group">
+            <div class="pe-field">
+              <label for="pe-max-products">Max producten</label>
+              <input type="number" id="pe-max-products" name="maxProducts" min="1" max="500" value="50">
+            </div>
+            <div class="pe-field">
+              <label for="pe-url-pattern">URL filter (optioneel)</label>
+              <input type="text" id="pe-url-pattern" name="productUrlPattern" placeholder="/product/">
+              <small class="pe-text-muted">Bijv. /product/ om alleen product paginas te importeren</small>
+            </div>
+          </div>
+          <div class="pe-card__footer">
+            <button type="submit" class="pe-button pe-button--primary" id="pe-sitemap-save">Instellingen opslaan</button>
+            <button type="button" class="pe-button pe-button--secondary" id="pe-sitemap-import">Nu importeren</button>
+          </div>
+        </form>
+      </section>
+
       <section class="pe-card" id="pe-shopify-card">
         <h2>Shopify catalogus sync</h2>
         <p>Push PriceElephant-producten naar de Shopify catalogus van deze klant.</p>

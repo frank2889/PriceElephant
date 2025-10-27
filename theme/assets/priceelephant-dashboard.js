@@ -28,6 +28,9 @@
   const channableForm = document.getElementById('pe-channable-form');
   const channableStatus = document.getElementById('pe-channable-status');
   const channableImportBtn = document.getElementById('pe-channable-import');
+  const sitemapForm = document.getElementById('pe-sitemap-form');
+  const sitemapStatus = document.getElementById('pe-sitemap-status');
+  const sitemapImportBtn = document.getElementById('pe-sitemap-import');
   const shopifyStatus = document.getElementById('pe-shopify-status');
   const shopifyMetrics = document.getElementById('pe-shopify-metrics');
   const shopifySyncBtn = document.getElementById('pe-shopify-sync');
@@ -272,6 +275,25 @@
     }
   }
 
+  async function loadSitemapConfig() {
+    showStatus(sitemapStatus, '', null);
+    try {
+      const config = await apiGet(`/api/v1/sitemap/config/${customerId}`);
+      if (config?.sitemapUrl) {
+        sitemapForm.sitemapUrl.value = config.sitemapUrl;
+        if (config.productUrlPattern) {
+          sitemapForm.productUrlPattern.value = config.productUrlPattern;
+        }
+        showStatus(sitemapStatus, 'Sitemap configuratie geladen.', 'success');
+      }
+    } catch (error) {
+      // 404 is OK - no config yet
+      if (error.message && !error.message.includes('404')) {
+        showStatus(sitemapStatus, `Kon sitemap-configuratie niet laden: ${error.message}`, 'error');
+      }
+    }
+  }
+
   async function loadShopifyStatus() {
     showStatus(shopifyStatus, '', null);
     shopifyMetrics.innerHTML = '';
@@ -408,6 +430,99 @@
       updateDebug('error', `❌ Import: ${error.message}`);
     } finally {
       setLoading(channableImportBtn, false);
+    }
+  }
+
+  async function handleSitemapSubmit(event) {
+    event.preventDefault();
+    console.log('[handleSitemapSubmit] STARTED');
+    updateDebug('action', '💾 Saving Sitemap config');
+    
+    const formData = new FormData(sitemapForm);
+    const sitemapUrl = formData.get('sitemapUrl')?.trim();
+    const maxProducts = formData.get('maxProducts');
+    const productUrlPattern = formData.get('productUrlPattern')?.trim();
+    
+    console.log('[handleSitemapSubmit] Form data:', { sitemapUrl, maxProducts, productUrlPattern });
+
+    if (!sitemapUrl) {
+      const msg = 'Sitemap URL is verplicht.';
+      console.warn('[handleSitemapSubmit]', msg);
+      showStatus(sitemapStatus, msg, 'error');
+      updateDebug('error', '❌ No sitemap URL');
+      return;
+    }
+
+    setLoading(sitemapForm.querySelector('button[type="submit"]'), true);
+
+    try {
+      console.log('[handleSitemapSubmit] Calling API...');
+      const response = await apiFetch('/api/v1/sitemap/configure', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          customerId, 
+          sitemapUrl,
+          productUrlPattern
+        }),
+      });
+      console.log('[handleSitemapSubmit] Success:', response);
+      showStatus(sitemapStatus, response.message || 'Instellingen opgeslagen.', 'success');
+      updateDebug('action', '✅ Sitemap config saved');
+    } catch (error) {
+      console.error('[handleSitemapSubmit] ERROR:', error);
+      showStatus(sitemapStatus, `Opslaan mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ ${error.message}`);
+    } finally {
+      setLoading(sitemapForm.querySelector('button[type="submit"]'), false);
+    }
+  }
+
+  async function handleSitemapImport() {
+    console.log('[handleSitemapImport] STARTED');
+    updateDebug('action', '🗺️ Importing from sitemap');
+    
+    showStatus(sitemapStatus, '', null);
+    setLoading(sitemapImportBtn, true);
+
+    const formData = new FormData(sitemapForm);
+    const sitemapUrl = formData.get('sitemapUrl')?.trim();
+    const maxProducts = parseInt(formData.get('maxProducts'), 10) || 50;
+    const productUrlPattern = formData.get('productUrlPattern')?.trim();
+
+    if (!sitemapUrl) {
+      showStatus(sitemapStatus, 'Vul eerst een sitemap URL in.', 'error');
+      setLoading(sitemapImportBtn, false);
+      return;
+    }
+
+    try {
+      console.log('[handleSitemapImport] Calling import API...');
+      showStatus(sitemapStatus, `Sitemap wordt verwerkt... (max ${maxProducts} producten)`, 'success');
+      
+      const response = await apiFetch('/api/v1/sitemap/import', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          customerId,
+          sitemapUrl,
+          maxProducts,
+          productUrlPattern
+        }),
+      });
+      console.log('[handleSitemapImport] Success:', response);
+      
+      const message = response?.message || 'Import uitgevoerd.';
+      const results = response?.results;
+      const detail = results ? ` (${results.created || 0} nieuw / ${results.updated || 0} bijgewerkt / ${results.skipped || 0} overgeslagen)` : '';
+      showStatus(sitemapStatus, `${message}${detail}`, results?.errors > 0 ? 'error' : 'success');
+      updateDebug('action', `✅ Sitemap import: ${results?.created || 0} created`);
+      
+      await loadProducts(productSearchInput.value.trim());
+    } catch (error) {
+      console.error('[handleSitemapImport] ERROR:', error);
+      showStatus(sitemapStatus, `Import mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ Import: ${error.message}`);
+    } finally {
+      setLoading(sitemapImportBtn, false);
     }
   }
 
@@ -653,6 +768,18 @@
       listenersCount++;
     }
     
+    if (sitemapForm) {
+      sitemapForm.addEventListener('submit', handleSitemapSubmit);
+      console.log('[PriceElephant] Sitemap form listener attached');
+      listenersCount++;
+    }
+    
+    if (sitemapImportBtn) {
+      sitemapImportBtn.addEventListener('click', handleSitemapImport);
+      console.log('[PriceElephant] Sitemap import button listener attached');
+      listenersCount++;
+    }
+    
     if (shopifySyncBtn) {
       shopifySyncBtn.addEventListener('click', () => {
         console.log('[EVENT] Shopify sync batch button clicked!');
@@ -747,6 +874,7 @@
       console.log('[PriceElephant] Loading initial data...');
       await Promise.all([
         loadChannableConfig(),
+        loadSitemapConfig(),
         loadShopifyStatus(),
         loadProducts(),
       ]);
