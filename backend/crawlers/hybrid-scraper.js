@@ -111,6 +111,23 @@ class HybridScraper {
         '.stock', '.availability',
         // Generic
         '.stock-status', '.availability', '.voorraad', '.in-stock'
+      ].join(', '),
+      
+      image: [
+        // Schema.org
+        '[itemprop="image"]', 'meta[property="og:image"]',
+        // Shopify
+        '.product__media img', '.product-single__photo img', '.product__main-photos img',
+        // Magento
+        '.product-image-photo', '.fotorama__img', '.gallery-placeholder__image',
+        // WooCommerce
+        '.woocommerce-product-gallery__image img', '.wp-post-image',
+        // Lightspeed
+        '.product-image img', '.main-image img',
+        // CCV Shop
+        '.productImage img', '.product-photo img',
+        // Generic
+        '.product-image img', '.main-image', '.gallery-image img', 'img.product'
       ].join(', ')
     };
     
@@ -334,6 +351,7 @@ class HybridScraper {
         const priceElement = trySelectors(selectors.price);
         const titleElement = trySelectors(selectors.title);
         const stockElement = trySelectors(selectors.availability);
+        const imageElement = trySelectors(selectors.image);
 
         if (!priceElement) {
           return null; // Trigger fallback
@@ -348,10 +366,26 @@ class HybridScraper {
           return null; // Invalid price
         }
 
+        // Extract image URL
+        let imageUrl = null;
+        if (imageElement) {
+          if (imageElement.tagName === 'IMG') {
+            imageUrl = imageElement.src || imageElement.dataset.src || imageElement.getAttribute('data-lazy-src');
+          } else if (imageElement.tagName === 'META') {
+            imageUrl = imageElement.content;
+          }
+          
+          // Convert relative URLs to absolute
+          if (imageUrl && !imageUrl.startsWith('http')) {
+            imageUrl = new URL(imageUrl, window.location.origin).href;
+          }
+        }
+
         return {
           title: titleElement?.textContent?.trim() || 'Unknown Product',
           price: price,
           inStock: stockElement ? !stockElement.textContent.toLowerCase().includes('niet beschikbaar') : true,
+          imageUrl: imageUrl,
           currency: 'EUR',
           extractedBy: 'selectors',
           scrapedAt: new Date().toISOString()

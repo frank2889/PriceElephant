@@ -108,6 +108,7 @@ class SitemapImportService {
                 product_name: scrapedData.title,
                 own_price: scrapedData.price,
                 in_stock: scrapedData.inStock !== false,
+                image_url: scrapedData.imageUrl || existing.image_url,
                 updated_at: new Date()
               });
             
@@ -124,14 +125,14 @@ class SitemapImportService {
               in_stock: scrapedData.inStock !== false,
               brand: null,
               category: null,
-              image_url: null,
+              image_url: scrapedData.imageUrl || null,
               import_source: 'sitemap',
               created_at: new Date()
             }).returning('*');
             
             results.created++;
             results.products.push(newProduct);
-            console.log(`[SitemapImport] Created: ${scrapedData.title}`);
+            console.log(`[SitemapImport] Created: ${scrapedData.title}${scrapedData.imageUrl ? ' (with image)' : ''}`);
           }
 
         } catch (error) {
