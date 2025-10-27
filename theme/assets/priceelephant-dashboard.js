@@ -46,6 +46,16 @@
   const selectedProductEan = document.getElementById('pe-selected-product-ean');
   const selectedProductOwnPrice = document.getElementById('pe-selected-product-own-price');
 
+  // Variant management elements
+  const variantsCard = document.getElementById('pe-variants-card');
+  const variantsList = document.getElementById('pe-variants-list');
+  const variantsEmpty = document.getElementById('pe-variants-empty');
+  const variantsStatus = document.getElementById('pe-variants-status');
+  const variantForm = document.getElementById('pe-variant-form');
+  const selectedVariantProductName = document.getElementById('pe-selected-variant-product-name');
+  const selectedVariantProductSku = document.getElementById('pe-selected-variant-product-sku');
+  const selectedVariantProductEan = document.getElementById('pe-selected-variant-product-ean');
+
   const state = {
     products: [],
     pagination: null,
@@ -171,6 +181,11 @@
         </td>
         <td>${product.product_ean || '—'}</td>
         <td>${formatPrice(product.own_price)}</td>
+        <td>
+          <button class="pe-button pe-button--small" data-action="manage-variants" data-product-id="${product.id}">
+            ${product.variant_count || 0} varianten
+          </button>
+        </td>
         <td>
           <span class="pe-status-chip pe-status-chip--${product.metrics?.competitorCount ? 'success' : 'pending'}">
             ${product.metrics?.competitorCount || 0} concurrenten
@@ -489,6 +504,130 @@
     }
   }
 
+  // Variant management functions
+  async function openVariantManager(productId) {
+    const product = state.products.find((item) => String(item.id) === String(productId));
+    if (!product) {
+      showStatus(variantsStatus, 'Product niet gevonden in huidige lijst.', 'error');
+      return;
+    }
+
+    state.selectedProductId = product.id;
+    showStatus(variantsStatus, '', null);
+    variantsEmpty.hidden = true;
+    variantsList.innerHTML = '';
+    variantsCard.hidden = false;
+    
+    selectedVariantProductName.textContent = product.product_name || 'Onbekend product';
+    selectedVariantProductSku.textContent = product.product_sku ? `SKU ${product.product_sku}` : 'Geen SKU';
+    selectedVariantProductEan.textContent = product.product_ean ? `EAN ${product.product_ean}` : 'Geen EAN';
+
+    try {
+      const data = await apiFetch(`/api/v1/products/${customerId}/${product.id}/variants`, {
+        method: 'GET',
+      });
+      renderVariants(data?.variants || []);
+    } catch (error) {
+      showStatus(variantsStatus, `Kon varianten niet laden: ${error.message}`, 'error');
+    }
+  }
+
+  function renderVariants(variants) {
+    variantsList.innerHTML = '';
+    if (!variants || !variants.length) {
+      variantsEmpty.hidden = false;
+      return;
+    }
+
+    variantsEmpty.hidden = true;
+    variants.forEach((variant) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pe-variant-item';
+      wrapper.innerHTML = `
+        <div class="pe-variant-item__meta">
+          <strong>${variant.variant_title || 'Variant zonder titel'}</strong>
+          <div class="pe-text-muted">
+            ${variant.option1_name ? `${variant.option1_name}: ${variant.option1_value}` : ''}
+            ${variant.option2_name ? ` | ${variant.option2_name}: ${variant.option2_value}` : ''}
+          </div>
+          <div class="pe-text-muted">
+            Prijs: ${formatPrice(variant.price)} | SKU: ${variant.sku || 'Geen SKU'}
+          </div>
+          <div class="pe-text-muted">Aangemaakt: ${formatDate(variant.created_at)}</div>
+        </div>
+        <div>
+          <button
+            class="pe-button pe-button--danger"
+            data-action="delete-variant"
+            data-variant-id="${variant.id}"
+          >Verwijderen</button>
+        </div>
+      `;
+      variantsList.appendChild(wrapper);
+    });
+  }
+
+  async function handleVariantSubmit(event) {
+    event.preventDefault();
+    if (!state.selectedProductId) {
+      showStatus(variantsStatus, 'Selecteer eerst een product.', 'error');
+      return;
+    }
+
+    const formData = new FormData(variantForm);
+    const variantData = {
+      variant_title: formData.get('variantTitle')?.trim(),
+      option1_name: formData.get('option1Name')?.trim(),
+      option1_value: formData.get('option1Value')?.trim(),
+      option2_name: formData.get('option2Name')?.trim(),
+      option2_value: formData.get('option2Value')?.trim(),
+      sku: formData.get('sku')?.trim(),
+      price: formData.get('price')?.trim()
+    };
+
+    if (!variantData.variant_title) {
+      showStatus(variantsStatus, 'Variant titel is verplicht.', 'error');
+      return;
+    }
+
+    setLoading(variantForm.querySelector('button[type="submit"]'), true);
+
+    try {
+      await apiFetch(`/api/v1/products/${customerId}/${state.selectedProductId}/variants`, {
+        method: 'POST',
+        body: JSON.stringify(variantData),
+      });
+      variantForm.reset();
+      showStatus(variantsStatus, 'Variant toegevoegd.', 'success');
+      await openVariantManager(state.selectedProductId);
+      // Refresh product list to update variant count
+      await loadProducts(productSearchInput.value.trim());
+    } catch (error) {
+      showStatus(variantsStatus, `Toevoegen mislukt: ${error.message}`, 'error');
+    } finally {
+      setLoading(variantForm.querySelector('button[type="submit"]'), false);
+    }
+  }
+
+  async function handleDeleteVariant(variantId) {
+    if (!state.selectedProductId) {
+      showStatus(variantsStatus, 'Geen product geselecteerd.', 'error');
+      return;
+    }
+
+    try {
+      await apiFetch(`/api/v1/products/${customerId}/${state.selectedProductId}/variants/${variantId}`, {
+        method: 'DELETE',
+      });
+      showStatus(variantsStatus, 'Variant verwijderd.', 'success');
+      await openVariantManager(state.selectedProductId);
+      // Refresh product list to update variant count
+      await loadProducts(productSearchInput.value.trim());
+    } catch (error) {
+      showStatus(variantsStatus, `Verwijderen mislukt: ${error.message}`, 'error');
+    }
+  }
+
   function setupEventListeners() {
     console.log('[PriceElephant] Setup event listeners');
     console.log('[PriceElephant] Elements check:', {
@@ -496,7 +635,8 @@
       channableImportBtn: !!channableImportBtn,
       shopifySyncBtn: !!shopifySyncBtn,
       shopifySyncAllBtn: !!shopifySyncAllBtn,
-      competitorForm: !!competitorForm
+      competitorForm: !!competitorForm,
+      variantForm: !!variantForm
     });
     
     let listenersCount = 0;
@@ -541,6 +681,12 @@
       listenersCount++;
     }
     
+    if (variantForm) {
+      variantForm.addEventListener('submit', handleVariantSubmit);
+      console.log('[PriceElephant] Variant form listener attached');
+      listenersCount++;
+    }
+    
     updateDebug('listeners', `✅ ${listenersCount} listeners`);
   
 
@@ -553,6 +699,9 @@
       if (action === 'manage-competitors') {
         const productId = target.dataset.productId;
         openCompetitorManager(productId);
+      } else if (action === 'manage-variants') {
+        const productId = target.dataset.productId;
+        openVariantManager(productId);
       }
     });
 
@@ -565,6 +714,18 @@
       if (action === 'delete-competitor') {
         const competitorId = target.dataset.competitorId;
         handleDeleteCompetitor(competitorId);
+      }
+    });
+
+    variantsList.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const action = target.dataset.action;
+      if (action === 'delete-variant') {
+        const variantId = target.dataset.variantId;
+        handleDeleteVariant(variantId);
       }
     });
 

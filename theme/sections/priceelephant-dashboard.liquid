@@ -92,6 +92,7 @@
               <th>Product</th>
               <th>EAN</th>
               <th>Eigen prijs</th>
+              <th>Varianten</th>
               <th>Concurrenten</th>
               <th>Sync status</th>
               <th></th>
@@ -103,6 +104,58 @@
       <div id="pe-products-empty" class="pe-empty-state" hidden>
         Nog geen producten gevonden. Importeer via Channable en refresh.
       </div>
+    </section>
+
+    <section class="pe-card" id="pe-variants-card" hidden>
+      <h2>Varianten voor <span id="pe-selected-variant-product-name"></span></h2>
+      <div class="pe-badges" style="margin-bottom: 12px;">
+        <span class="pe-badge" id="pe-selected-variant-product-sku"></span>
+        <span class="pe-badge" id="pe-selected-variant-product-ean"></span>
+      </div>
+      <div id="pe-variants-status" class="pe-alert" hidden></div>
+      <div id="pe-variants-empty" class="pe-empty-state" hidden>
+        Geen varianten aangemaakt voor dit product.
+      </div>
+      <div class="pe-variants__list" id="pe-variants-list"></div>
+      <form id="pe-variant-form" style="margin-top: 16px;" novalidate>
+        <div class="pe-field-group">
+          <div class="pe-field">
+            <label for="pe-variant-title">Variant titel</label>
+            <input type="text" id="pe-variant-title" name="variantTitle" placeholder="Rood / Large">
+          </div>
+        </div>
+        <div class="pe-field-group">
+          <div class="pe-field">
+            <label for="pe-option1-name">Optie 1 naam</label>
+            <input type="text" id="pe-option1-name" name="option1Name" placeholder="Kleur">
+          </div>
+          <div class="pe-field">
+            <label for="pe-option1-value">Optie 1 waarde</label>
+            <input type="text" id="pe-option1-value" name="option1Value" placeholder="Rood">
+          </div>
+        </div>
+        <div class="pe-field-group">
+          <div class="pe-field">
+            <label for="pe-option2-name">Optie 2 naam (optioneel)</label>
+            <input type="text" id="pe-option2-name" name="option2Name" placeholder="Maat">
+          </div>
+          <div class="pe-field">
+            <label for="pe-option2-value">Optie 2 waarde (optioneel)</label>
+            <input type="text" id="pe-option2-value" name="option2Value" placeholder="Large">
+          </div>
+        </div>
+        <div class="pe-field-group">
+          <div class="pe-field">
+            <label for="pe-variant-sku">SKU (optioneel)</label>
+            <input type="text" id="pe-variant-sku" name="sku" placeholder="PROD-RED-L">
+          </div>
+          <div class="pe-field">
+            <label for="pe-variant-price">Prijs (optioneel)</label>
+            <input type="number" id="pe-variant-price" name="price" step="0.01" placeholder="99.95">
+          </div>
+        </div>
+        <button type="submit" class="pe-button pe-button--primary">Variant toevoegen</button>
+      </form>
     </section>
 
     <section class="pe-card" id="pe-competitors-card" hidden>
