@@ -22,7 +22,9 @@ const session = {
 };
 
 const metafieldDefinitions = [
+  // Product metafields
   {
+    ownerType: 'PRODUCT',
     name: 'Channable Product ID',
     namespace: 'priceelephant',
     key: 'channable_id',
@@ -30,6 +32,7 @@ const metafieldDefinitions = [
     type: 'single_line_text_field',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'EAN Code',
     namespace: 'priceelephant',
     key: 'ean',
@@ -37,6 +40,7 @@ const metafieldDefinitions = [
     type: 'single_line_text_field',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'Competitor Prices',
     namespace: 'priceelephant',
     key: 'competitor_prices',
@@ -44,6 +48,7 @@ const metafieldDefinitions = [
     type: 'json',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'Price History',
     namespace: 'priceelephant',
     key: 'price_history',
@@ -51,6 +56,7 @@ const metafieldDefinitions = [
     type: 'json',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'Last Scraped',
     namespace: 'priceelephant',
     key: 'last_scraped',
@@ -58,6 +64,7 @@ const metafieldDefinitions = [
     type: 'date_time',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'Lowest Competitor Price',
     namespace: 'priceelephant',
     key: 'lowest_competitor',
@@ -65,6 +72,7 @@ const metafieldDefinitions = [
     type: 'number_decimal',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'Price Difference',
     namespace: 'priceelephant',
     key: 'price_difference',
@@ -72,11 +80,54 @@ const metafieldDefinitions = [
     type: 'number_decimal',
   },
   {
+    ownerType: 'PRODUCT',
     name: 'Competitor Count',
     namespace: 'priceelephant',
     key: 'competitor_count',
     description: 'Number of active competitors tracked',
     type: 'number_integer',
+  },
+  
+  // Customer metafields
+  {
+    ownerType: 'CUSTOMER',
+    name: 'PriceElephant Tier',
+    namespace: 'priceelephant',
+    key: 'tier',
+    description: 'Subscription tier: trial, starter, professional, enterprise',
+    type: 'single_line_text_field',
+  },
+  {
+    ownerType: 'CUSTOMER',
+    name: 'Product Limit',
+    namespace: 'priceelephant',
+    key: 'product_limit',
+    description: 'Maximum number of products allowed (0 = unlimited)',
+    type: 'number_integer',
+  },
+  {
+    ownerType: 'CUSTOMER',
+    name: 'Competitor Limit',
+    namespace: 'priceelephant',
+    key: 'competitor_limit',
+    description: 'Maximum number of competitors per product (0 = unlimited)',
+    type: 'number_integer',
+  },
+  {
+    ownerType: 'CUSTOMER',
+    name: 'API Access',
+    namespace: 'priceelephant',
+    key: 'api_access',
+    description: 'Whether customer has API access enabled',
+    type: 'boolean',
+  },
+  {
+    ownerType: 'CUSTOMER',
+    name: 'Monthly Price',
+    namespace: 'priceelephant',
+    key: 'monthly_price',
+    description: 'Monthly subscription price in EUR',
+    type: 'number_decimal',
   }
 ];
 
@@ -117,7 +168,7 @@ async function createMetafieldDefinitions() {
             key: definition.key,
             description: definition.description,
             type: definition.type,
-            ownerType: 'PRODUCT',
+            ownerType: definition.ownerType,
           }
         };
 
@@ -145,7 +196,8 @@ async function createMetafieldDefinitions() {
 
     console.log('\n✅ Metafield definitions setup complete!');
     console.log('\nℹ️  You can view them in Shopify Admin:');
-    console.log('   Settings → Custom data → Products → Metafields\n');
+    console.log('   • Product metafields: Settings → Custom data → Products → Metafields');
+    console.log('   • Customer metafields: Settings → Custom data → Customers → Metafields\n');
 
   } catch (error) {
     console.error('❌ Setup failed:', error.message);
