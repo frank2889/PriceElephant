@@ -589,9 +589,14 @@
         progressFill.style.width = `${data.percentage || 0}%`;
         progressText.textContent = data.message || 'Bezig...';
         
+        // Show last error if available
+        if (data.lastError) {
+          console.error('[Scraper Error]', data.lastError);
+        }
+        
         // Update debug info
         if (data.scanned) {
-          updateDebug('action', `📊 Scan: ${data.scanned} | Detected: ${data.detectedProducts || 0}`);
+          updateDebug('action', `📊 Scan: ${data.scanned} | Detected: ${data.detectedProducts || 0} | Errors: ${data.errors || 0}`);
         }
       });
 

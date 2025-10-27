@@ -250,17 +250,20 @@ class SitemapImportService {
 
         } catch (error) {
           console.error(`[SitemapImport] Error scanning ${url}:`, error.message);
+          console.error(`[SitemapImport] Error stack:`, error.stack);
           results.errors.push({
             url,
-            error: error.message
+            error: error.message,
+            stack: error.stack?.substring(0, 200) // First 200 chars of stack
           });
           results.skipped++;
           
           sendProgress({
             stage: 'scanning',
-            message: `⚠️ Error bij ${url.substring(0, 50)}...`,
+            message: `⚠️ Error: ${error.message.substring(0, 50)}`,
             percentage: scanProgress,
-            errors: results.errors.length
+            errors: results.errors.length,
+            lastError: error.message
           });
         }
       }
