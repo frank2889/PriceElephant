@@ -177,13 +177,42 @@
     productsEmptyState.hidden = true;
     state.products.forEach((product) => {
       const row = document.createElement('tr');
+      
+      // Build metadata badges
+      const badges = [];
+      if (product.image_url) badges.push('🖼️');
+      if (product.rating) badges.push(`⭐${product.rating.toFixed(1)}`);
+      if (product.review_count) badges.push(`(${product.review_count})`);
+      if (product.discount_percentage) badges.push(`<span style="color: #dc2626;">-${product.discount_percentage}%</span>`);
+      if (product.has_free_shipping) badges.push('🚚');
+      if (product.stock_level !== null && product.stock_level !== undefined) {
+        const stockColor = product.stock_level > 10 ? '#059669' : product.stock_level > 0 ? '#f59e0b' : '#dc2626';
+        badges.push(`<span style="color: ${stockColor};">📦${product.stock_level}</span>`);
+      }
+      if (product.delivery_time) badges.push(`⏱️ ${product.delivery_time}`);
+      if (product.bundle_info) badges.push('🎁');
+      
+      const badgeHtml = badges.length ? `<div style="font-size: 11px; margin-top: 4px;">${badges.join(' ')}</div>` : '';
+      
+      // Price display with original price if discounted
+      let priceHtml = formatPrice(product.own_price);
+      if (product.original_price && product.original_price > product.own_price) {
+        priceHtml = `
+          <div>
+            <span style="text-decoration: line-through; color: #9ca3af; font-size: 12px;">${formatPrice(product.original_price)}</span>
+            <strong style="color: #dc2626;">${formatPrice(product.own_price)}</strong>
+          </div>
+        `;
+      }
+      
       row.innerHTML = `
         <td>
           <strong>${product.product_name || 'Naam onbekend'}</strong>
           <div class="pe-text-muted">${product.brand || '—'}${product.category ? ` · ${product.category}` : ''}</div>
+          ${badgeHtml}
         </td>
         <td>${product.product_ean || '—'}</td>
-        <td>${formatPrice(product.own_price)}</td>
+        <td>${priceHtml}</td>
         <td>
           <button class="pe-button pe-button--small" data-action="manage-variants" data-product-id="${product.id}">
             ${product.variant_count || 0} varianten
@@ -516,8 +545,33 @@
       if (results) {
         const scanInfo = `📊 Gescand: ${results.scanned} URLs | ✅ Producten gedetecteerd: ${results.detectedProducts}`;
         const importInfo = `📦 Nieuw: ${results.created} | 🔄 Bijgewerkt: ${results.updated} | ⏭️ Overgeslagen: ${results.skipped}`;
+        
+        // Count metadata extraction stats
+        const metadataStats = [];
+        let imagesCount = 0, ratingsCount = 0, brandsCount = 0, stockCount = 0, deliveryCount = 0, bundleCount = 0;
+        
+        if (results.products) {
+          results.products.forEach(p => {
+            if (p.image_url) imagesCount++;
+            if (p.rating) ratingsCount++;
+            if (p.brand) brandsCount++;
+            if (p.stock_level !== null && p.stock_level !== undefined) stockCount++;
+            if (p.delivery_time) deliveryCount++;
+            if (p.bundle_info) bundleCount++;
+          });
+          
+          if (imagesCount) metadataStats.push(`🖼️ ${imagesCount}`);
+          if (ratingsCount) metadataStats.push(`⭐ ${ratingsCount}`);
+          if (brandsCount) metadataStats.push(`🏷️ ${brandsCount}`);
+          if (stockCount) metadataStats.push(`📦 ${stockCount}`);
+          if (deliveryCount) metadataStats.push(`⏱️ ${deliveryCount}`);
+          if (bundleCount) metadataStats.push(`🎁 ${bundleCount}`);
+        }
+        
+        const metadataInfo = metadataStats.length ? `\n📋 Metadata: ${metadataStats.join(' · ')}` : '';
         const errorInfo = results.errors?.length > 0 ? ` | ⚠️ Errors: ${results.errors.length}` : '';
-        showStatus(sitemapStatus, `${message}\n${scanInfo}\n${importInfo}${errorInfo}`, results.errors?.length > 0 ? 'error' : 'success');
+        
+        showStatus(sitemapStatus, `${message}\n${scanInfo}\n${importInfo}${metadataInfo}${errorInfo}`, results.errors?.length > 0 ? 'error' : 'success');
         updateDebug('action', `✅ Sitemap: ${results.detectedProducts} detected, ${results.created} imported`);
       } else {
         showStatus(sitemapStatus, message, 'success');
