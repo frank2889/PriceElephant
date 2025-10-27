@@ -497,7 +497,7 @@
 
     try {
       console.log('[handleSitemapImport] Calling import API...');
-      showStatus(sitemapStatus, `Sitemap wordt verwerkt... (max ${maxProducts} producten)`, 'success');
+      showStatus(sitemapStatus, `🔍 Intelligente scan gestart... Sitemap wordt geparsed en URLs worden gecontroleerd op productpagina's (max ${maxProducts} producten)`, 'success');
       
       const response = await apiFetch('/api/v1/sitemap/import', {
         method: 'POST',
@@ -512,9 +512,16 @@
       
       const message = response?.message || 'Import uitgevoerd.';
       const results = response?.results;
-      const detail = results ? ` (${results.created || 0} nieuw / ${results.updated || 0} bijgewerkt / ${results.skipped || 0} overgeslagen)` : '';
-      showStatus(sitemapStatus, `${message}${detail}`, results?.errors > 0 ? 'error' : 'success');
-      updateDebug('action', `✅ Sitemap import: ${results?.created || 0} created`);
+      
+      if (results) {
+        const scanInfo = `📊 Gescand: ${results.scanned} URLs | ✅ Producten gedetecteerd: ${results.detectedProducts}`;
+        const importInfo = `📦 Nieuw: ${results.created} | 🔄 Bijgewerkt: ${results.updated} | ⏭️ Overgeslagen: ${results.skipped}`;
+        const errorInfo = results.errors?.length > 0 ? ` | ⚠️ Errors: ${results.errors.length}` : '';
+        showStatus(sitemapStatus, `${message}\n${scanInfo}\n${importInfo}${errorInfo}`, results.errors?.length > 0 ? 'error' : 'success');
+        updateDebug('action', `✅ Sitemap: ${results.detectedProducts} detected, ${results.created} imported`);
+      } else {
+        showStatus(sitemapStatus, message, 'success');
+      }
       
       await loadProducts(productSearchInput.value.trim());
     } catch (error) {

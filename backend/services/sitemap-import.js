@@ -24,12 +24,12 @@ class SitemapImportService {
   async importFromSitemap(sitemapUrl, options = {}) {
     const {
       maxProducts = 100, // Limit aantal producten
-      productUrlPattern = null, // Regex filter voor product URLs
+      productUrlPattern = null, // Regex filter voor product URLs (optional pre-filter)
       selectors = {} // Custom selectors voor scraping
     } = options;
 
-    console.log(`[SitemapImport] Starting import from: ${sitemapUrl}`);
-    console.log(`[SitemapImport] Max products: ${maxProducts}`);
+    console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
+    console.log(`[SitemapImport] Max products target: ${maxProducts}`);
 
     try {
       // Parse sitemap
@@ -41,42 +41,54 @@ class SitemapImportService {
       const { sites } = await sitemap.fetch();
       console.log(`[SitemapImport] Found ${sites.length} URLs in sitemap`);
 
-      // Filter product URLs
-      let productUrls = sites;
+      // Optional: Pre-filter URLs with pattern to speed up detection
+      let candidateUrls = sites;
       
       if (productUrlPattern) {
         const regex = new RegExp(productUrlPattern, 'i');
-        productUrls = sites.filter(url => regex.test(url));
-        console.log(`[SitemapImport] Filtered to ${productUrls.length} product URLs`);
+        candidateUrls = sites.filter(url => regex.test(url));
+        console.log(`[SitemapImport] Pre-filtered to ${candidateUrls.length} candidate URLs`);
       }
 
-      // Limit to maxProducts
-      productUrls = productUrls.slice(0, maxProducts);
-      console.log(`[SitemapImport] Processing ${productUrls.length} products`);
+      console.log(`[SitemapImport] Starting intelligent product detection...`);
 
-      // Scrape products
+      // Scrape products with intelligent detection
       const results = {
         created: 0,
         updated: 0,
         skipped: 0,
         errors: [],
-        products: []
+        products: [],
+        scanned: 0,
+        detectedProducts: 0
       };
 
       this.browser = await chromium.launch({ headless: true });
 
-      for (let i = 0; i < productUrls.length; i++) {
-        const url = productUrls[i];
-        console.log(`[SitemapImport] [${i+1}/${productUrls.length}] Scraping: ${url}`);
+      // Detecteer producten door te scrapen tot we maxProducts gevonden hebben
+      let productsFound = 0;
+      
+      for (let i = 0; i < candidateUrls.length && productsFound < maxProducts; i++) {
+        const url = candidateUrls[i];
+        results.scanned++;
+        
+        console.log(`[SitemapImport] [${i+1}/${candidateUrls.length}] Scanning: ${url}`);
 
         try {
           const product = await this.scrapeProduct(url, selectors);
           
-          if (!product.title || !product.price) {
-            console.warn(`[SitemapImport] Skipping ${url}: Missing title or price`);
+          // Intelligent product detection: check if this is actually a product page
+          const isProductPage = this.isProductPage(product);
+          
+          if (!isProductPage) {
+            console.log(`[SitemapImport] ❌ Not a product page (no price/title found)`);
             results.skipped++;
             continue;
           }
+
+          console.log(`[SitemapImport] ✅ Product detected: ${product.title} - €${product.price}`);
+          results.detectedProducts++;
+          productsFound++;
 
           // Check if product exists (by URL)
           const existing = await db('products')
@@ -121,11 +133,11 @@ class SitemapImportService {
             console.log(`[SitemapImport] Created: ${product.title}`);
           }
 
-          // Rate limiting
-          await this.delay(2000);
+          // Rate limiting between scrapes
+          await this.delay(1500);
 
         } catch (error) {
-          console.error(`[SitemapImport] Error scraping ${url}:`, error.message);
+          console.error(`[SitemapImport] Error scanning ${url}:`, error.message);
           results.errors.push({
             url,
             error: error.message
@@ -135,7 +147,11 @@ class SitemapImportService {
 
       await this.browser.close();
 
-      console.log(`[SitemapImport] Complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.errors.length} errors`);
+      console.log(`[SitemapImport] ✅ Complete!`);
+      console.log(`[SitemapImport] Scanned: ${results.scanned} URLs`);
+      console.log(`[SitemapImport] Products detected: ${results.detectedProducts}`);
+      console.log(`[SitemapImport] Created: ${results.created}, Updated: ${results.updated}`);
+      console.log(`[SitemapImport] Skipped: ${results.skipped}, Errors: ${results.errors.length}`);
 
       return results;
 
@@ -145,6 +161,50 @@ class SitemapImportService {
       }
       throw new Error(`Sitemap import failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Intelligent product page detection
+   * @param {object} product - Scraped product data
+   * @returns {boolean} True if this is a product page
+   */
+  isProductPage(product) {
+    // Must have at minimum: title AND price
+    if (!product.title || !product.price) {
+      return false;
+    }
+
+    // Price must be valid number > 0
+    if (typeof product.price !== 'number' || product.price <= 0) {
+      return false;
+    }
+
+    // Title should be reasonable length (not just "Home" or "Contact")
+    if (product.title.length < 5) {
+      return false;
+    }
+
+    // Exclude common non-product pages by title patterns
+    const excludePatterns = [
+      /^home$/i,
+      /^contact$/i,
+      /^over ons$/i,
+      /^about us$/i,
+      /^privacy/i,
+      /^terms/i,
+      /^algemene voorwaarden/i,
+      /^checkout$/i,
+      /^cart$/i,
+      /^winkelwagen$/i
+    ];
+
+    for (const pattern of excludePatterns) {
+      if (pattern.test(product.title)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
