@@ -23,7 +23,7 @@ exports.seed = async function(knex) {
         requires_js: true
       }),
       proxy_config: JSON.stringify({
-        provider: 'brightdata',
+        provider: 'webshare',
         country: 'nl',
         sticky_session: true
       })
@@ -44,7 +44,7 @@ exports.seed = async function(knex) {
         requires_js: true
       }),
       proxy_config: JSON.stringify({
-        provider: 'brightdata',
+        provider: 'webshare',
         country: 'nl',
         sticky_session: true
       })
@@ -88,7 +88,7 @@ exports.seed = async function(knex) {
         requires_js: true
       }),
       proxy_config: JSON.stringify({
-        provider: 'brightdata',
+        provider: 'webshare',
         country: 'nl',
         sticky_session: true
       })

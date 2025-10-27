@@ -149,7 +149,7 @@ class CoolblueScraper {
    */
   static async test() {
     console.log('\n🚀 Starting Coolblue scraper POC (Mock Data)...\n');
-    console.log('⚠️  Note: Real scraping requires BrightData/Oxylabs proxy (Sprint 1)');
+    console.log('⚠️  Note: Real scraping requires WebShare proxy (Sprint 1)');
     console.log('⚠️  Coolblue blocks headless browsers without proxy rotation\n');
 
     const scraper = new CoolblueScraper();
@@ -227,7 +227,7 @@ class CoolblueScraper {
       if (successRate >= 0.95) {
         console.log('🎉 SUCCESS: Scraper POC meets 95%+ success rate requirement!');
         console.log('📦 Sprint 0 COMPLETE: Database + scraper infrastructure ready');
-        console.log('🔜 Next: Sprint 1 - Add BrightData/Oxylabs proxy for real scraping');
+        console.log('🔜 Next: Sprint 1 - Add WebShare proxy for real scraping');
       } else {
         console.log('⚠️  WARNING: Success rate below 95% threshold');
       }

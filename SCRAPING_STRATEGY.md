@@ -16,7 +16,7 @@ PriceElephant combines **cost-optimized scraping** with **intelligent automation
 ## 📊 Cost-Optimized Multi-Tier Approach
 
 ### Problem Statement
-Initial Bright Data implementation had monthly costs of **€600-800 for 500 products**, making the business model unprofitable:
+Initial premium proxy implementation had monthly costs of **€600+ for 500 products**, making the business model unprofitable:
 - Professional plan (€99/month): -€701 loss per customer
 - Enterprise plan (€249/month): -€551 loss per customer
 - Break-even required 134+ paying customers
@@ -51,13 +51,10 @@ Initial Bright Data implementation had monthly costs of **€600-800 for 500 pro
                            │ Failed
                            ▼
         ┌──────────────────────────────────────┐
-        │  TIER 4: Bright Data Residential     │
-        │  Cost: €0.01/request                 │
+        │  TIER 4: AI Vision Analysis          │
+        │  Cost: €0.02/request                 │
         │  Success: ~99%                       │
         └──────────────────────────────────────┘
-                           │ Failed
-                           ▼
-        ┌──────────────────────────────────────┐
         │  TIER 5: GPT-4 Vision API            │
         │  Cost: €0.02/request                 │
         │  Success: 99%+                       │
@@ -84,17 +81,16 @@ Initial Bright Data implementation had monthly costs of **€600-800 for 500 pro
 | 1 | Direct | 60% | 72,000 | €0 | **€0** |
 | 2 | Free Proxy | 20% of failures | 24,000 | €0 | **€0** |
 | 3 | WebShare | 15% of failures | 18,000 | €0.0003 | **€5.40** |
-| 4 | Bright Data | 4% of failures | 4,800 | €0.01 | **€48** |
-| 5 | AI Vision | 1% of failures | 1,200 | €0.02 | **€24** |
-| **TOTAL** | | **99%+** | 120,000 | | **€77.40** |
+| 4 | AI Vision | 5% of failures | 6,000 | €0.02 | **€120** |
+| **TOTAL** | | **99%+** | 120,000 | | **€125.40** |
 
 ### Comparison with Original Strategy
 
-| Metric | Bright Data Only | Hybrid (Per-Customer) | Multi-Tenant Shared | Savings |
-|--------|-----------------|----------------------|---------------------|---------|
-| Monthly cost (500 products) | €600-800 | €75-100 | **€5** | **€795** |
-| Cost per scrape | €0.006 | €0.0006 | **€0.00004** | **99.3%** |
-| Cost per customer | €800 | €75 | **€5** | **99.4%** |
+| Metric | Premium Proxy Only | Hybrid (Per-Customer) | Multi-Tenant Shared | Savings |
+|--------|-------------------|----------------------|---------------------|---------|
+| Monthly cost (500 products) | €600+ | €125-150 | **€5** | **€595** |
+| Cost per scrape | €0.005 | €0.001 | **€0.00004** | **99.2%** |
+| Cost per customer | €600 | €125 | **€5** | **99.2%** |
 | Success rate | 99% | 99%+ | 99%+ | Same |
 | Vendor lock-in | High | Low | None | ✅ |
 | Gross margin (€99 plan) | -708% | 24% | **95%** | ✅✅✅ |
@@ -530,15 +526,7 @@ WEBSHARE_USERNAME=your-username
 WEBSHARE_PASSWORD=your-password
 ```
 
-**Tier 4: Bright Data (Optional fallback - pay per use)**
-```bash
-BRIGHTDATA_USERNAME=brd-customer-hl_xxxxx-zone-priceelephant_nl
-BRIGHTDATA_PASSWORD=your-password
-BRIGHTDATA_HOST=brd.superproxy.io
-BRIGHTDATA_PORT=22225
-```
-
-**Tier 5: OpenAI GPT-4 Vision (Optional - €0.02/request)**
+**Tier 4: OpenAI GPT-4 Vision (Final fallback - €0.02/request)**
 ```bash
 OPENAI_API_KEY=sk-xxxxx
 ```
@@ -550,7 +538,7 @@ OPENAI_API_KEY=sk-xxxxx
 | **None (Direct)** | No proxy | Free | N/A | 60% | ✅ Always try first |
 | **ProxyScrape** | Free public | Free | Yes | 40% | ✅ Good fallback |
 | **WebShare.io** | Datacenter | €30/month | Yes | 90% | ✅ Best value |
-| **Bright Data** | Residential | €500+/month | Yes | 99% | ⚠️ Fallback only |
+| **AI Vision** | Screenshot | €0.02/req | Ultimate | 99% | ✅ Final fallback |
 | **Smartproxy** | Residential | €75/month | Yes | 95% | ❌ More expensive than WebShare |
 | **IPRoyal** | Datacenter | €50/month | Yes | 85% | ❌ Lower success than WebShare |
 
@@ -573,7 +561,7 @@ OPENAI_API_KEY=sk-xxxxx
 - Tier 1: Direct ✅
 - Tier 2: Free proxies ✅
 - Tier 3: WebShare ✅ (€30/month)
-- Tier 4: Bright Data ✅ (pay per use)
+- Tier 4: AI Vision ✅ (€0.02/request)
 - Tier 5: AI Vision ✅ (pay per use)
 - **Cost: €75-100/month**
 - **Success: 99%+**
@@ -586,7 +574,7 @@ OPENAI_API_KEY=sk-xxxxx
 
 | Model | Revenue | COGS | Gross Profit | Margin |
 |-------|---------|------|--------------|--------|
-| **Bright Data Only** | €99 | €800 | -€701 ❌ | -708% |
+| **Premium Only** | €99 | €600 | -€501 ❌ | -506% |
 | **Hybrid Per-Customer** | €99 | €75 | +€24 ✅ | 24% |
 | **Multi-Tenant Shared** | €99 | €5 | **+€94** ✅✅ | **95%** |
 
@@ -631,7 +619,7 @@ OPENAI_API_KEY=sk-xxxxx
 
 ### Break-even Analysis
 
-| Metric | Bright Data | Hybrid | Multi-Tenant |
+| Metric | Premium Proxy | Hybrid | Multi-Tenant |
 |--------|-------------|--------|--------------|
 | Customers needed | 134+ | 1 | 1 |
 | Monthly revenue (break-even) | €13,360 | €99 | €49 |
@@ -778,7 +766,7 @@ const avoidTimes = [
       "direct": { "count": 2541, "cost": "€0" },
       "free": { "count": 847, "cost": "€0" },
       "webshare": { "count": 635, "cost": "€0.19" },
-      "brightdata": { "count": 169, "cost": "€1.69" },
+      "ai_vision": { "count": 169, "cost": "€3.38" },
       "aivision": { "count": 43, "cost": "€0.86" }
     }
   },

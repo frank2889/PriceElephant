@@ -4,8 +4,7 @@
  * Manages multiple proxy tiers:
  * - Tier 1: Direct (no proxy) - FREE
  * - Tier 2: Free public proxies - FREE (wisselend)
- * - Tier 3: WebShare datacenter proxies - €30/maand
- * - Tier 4: Premium residential (fallback) - €0.01/request
+ * - Tier 3: WebShare residential - €0.0003/request
  * 
  * Features:
  * - Health checking
@@ -54,20 +53,6 @@ class ProxyPool {
         successRate: 0.9, // 90% verwacht
         totalRequests: 0,
         successfulRequests: 0
-      },
-      
-      // Tier 4: Premium residential (Bright Data fallback)
-      premium: {
-        tier: 4,
-        cost: 0.01, // €0.01/request
-        enabled: !!process.env.BRIGHTDATA_USERNAME,
-        host: process.env.BRIGHTDATA_HOST || 'brd.superproxy.io',
-        port: parseInt(process.env.BRIGHTDATA_PORT) || 22225,
-        username: process.env.BRIGHTDATA_USERNAME,
-        password: process.env.BRIGHTDATA_PASSWORD,
-        successRate: 0.99, // 99% verwacht
-        totalRequests: 0,
-        successfulRequests: 0
       }
     };
     
@@ -98,11 +83,6 @@ class ProxyPool {
     // Try Tier 3: WebShare (cheap paid)
     if (this.proxies.webshare.enabled) {
       return this.createProxyConfig('webshare');
-    }
-    
-    // Fallback Tier 4: Premium
-    if (this.proxies.premium.enabled) {
-      return this.createProxyConfig('premium');
     }
     
     // No proxy available, try direct anyway
@@ -155,7 +135,7 @@ class ProxyPool {
       return config;
     }
     
-    if (tier === 'webshare' || tier === 'premium') {
+    if (tier === 'webshare') {
       const proxyInfo = this.proxies[tier];
       config.proxy = {
         server: `http://${proxyInfo.host}:${proxyInfo.port}`,

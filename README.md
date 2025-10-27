@@ -22,7 +22,7 @@ Een **SaaS platform** voor competitor price intelligence via Channable integrati
 
 - ✅ 15-table database schema with partitioning### 1. **Backend API**
 
-- ✅ Hybrid scraper (BrightData proxy + GPT-4 Vision fallback)Express.js server die price data verzamelt en analyseert:
+- ✅ 4-tier hybrid scraper (WebShare proxy + AI Vision fallback)Express.js server die price data verzamelt en analyseert:
 
 - ✅ 99.9% success rate guarantee- 🔗 Channable integration (API + Feed URL)
 
@@ -68,7 +68,7 @@ Klanten kunnen **elk e-commerce platform** gebruiken:
 
 - Playwright (headless browser)- ✅ Magento
 
-- BrightData residential proxies (Dutch IPs)- ✅ WooCommerce
+- WebShare proxies (Dutch IPs)- ✅ WooCommerce
 
 - GPT-4 Vision API (fallback for anti-bot)- ✅ Custom solutions
 
@@ -92,7 +92,7 @@ Klanten kunnen **elk e-commerce platform** gebruiken:
 
 ### Hybrid Scraper Strategycd backend
 
-1. **Primary**: Selector-based scraping with BrightData proxy (95% success, fast & cheap)npm install
+1. **Primary**: Selector-based scraping with WebShare proxy (90% success, fast & cheap)npm install
 
 2. **Fallback**: GPT-4 Vision AI scraping (99.5% success, selector-free)npm run dev
 
@@ -144,7 +144,7 @@ Dashboard: **http://localhost:8081/admin-dashboard/client-dashboard.html**
 
 - Node.js 18+│
 
-- BrightData account (proxy)├── shopify-app/              ← Shopify App (Backend API)
+- WebShare account (proxy)├── shopify-app/              ← Shopify App (Backend API)
 
 - OpenAI API key (GPT-4 Vision)│   ├── server.js             # Express API server
 
@@ -178,7 +178,7 @@ npm run db:seed│
 
 cp .env.example .env└── SHOPIFY-SETUP.md          # Deployment guide
 
-# Add: OPENAI_API_KEY, BRIGHTDATA_USERNAME, BRIGHTDATA_PASSWORD```
+# Add: OPENAI_API_KEY, WEBSHARE_USERNAME, WEBSHARE_PASSWORD```
 
 
 
@@ -212,7 +212,7 @@ PriceElephant/- ⚡ Price alert formulieren
 
 │   ├── services/        # Product import, price tracking- Shopify OAuth multi-merchant
 
-│   ├── utils/           # BrightData proxy, AI Vision- AI pricing recommendations
+│   ├── utils/           # ProxyPool, AI Vision- AI pricing recommendations
 
 │   └── server.js        # Express app
 

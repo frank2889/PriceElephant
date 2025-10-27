@@ -5,11 +5,9 @@
  * 1. Try direct (no proxy) - FREE - 60% success
  * 2. Try free proxies - FREE - 40% success  
  * 3. Try WebShare - €0.0003/req - 90% success
- * 4. Try Bright Data - €0.01/req - 99% success
- * 5. Fallback AI Vision - €0.02/req - 99% success
+ * 4. Fallback AI Vision - €0.02/req - 99% success
  * 
  * Target: €30-50/maand for 500 products (2x/dag scraping)
- * vs €800/maand Bright Data only
  */
 
 require('dotenv').config();
@@ -71,7 +69,6 @@ class HybridScraper {
       directSuccess: 0,
       freeProxySuccess: 0,
       paidProxySuccess: 0,
-      premiumProxySuccess: 0,
       aiVisionSuccess: 0,
       failures: 0,
       totalCost: 0
@@ -197,44 +194,18 @@ class HybridScraper {
           console.log(`❌ Tier 3 failed: ${error3.message}`);
           await this.close();
 
-          // Try Tier 4: Premium (Bright Data)
+          // Try Tier 4: AI Vision (final fallback)
+          console.log(`🎯 Tier 4: AI Vision fallback`);
           try {
-            console.log(`🎯 Tier 4: Premium proxy (Bright Data)`);
-            const proxyConfig = this.proxyPool.createProxyConfig('premium');
-            if (!proxyConfig.proxy) {
-              throw new Error('Premium proxy not configured');
-            }
-            
-            await this.init(proxyConfig);
-            scrapedData = await this.scrapeWithSelectors(url, retailer);
-            
-            if (scrapedData && scrapedData.price > 0) {
-              this.proxyPool.recordResult('premium', true, 0.01);
-              this.stats.premiumProxySuccess++;
-              tier = 'premium';
-              cost = 0.01;
-              console.log(`✅ Tier 4 success: €${scrapedData.price} (cost: €${cost})`);
-            } else {
-              throw new Error('No valid price found');
-            }
+            scrapedData = await this.aiVision.scrape(url);
+            this.stats.aiVisionSuccess++;
+            tier = 'ai-vision';
+            cost = 0.02; // GPT-4V API cost
+            console.log(`✅ Tier 4 AI success: €${scrapedData.price} (cost: €${cost})`);
           } catch (error4) {
-            this.proxyPool.recordResult('premium', false, 0);
-            console.log(`❌ Tier 4 failed: ${error4.message}`);
-            await this.close();
-
-            // Final fallback: AI Vision
-            console.log(`🎯 Tier 5: AI Vision fallback`);
-            try {
-              scrapedData = await this.aiVision.scrape(url);
-              this.stats.aiVisionSuccess++;
-              tier = 'ai-vision';
-              cost = 0.02; // GPT-4V API cost
-              console.log(`✅ Tier 5 AI success: €${scrapedData.price} (cost: €${cost})`);
-            } catch (error5) {
-              console.error(`❌ All tiers failed for ${url}:`, error5.message);
-              this.stats.failures++;
-              throw new Error(`All scraping methods failed: ${error5.message}`);
-            }
+            console.error(`❌ All tiers failed for ${url}:`, error4.message);
+            this.stats.failures++;
+            throw new Error(`All scraping methods failed: ${error4.message}`);
           }
         }
       }
@@ -398,7 +369,6 @@ class HybridScraper {
         direct: this.stats.directSuccess,
         freeProxy: this.stats.freeProxySuccess,
         paidProxy: this.stats.paidProxySuccess,
-        premiumProxy: this.stats.premiumProxySuccess,
         aiVision: this.stats.aiVisionSuccess
       },
       proxyPoolStats: this.proxyPool.getStats()

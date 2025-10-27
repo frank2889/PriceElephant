@@ -1,7 +1,7 @@
 /**
  * Scraper API Routes - Cost-Optimized Hybrid Scraping
  * POST /api/v1/scraper/run - Trigger scrape for products
- * Uses multi-tier fallback: Direct → Free Proxy → WebShare → Bright Data → AI Vision
+ * Uses multi-tier fallback: Direct → Free Proxy → WebShare → AI Vision
  * Target cost: €30-50/maand instead of €800/maand
  */
 

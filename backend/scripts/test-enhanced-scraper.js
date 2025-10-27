@@ -14,7 +14,7 @@ const db = require('../config/database');
 async function testEnhancedScraper() {
   console.log('🧪 Testing Enhanced Hybrid Scraper\n');
   console.log('Features being tested:');
-  console.log('✅ Multi-tier fallback (Direct → Free → WebShare → Bright Data → AI)');
+  console.log('✅ Multi-tier fallback (Direct → Free → WebShare → AI)');
   console.log('✅ Intelligent scheduling (hot/warm/normal/cold products)');
   console.log('✅ Real-time price alerts (drops, undercuts, stock changes)');
   console.log('✅ Cost optimization\n');
@@ -217,7 +217,6 @@ async function testEnhancedScraper() {
     console.log(`   - Direct success: ${stats.directSuccess} (${((stats.directSuccess/stats.total)*100).toFixed(1)}%)`);
     console.log(`   - Free proxy: ${stats.freeProxySuccess}`);
     console.log(`   - WebShare: ${stats.paidProxySuccess}`);
-    console.log(`   - Bright Data: ${stats.premiumProxySuccess}`);
     console.log(`   - AI Vision: ${stats.aiVisionSuccess}`);
     console.log(`   - Failures: ${stats.failures}`);
     console.log(`   - Total cost: €${stats.totalCost.toFixed(4)}`);

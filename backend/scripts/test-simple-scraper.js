@@ -60,15 +60,14 @@ async function simpleTest() {
   console.log(`   - Direct (FREE): ${stats.directSuccess} (${((stats.directSuccess/stats.total)*100).toFixed(1)}%)`);
   console.log(`   - Free proxies: ${stats.freeProxySuccess}`);
   console.log(`   - WebShare (€0.0003): ${stats.paidProxySuccess}`);
-  console.log(`   - Bright Data (€0.01): ${stats.premiumProxySuccess}`);
   console.log(`   - AI Vision (€0.02): ${stats.aiVisionSuccess}`);
   console.log(`   - Failures: ${stats.failures}`);
   console.log(`\nCost Analysis:`);
   console.log(`   - Total cost: €${stats.totalCost.toFixed(4)}`);
   console.log(`   - Avg per scrape: €${(stats.totalCost / stats.total).toFixed(4)}`);
 
-  const savingsVsBrightData = (0.01 - (stats.totalCost / stats.total)) * 1000;
-  console.log(`   - Savings vs Bright Data only: €${savingsVsBrightData.toFixed(2)}/1000 scrapes`);
+  const savingsVsAI = (0.02 - (stats.totalCost / stats.total)) * 1000;
+  console.log(`   - Savings vs AI-only: €${savingsVsAI.toFixed(2)}/1000 scrapes`);
 
   console.log('\n✅ Test complete!\n');
   console.log('💡 Note: Intelligent scheduling and alerts require productId + customerId');
