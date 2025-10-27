@@ -66,21 +66,58 @@ class HybridScraper {
     // Universal fallback selectors voor onbekende retailers
     // Werkt met: Shopify, Magento, WooCommerce, Lightspeed, CCV, etc.
     this.universalSelectors = {
+      // Current/Sale price (actual selling price)
       price: [
         // Schema.org
         '[itemprop="price"]', 'meta[property="product:price:amount"]',
         // Shopify
-        '.product__price .price-item--regular', '.product-price', '[data-product-price]',
+        '.product__price .price-item--regular', '.product__price .price-item--sale', '.product-price', '[data-product-price]',
         // Magento
-        '.price-box .price', '[data-price-type="finalPrice"]', '.product-info-price .price',
+        '.price-box .price', '[data-price-type="finalPrice"]', '.special-price .price', '.product-info-price .price',
         // WooCommerce
-        '.woocommerce-Price-amount', 'p.price .amount', '.price ins .amount',
+        '.woocommerce-Price-amount', 'p.price ins .amount', 'p.price .amount', '.price ins .amount',
         // Lightspeed
-        '.product-price', '.price-current',
+        '.product-price', '.price-current', '.sale-price',
         // CCV Shop
-        '.productPrice', '.price',
+        '.productPrice', '.price', '.salePrice',
         // Generic
-        '.price', '[data-price]', '.product-price', '.current-price'
+        '.sale-price', '.special-price', '.price', '[data-price]', '.product-price', '.current-price'
+      ].join(', '),
+      
+      // Original price (crossed out / was price)
+      originalPrice: [
+        // Shopify
+        '.product__price .price-item--regular s', '.price--compare', '.was-price',
+        // Magento
+        '.old-price .price', '.price-box .old-price',
+        // WooCommerce
+        'p.price del .amount', '.price del .amount',
+        // Generic
+        '.original-price', '.old-price', '.was-price', '.compare-at-price', 's .price', 'del .price'
+      ].join(', '),
+      
+      // Discount/Sale badge
+      discount: [
+        // Shopify
+        '.product__badge', '.badge--sale', '[data-sale-badge]',
+        // Magento
+        '.product-label-sale', '.sale-label',
+        // WooCommerce
+        '.onsale', '.product-badge',
+        // Generic
+        '.discount', '.sale-badge', '.discount-badge', '.promo-badge'
+      ].join(', '),
+      
+      // Free shipping info
+      shipping: [
+        // Shopify
+        '.product__shipping', '.free-shipping', '[data-free-shipping]',
+        // Magento
+        '.shipping-info', '.free-shipping-message',
+        // WooCommerce
+        '.free-shipping', '.shipping-notice',
+        // Generic
+        '.shipping-info', '.delivery-info', '.free-shipping', '.shipping-message'
       ].join(', '),
       
       title: [
@@ -348,23 +385,49 @@ class HybridScraper {
           return null;
         };
 
+        // Helper to parse price from text
+        const parsePrice = (text) => {
+          if (!text) return null;
+          const cleaned = text.replace('€', '').replace(',', '.').replace(/[^\d.]/g, '').trim();
+          const price = parseFloat(cleaned);
+          return (isNaN(price) || price <= 0) ? null : price;
+        };
+
         const priceElement = trySelectors(selectors.price);
+        const originalPriceElement = trySelectors(selectors.originalPrice);
         const titleElement = trySelectors(selectors.title);
         const stockElement = trySelectors(selectors.availability);
         const imageElement = trySelectors(selectors.image);
+        const discountElement = trySelectors(selectors.discount);
+        const shippingElement = trySelectors(selectors.shipping);
 
         if (!priceElement) {
           return null; // Trigger fallback
         }
 
-        // Parse price
-        let priceText = priceElement.textContent.trim();
-        priceText = priceText.replace('€', '').replace(',', '.').replace(/[^\d.]/g, '').trim();
-        const price = parseFloat(priceText);
-
-        if (isNaN(price) || price <= 0) {
+        // Parse current price (actual selling price)
+        const price = parsePrice(priceElement.textContent);
+        if (!price) {
           return null; // Invalid price
         }
+
+        // Parse original price (if on sale)
+        const originalPrice = originalPriceElement ? parsePrice(originalPriceElement.textContent) : null;
+        
+        // Calculate discount percentage
+        let discountPercentage = null;
+        if (originalPrice && originalPrice > price) {
+          discountPercentage = Math.round(((originalPrice - price) / originalPrice) * 100);
+        }
+
+        // Extract discount badge text
+        const discountBadge = discountElement?.textContent?.trim() || null;
+
+        // Check for free shipping
+        const shippingText = shippingElement?.textContent?.toLowerCase() || '';
+        const hasFreeShipping = shippingText.includes('gratis') || 
+                                shippingText.includes('free') || 
+                                shippingText.includes('verzending');
 
         // Extract image URL
         let imageUrl = null;
@@ -384,6 +447,11 @@ class HybridScraper {
         return {
           title: titleElement?.textContent?.trim() || 'Unknown Product',
           price: price,
+          originalPrice: originalPrice,
+          discountPercentage: discountPercentage,
+          discountBadge: discountBadge,
+          hasFreeShipping: hasFreeShipping,
+          shippingInfo: shippingText || null,
           inStock: stockElement ? !stockElement.textContent.toLowerCase().includes('niet beschikbaar') : true,
           imageUrl: imageUrl,
           currency: 'EUR',

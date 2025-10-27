@@ -107,13 +107,18 @@ class SitemapImportService {
               .update({
                 product_name: scrapedData.title,
                 own_price: scrapedData.price,
+                original_price: scrapedData.originalPrice || existing.original_price,
+                discount_percentage: scrapedData.discountPercentage || existing.discount_percentage,
+                discount_badge: scrapedData.discountBadge || existing.discount_badge,
+                has_free_shipping: scrapedData.hasFreeShipping || existing.has_free_shipping,
+                shipping_info: scrapedData.shippingInfo || existing.shipping_info,
                 in_stock: scrapedData.inStock !== false,
                 image_url: scrapedData.imageUrl || existing.image_url,
                 updated_at: new Date()
               });
             
             results.updated++;
-            console.log(`[SitemapImport] Updated: ${scrapedData.title}`);
+            console.log(`[SitemapImport] Updated: ${scrapedData.title}${scrapedData.discountPercentage ? ` (-${scrapedData.discountPercentage}%)` : ''}`);
           } else {
             const [newProduct] = await db('products').insert({
               customer_id: this.customerId,
@@ -121,6 +126,11 @@ class SitemapImportService {
               product_ean: null,
               product_sku: null,
               own_price: scrapedData.price,
+              original_price: scrapedData.originalPrice || null,
+              discount_percentage: scrapedData.discountPercentage || null,
+              discount_badge: scrapedData.discountBadge || null,
+              has_free_shipping: scrapedData.hasFreeShipping || false,
+              shipping_info: scrapedData.shippingInfo || null,
               product_url: url,
               in_stock: scrapedData.inStock !== false,
               brand: null,
@@ -132,7 +142,11 @@ class SitemapImportService {
             
             results.created++;
             results.products.push(newProduct);
-            console.log(`[SitemapImport] Created: ${scrapedData.title}${scrapedData.imageUrl ? ' (with image)' : ''}`);
+            const badges = [];
+            if (scrapedData.imageUrl) badges.push('🖼️');
+            if (scrapedData.discountPercentage) badges.push(`-${scrapedData.discountPercentage}%`);
+            if (scrapedData.hasFreeShipping) badges.push('🚚 Free');
+            console.log(`[SitemapImport] Created: ${scrapedData.title} ${badges.join(' ')}`);
           }
 
         } catch (error) {
