@@ -185,11 +185,11 @@ class SitemapImportService {
 
       const scraperStats = this.scraper.getStats();
       results.scrapingStats = {
-        direct: scraperStats.directSuccess,
-        freeProxy: scraperStats.freeProxySuccess,
-        paidProxy: scraperStats.paidProxySuccess,
-        aiVision: scraperStats.aiVisionSuccess,
-        totalCost: scraperStats.totalCost
+        direct: scraperStats.directSuccess || 0,
+        freeProxy: scraperStats.freeProxySuccess || 0,
+        paidProxy: scraperStats.paidProxySuccess || 0,
+        aiVision: scraperStats.aiVisionSuccess || 0,
+        totalCost: parseFloat(scraperStats.totalCost) || 0
       };
 
       console.log(`[SitemapImport] ✅ Complete!`);

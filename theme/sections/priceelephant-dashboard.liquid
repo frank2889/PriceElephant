@@ -74,6 +74,15 @@
         <h2>Optie 2: Sitemap import</h2>
         <p>Geen Channable? Gebruik je webshop sitemap.xml.</p>
         <p><small class="pe-text-muted">✨ Intelligente detectie: scant automatisch alle URLs en herkent productpagina's op basis van prijs en titel.</small></p>
+        
+        <!-- Progress bar -->
+        <div id="pe-sitemap-progress" class="pe-progress-container" hidden>
+          <div class="pe-progress-bar">
+            <div id="pe-sitemap-progress-fill" class="pe-progress-fill" style="width: 0%"></div>
+          </div>
+          <div id="pe-sitemap-progress-text" class="pe-progress-text">Voorbereiden...</div>
+        </div>
+        
         <div id="pe-sitemap-status" class="pe-alert" hidden></div>
         <form id="pe-sitemap-form" novalidate>
           <div class="pe-field">

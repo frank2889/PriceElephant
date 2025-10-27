@@ -261,6 +261,44 @@
   font-weight: 600;
 }
 
+/* Progress Bar */
+.pe-progress-container {
+  margin: 16px 0;
+}
+
+.pe-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e3dafc;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pe-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark));
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+
+.pe-progress-text {
+  font-size: 13px;
+  color: var(--pe-text-muted);
+  text-align: center;
+  font-weight: 500;
+}
+
 @media (max-width: 768px) {
   .pe-dashboard {
     padding: 24px 16px 36px;

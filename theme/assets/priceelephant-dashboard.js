@@ -524,6 +524,11 @@
     showStatus(sitemapStatus, '', null);
     setLoading(sitemapImportBtn, true);
 
+    // Get progress elements
+    const progressContainer = document.getElementById('pe-sitemap-progress');
+    const progressFill = document.getElementById('pe-sitemap-progress-fill');
+    const progressText = document.getElementById('pe-sitemap-progress-text');
+
     const formData = new FormData(sitemapForm);
     const sitemapUrl = formData.get('sitemapUrl')?.trim();
     const maxProducts = parseInt(formData.get('maxProducts'), 10) || 50;
@@ -537,7 +542,26 @@
 
     try {
       console.log('[handleSitemapImport] Calling import API...');
-      showStatus(sitemapStatus, `🔍 Intelligente scan gestart... Sitemap wordt geparsed en URLs worden gecontroleerd op productpagina's (max ${maxProducts} producten)`, 'success');
+      
+      // Show progress bar
+      progressContainer.hidden = false;
+      progressFill.style.width = '10%';
+      progressText.textContent = '📡 Sitemap wordt opgehaald...';
+      
+      // Simulate progress updates (since we can't get real-time updates from backend)
+      const progressInterval = setInterval(() => {
+        const currentWidth = parseInt(progressFill.style.width) || 0;
+        if (currentWidth < 90) {
+          progressFill.style.width = `${currentWidth + 5}%`;
+          if (currentWidth < 30) {
+            progressText.textContent = '🔍 URLs scannen voor productpagina\'s...';
+          } else if (currentWidth < 60) {
+            progressText.textContent = '🛍️ Productinformatie ophalen...';
+          } else {
+            progressText.textContent = '💾 Data opslaan in database...';
+          }
+        }
+      }, 800);
       
       const response = await apiFetch('/api/v1/sitemap/import', {
         method: 'POST',
@@ -548,6 +572,11 @@
           productUrlPattern
         }),
       });
+      
+      clearInterval(progressInterval);
+      progressFill.style.width = '100%';
+      progressText.textContent = '✅ Scan voltooid!';
+      
       console.log('[handleSitemapImport] Success:', response);
       
       const message = response?.message || 'Import uitgevoerd.';
@@ -589,10 +618,34 @@
       }
       
       await loadProducts(productSearchInput.value.trim());
+      
+      // Hide progress bar after 2 seconds
+      setTimeout(() => {
+        progressContainer.hidden = true;
+        progressFill.style.width = '0%';
+      }, 2000);
+      
     } catch (error) {
       console.error('[handleSitemapImport] ERROR:', error);
+      
+      // Stop progress and show error
+      if (typeof progressInterval !== 'undefined') {
+        clearInterval(progressInterval);
+      }
+      progressFill.style.width = '100%';
+      progressFill.style.background = 'var(--pe-danger)';
+      progressText.textContent = '❌ Fout opgetreden';
+      
       showStatus(sitemapStatus, `Import mislukt: ${error.message}`, 'error');
       updateDebug('error', `❌ Import: ${error.message}`);
+      
+      // Hide progress bar after 3 seconds
+      setTimeout(() => {
+        progressContainer.hidden = true;
+        progressFill.style.width = '0%';
+        progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
+      }, 3000);
+      
     } finally {
       setLoading(sitemapImportBtn, false);
     }
