@@ -56,6 +56,57 @@ Migrations run automatically on deployment via `railway.json` startCommand.
 
 Manual migration: `railway run npm run db:migrate`
 
+### Production Migration Options
+
+**Option 1: Railway CLI (Recommended)**
+
+```bash
+cd backend
+
+# Install Railway CLI if needed
+npm install -g @railway/cli
+
+# Login to Railway
+railway login
+
+# Link to project
+railway link
+
+# Run migration
+railway run npx knex migrate:latest
+
+# Verify migration
+railway run node scripts/run-production-migration.js
+```
+
+**Option 2: Railway Dashboard**
+
+1. Go to https://railway.app/dashboard
+2. Select PriceElephant project
+3. Click on backend service
+4. Go to "Variables" tab
+5. Copy the DATABASE_URL value
+6. Run locally:
+
+```bash
+cd backend
+DATABASE_URL="<paste from Railway>" node scripts/run-production-migration.js
+```
+
+**Option 3: Admin API Endpoint**
+
+If ADMIN_TOKEN is set in Railway environment:
+
+```bash
+# Check migration status
+curl https://web-production-2568.up.railway.app/api/v1/admin/migrate/status \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+
+# Run migrations
+curl -X POST https://web-production-2568.up.railway.app/api/v1/admin/migrate/run \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
 ### Production URL
 
 After deployment, Railway provides a public URL:
