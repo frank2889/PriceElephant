@@ -7,6 +7,20 @@
     if (el) el.textContent = value;
   }
   
+  function setApiStatus(api, status) {
+    const el = document.getElementById(`pe-debug-${api}`);
+    if (!el) return;
+    
+    const icons = { loading: '⏳', success: '✅', error: '❌', skip: '⏭️' };
+    const colors = { loading: '#64748b', success: '#16a34a', error: '#dc2626', skip: '#94a3b8' };
+    
+    const icon = icons[status] || '?';
+    const color = colors[status] || '#000';
+    
+    el.style.color = color;
+    el.textContent = `${api.charAt(0).toUpperCase() + api.slice(1)}: ${icon}`;
+  }
+  
   const root = document.getElementById('priceelephant-dashboard-root');
   if (!root) {
     console.error('[PriceElephant] Root element niet gevonden: #priceelephant-dashboard-root');
@@ -28,6 +42,8 @@
     console.warn('[PriceElephant] Configureer dit in: Theme Editor → PriceElephant Dashboard → API Base URL');
     updateDebug('error', '⚠️  API URL gebruikt fallback - configureer in theme settings');
   }
+  
+  updateDebug('url', apiBaseUrl);
   
   console.log('[PriceElephant] Configuratie:', {
     customerId,
@@ -295,6 +311,7 @@
 
   async function loadChannableConfig() {
     showStatus(channableStatus, '', null);
+    setApiStatus('channable', 'loading');
     try {
       const config = await apiGet(`/api/v1/channable/config/${customerId}`);
       if (config?.config) {
@@ -308,14 +325,19 @@
         if (data.hasApiCredentials) {
           showStatus(channableStatus, 'API credentials opgeslagen. Token wordt om veiligheidsredenen niet getoond.', 'success');
         }
+        setApiStatus('channable', 'success');
+      } else {
+        setApiStatus('channable', 'skip');
       }
     } catch (error) {
       showStatus(channableStatus, `Kon Channable-configuratie niet laden: ${error.message}`, 'error');
+      setApiStatus('channable', 'error');
     }
   }
 
   async function loadSitemapConfig() {
     showStatus(sitemapStatus, '', null);
+    setApiStatus('sitemap', 'loading');
     try {
       console.log('[loadSitemapConfig] Fetching config for customer:', customerId);
       const config = await apiGet(`/api/v1/sitemap/config/${customerId}`);
@@ -327,12 +349,18 @@
           sitemapForm.productUrlPattern.value = config.productUrlPattern;
         }
         showStatus(sitemapStatus, 'Sitemap configuratie geladen.', 'success');
+        setApiStatus('sitemap', 'success');
+      } else {
+        setApiStatus('sitemap', 'skip');
       }
     } catch (error) {
       console.error('[loadSitemapConfig] Error:', error);
       // 404 is OK - no config yet
       if (error.message && !error.message.includes('404')) {
         showStatus(sitemapStatus, `Kon sitemap-configuratie niet laden: ${error.message}`, 'error');
+        setApiStatus('sitemap', 'error');
+      } else {
+        setApiStatus('sitemap', 'skip');
       }
     }
   }
@@ -340,6 +368,7 @@
   async function loadShopifyStatus() {
     showStatus(shopifyStatus, '', null);
     shopifyMetrics.innerHTML = '';
+    setApiStatus('shopify', 'loading');
     try {
       const status = await apiFetch(`/api/v1/shopify/status/${customerId}`, { method: 'GET' });
       if (!status?.status) {
@@ -360,12 +389,15 @@
         badge.textContent = `${metric.label}: ${metric.value}`;
         shopifyMetrics.appendChild(badge);
       });
+      setApiStatus('shopify', 'success');
     } catch (error) {
       showStatus(shopifyStatus, `Kon Shopify-status niet ophalen: ${error.message}`, 'error');
+      setApiStatus('shopify', 'error');
     }
   }
 
   async function loadProducts(searchTerm) {
+    setApiStatus('products', 'loading');
     const params = new URLSearchParams({ limit: '50' });
     if (searchTerm) {
       params.set('search', searchTerm);
@@ -376,10 +408,12 @@
       state.products = data?.products || [];
       state.pagination = data?.pagination || null;
       renderProducts();
+      setApiStatus('products', 'success');
     } catch (error) {
       productsBody.innerHTML = '';
       productsEmptyState.hidden = false;
       productsEmptyState.textContent = `Kon producten niet laden: ${error.message}`;
+      setApiStatus('products', 'error');
     }
   }
 
@@ -943,20 +977,30 @@
   async function init() {
     console.log('[PriceElephant] Initializing dashboard...');
     updateDebug('script', '✅ Script geladen');
+    updateDebug('action', '🔄 Loading initial data...');
     
     try {
       setupEventListeners();
+      updateDebug('listeners', '✅ 8 listeners');
+      
       console.log('[PriceElephant] Loading initial data...');
-      await Promise.all([
-        loadChannableConfig(),
-        loadSitemapConfig(),
-        loadShopifyStatus(),
-        loadProducts(),
-      ]);
+      
+      // Load configs sequentially to see which one fails
+      updateDebug('action', '📡 Loading Channable config...');
+      await loadChannableConfig();
+      updateDebug('action', '📡 Loading Sitemap config...');
+      await loadSitemapConfig();
+      updateDebug('action', '📡 Loading Shopify status...');
+      await loadShopifyStatus();
+      updateDebug('action', '📡 Loading products...');
+      await loadProducts();
+      
+      updateDebug('action', '✅ All data loaded');
       console.log('[PriceElephant] Dashboard initialized successfully');
     } catch (error) {
       console.error('[PriceElephant] Fout bij initialisatie:', error);
-      updateDebug('error', error.message);
+      updateDebug('error', `❌ ${error.message}`);
+      updateDebug('action', `❌ Failed: ${error.message}`);
     }
   }
 

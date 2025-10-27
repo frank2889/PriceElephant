@@ -12,11 +12,18 @@
       <h3 style="margin-top: 0; color: #0284c7;">🔧 Debug Info (Auto-Deploy Active)</h3>
       <div id="pe-debug-output" style="font-family: monospace; font-size: 12px; line-height: 1.6;">
         <div><strong>Customer ID:</strong> {{ customer.id }}</div>
-        <div><strong>API Base URL:</strong> {{ section.settings.api_base_url | escape }}</div>
-        <div><strong>Script Status:</strong> <span id="pe-debug-script">Wachten...</span></div>
-        <div><strong>Event Listeners:</strong> <span id="pe-debug-listeners">Wachten...</span></div>
-        <div><strong>Last Action:</strong> <span id="pe-debug-action">Geen</span></div>
-        <div><strong>Last Error:</strong> <span id="pe-debug-error" style="color: #dc2626;">Geen</span></div>
+        <div><strong>API Base URL:</strong> <span id="pe-debug-url">{{ section.settings.api_base_url | escape }}</span></div>
+        <div><strong>Script Status:</strong> <span id="pe-debug-script">⏳ Wachten...</span></div>
+        <div><strong>Event Listeners:</strong> <span id="pe-debug-listeners">⏳ Wachten...</span></div>
+        <div><strong>Last Action:</strong> <span id="pe-debug-action">-</span></div>
+        <div><strong>Last Error:</strong> <span id="pe-debug-error" style="color: #dc2626;">-</span></div>
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #cbd5e1;">
+          <strong>API Tests:</strong><br>
+          <span id="pe-debug-channable" style="color: #64748b;">Channable: ⏳</span><br>
+          <span id="pe-debug-sitemap" style="color: #64748b;">Sitemap: ⏳</span><br>
+          <span id="pe-debug-shopify" style="color: #64748b;">Shopify: ⏳</span><br>
+          <span id="pe-debug-products" style="color: #64748b;">Products: ⏳</span>
+        </div>
       </div>
     </div>
     
