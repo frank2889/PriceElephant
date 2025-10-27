@@ -218,6 +218,8 @@ router.get('/import-stream', async (req, res) => {
  */
 router.post('/configure', async (req, res) => {
   try {
+    console.log('[Sitemap Config] Save request:', req.body);
+    
     const { 
       customerId, 
       sitemapUrl,
@@ -233,28 +235,29 @@ router.post('/configure', async (req, res) => {
       return res.status(400).json({ error: 'sitemapUrl is required' });
     }
 
-    // Save configuration
-    const existing = await db('sitemap_configs')
+    // Save configuration to customer_configs table
+    const existing = await db('customer_configs')
       .where({ customer_id: customerId })
       .first();
 
     if (existing) {
-      await db('sitemap_configs')
+      await db('customer_configs')
         .where({ customer_id: customerId })
         .update({
           sitemap_url: sitemapUrl,
-          product_url_pattern: productUrlPattern,
-          selectors: JSON.stringify(selectors || {}),
+          sitemap_product_url_pattern: productUrlPattern,
           updated_at: new Date()
         });
+      console.log('[Sitemap Config] ✅ Updated config for customer:', customerId);
     } else {
-      await db('sitemap_configs').insert({
-        customer_id: customerId,
-        sitemap_url: sitemapUrl,
-        product_url_pattern: productUrlPattern,
-        selectors: JSON.stringify(selectors || {}),
-        created_at: new Date()
-      });
+      await db('customer_configs')
+        .insert({
+          customer_id: customerId,
+          sitemap_url: sitemapUrl,
+          sitemap_product_url_pattern: productUrlPattern,
+          created_at: new Date()
+        });
+      console.log('[Sitemap Config] ✅ Created config for customer:', customerId);
     }
 
     res.json({
@@ -263,7 +266,7 @@ router.post('/configure', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Configuration error:', error);
+    console.error('[Sitemap Config] ❌ Error:', error.message);
     res.status(500).json({ 
       error: 'Failed to save configuration', 
       message: error.message 
@@ -278,25 +281,32 @@ router.post('/configure', async (req, res) => {
 router.get('/config/:customerId', async (req, res) => {
   try {
     const { customerId } = req.params;
+    console.log('[Sitemap Config] Load request for customer:', customerId);
 
-    const config = await db('sitemap_configs')
+    const config = await db('customer_configs')
       .where({ customer_id: customerId })
       .first();
 
     if (!config) {
+      console.log('[Sitemap Config] No config found for customer:', customerId);
       return res.status(404).json({ 
         error: 'No sitemap configuration found' 
       });
     }
 
+    console.log('[Sitemap Config] ✅ Loaded config:', {
+      sitemapUrl: config.sitemap_url,
+      maxProducts: config.sitemap_max_products
+    });
+
     res.json({
       sitemapUrl: config.sitemap_url,
-      productUrlPattern: config.product_url_pattern,
-      selectors: config.selectors ? JSON.parse(config.selectors) : {}
+      productUrlPattern: config.sitemap_product_url_pattern,
+      maxProducts: config.sitemap_max_products
     });
 
   } catch (error) {
-    console.error('Config fetch error:', error);
+    console.error('[Sitemap Config] ❌ Load error:', error.message);
     res.status(500).json({ 
       error: 'Failed to fetch configuration', 
       message: error.message 
