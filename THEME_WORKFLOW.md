@@ -148,6 +148,26 @@ git push origin :shopify-theme
 git subtree push --prefix=theme origin shopify-theme
 ```
 
+### Git subtree loopt vast in VS Code
+
+**Probleem**: Het `./sync-theme.sh` script loopt vast of hangt in de VS Code terminal.
+
+**✅ WERKENDE OPLOSSING** (getest 27 okt 2025):
+
+```bash
+# 1. Verwijder shopify-theme branch om conflicts te voorkomen
+git push origin :shopify-theme
+
+# 2. Maak nieuwe shopify-theme branch met subtree push
+git subtree push --prefix=theme origin shopify-theme
+```
+
+**Waarom dit werkt**:
+
+- Verwijdert conflicten tussen lokale en remote shopify-theme branch
+- Git subtree kan dan een clean nieuwe branch maken
+- Voorkomt vastlopen van het sync proces
+
 ### Theme files verdwenen
 
 Check of je op de juiste branch zit:
