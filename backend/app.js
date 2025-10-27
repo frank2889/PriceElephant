@@ -16,6 +16,7 @@ const productRoutes = require('./routes/product-routes');
 const scraperRoutes = require('./routes/scraper-routes');
 const variantRoutes = require('./routes/variant-routes');
 const sitemapRoutes = require('./routes/sitemap-routes');
+const customerRoutes = require('./routes/customer-routes');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/products', variantRoutes); // Variant management
 app.use('/api/v1/scraper', scraperRoutes);
 app.use('/api/v1/sitemap', sitemapRoutes);
+app.use('/api/v1/customers', customerRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({

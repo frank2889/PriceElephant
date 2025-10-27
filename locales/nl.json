@@ -1,0 +1,292 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin language editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
+{
+  "general": {
+    "404": {
+      "title": "Pagina niet gevonden",
+      "subtext": "De pagina die je zoekt bestaat niet."
+    }
+  },
+  "customer": {
+    "account": {
+      "title": "Account"
+    },
+    "login": {
+      "title": "Inloggen",
+      "email": "E-mail",
+      "password": "Wachtwoord",
+      "sign_in": "Inloggen"
+    },
+    "register": {
+      "title": "Registreren",
+      "first_name": "Voornaam",
+      "last_name": "Achternaam",
+      "email": "E-mail",
+      "password": "Wachtwoord",
+      "submit": "Account aanmaken"
+    }
+  },
+  "priceelephant": {
+    "homepage": {
+      "hero": {
+        "title": "Win altijd op prijs",
+        "subtitle": "De enige Shopify-native price intelligence tool. Monitor concurrenten. Optimaliseer automatisch. Verhoog je marges.",
+        "cta_trial": "Start gratis trial - 14 dagen",
+        "cta_pricing": "Bekijk tarieven",
+        "welcome_back": "Welkom terug, {{ name }}!",
+        "welcome_subtitle": "Bekijk je dashboard voor de laatste prijsinzichten",
+        "cta_dashboard": "Naar Dashboard →"
+      },
+      "features": {
+        "monitoring": {
+          "title": "Real-time monitoring",
+          "description": "Volg concurrenten 24/7. Ontvang directe meldingen bij prijswijzigingen. AI-scraping werkt op elke webshop."
+        },
+        "intelligence": {
+          "title": "Prijsintelligentie",
+          "description": "Begrijp markttrends. Bekijk historische prijsveranderingen. Weet precies wanneer je je prijzen moet aanpassen voor maximale winst."
+        },
+        "alerts": {
+          "title": "Slimme alerts",
+          "description": "Ontvang SMS-alerts wanneer concurrenten je onderbieden. Email notificaties voor prijsdalingen en kansen. Mis nooit meer een prijsopportuniteit."
+        },
+        "ai_scraping": {
+          "title": "AI-scraping",
+          "description": "Onze intelligente scraper past zich aan elke website aan. Geen handmatige setup. Voeg gewoon concurrent URLs toe. Werkt zelfs als websites wijzigen."
+        },
+        "integration": {
+          "title": "Eenvoudige integratie",
+          "description": "Importeer producten via Channable feed. Voeg concurrent URLs toe met één klik. Self-service. Geen technische kennis vereist."
+        },
+        "insights": {
+          "title": "Actiegerichte inzichten",
+          "description": "Zie welke producten te duur of te goedkoop zijn. Identificeer kansen om marges te verhogen. Data-gedreven prijsbeslissingen."
+        }
+      },
+      "usp": {
+        "title": "Waarom PriceElephant?",
+        "subtitle": "De enige Shopify-native price intelligence tool voor Nederlandse webshops",
+        "shopify_native": {
+          "title": "Shopify-native",
+          "description": "Naadloos geïntegreerd in je Shopify Admin. Geen externe tools. Alles op één plek."
+        },
+        "channable_integration": {
+          "title": "Channable integratie",
+          "description": "Hergebruik je bestaande productfeeds. Geen dubbele setup. Importeer 500+ producten in seconden."
+        },
+        "dutch_focus": {
+          "title": "Nederlandse focus",
+          "description": "Bol.com, Coolblue, MediaMarkt out-of-the-box. Optimized voor de Nederlandse markt."
+        },
+        "self_service": {
+          "title": "Self-service platform",
+          "description": "Geen onboarding weken. Geen technische kennis vereist. Start vandaag nog."
+        },
+        "transparent_pricing": {
+          "title": "Transparante pricing",
+          "description": "Geen verrassingen. Geen verborgen kosten. Schaal mee met je groei."
+        },
+        "variant_support": {
+          "title": "Variant support",
+          "description": "Automatische variant detection. Beheer producten met kleuren, maten, types. Uniek in de markt."
+        }
+      },
+      "how_it_works": {
+        "title": "Hoe het werkt",
+        "subtitle": "Start in 3 eenvoudige stappen",
+        "step1": {
+          "title": "Importeer je producten",
+          "description": "Koppel je Channable feed of voeg handmatig producten toe. 500+ producten in enkele seconden."
+        },
+        "step2": {
+          "title": "Voeg concurrenten toe",
+          "description": "Plak concurrent URLs. Onze AI-scraper doet de rest. Geen technische setup nodig."
+        },
+        "step3": {
+          "title": "Ontvang inzichten",
+          "description": "Zie real-time prijsvergelijkingen. Krijg alerts bij wijzigingen. Optimaliseer je prijzen."
+        }
+      },
+      "pricing": {
+        "title": "Simpel en transparant",
+        "subtitle": "Begin gratis. Schaal mee met je groei.",
+        "trial": {
+          "name": "Trial",
+          "price": "€0",
+          "period": "14 dagen gratis",
+          "features": "Max 1 concurrent||Max 50 producten||Handmatige input only||Geen Channable feed||Geen email alerts",
+          "cta": "Start gratis trial"
+        },
+        "starter": {
+          "name": "Starter",
+          "price": "€49",
+          "period": "per maand",
+          "features": "3 concurrenten||Max 500 producten||Channable feed sync||Email alerts (Klaviyo)||Basis analytics||Priority support",
+          "cta": "Begin nu"
+        },
+        "professional": {
+          "name": "Professional",
+          "price": "€99",
+          "period": "per maand",
+          "badge": "Populairste keuze",
+          "features": "5 concurrenten||Max 2.500 producten||Channable feed sync||Email alerts||Geavanceerde analytics||Wekelijkse rapporten||API access",
+          "cta": "Begin nu"
+        },
+        "enterprise": {
+          "name": "Enterprise",
+          "price": "€249",
+          "period": "per maand",
+          "features": "Onbeperkt concurrenten||Onbeperkt producten||Channable feed sync||API access||White-label optie||Priority support||Dedicated manager",
+          "cta": "Neem contact op"
+        }
+      },
+      "social_proof": {
+        "title": "Vertrouwd door Nederlandse webshops",
+        "stats": {
+          "products": "Producten gemonitord",
+          "success_rate": "Scrape success rate",
+          "monitoring": "Prijsmonitoring"
+        }
+      }
+    },
+    "features_page": {
+      "hero": {
+        "title": "Krachtige features voor slimme prijzen",
+        "subtitle": "Alles wat je nodig hebt om competitief te blijven en winst te maximaliseren"
+      },
+      "monitoring": {
+        "title": "🔍 Real-time prijsmonitoring",
+        "description": "Onze AI-scraper monitort concurrent prijzen 24/7, zodat je nooit een prijswijziging mist. Ontvang directe updates wanneer concurrenten hun prijzen aanpassen.",
+        "features": [
+          "Monitor onbeperkt concurrenten (Enterprise)",
+          "12-uurs refresh cycles houden data actueel",
+          "Werkt op elke e-commerce website",
+          "AI past zich aan wanneer websites wijzigen",
+          "99.9% scraping success rate"
+        ]
+      },
+      "alerts": {
+        "title": "🚨 Intelligente prijsalerts",
+        "description": "Word nooit verrast door prijswijzigingen van concurrenten. Ontvang SMS en email alerts wanneer actie vereist is.",
+        "features": [
+          "SMS alerts bij kritieke prijsdalingen (>15%)",
+          "Email notificaties bij concurrent undercutting",
+          "Voorraad alerts onthullen kansen",
+          "Aanpasbare alert drempels",
+          "Geïntegreerd met Klaviyo voor automatisering"
+        ]
+      },
+      "ai_scraping": {
+        "title": "🤖 AI-aangedreven scraping",
+        "description": "Traditionele scrapers breken wanneer websites wijzigen. De onze leert en past zich aan. Onze intelligente scraper gebruikt GPT-4 om elke productpagina te begrijpen.",
+        "features": [
+          "AI analyseert HTML om prijzen intelligent te vinden",
+          "Leert van succesvolle scrapes (caching)",
+          "Vision fallback voor 100% betrouwbaarheid",
+          "Geen handmatige selector configuratie nodig",
+          "Werkt op Coolblue, Bol.com, Amazon, MediaMarkt, etc."
+        ]
+      },
+      "integration": {
+        "title": "⚡ Naadloze integratie",
+        "description": "Koppel je productcatalogus in minuten, niet uren. Importeer via Channable feed of voeg producten handmatig toe.",
+        "features": [
+          "One-click Channable feed import",
+          "Self-service concurrent URL beheer",
+          "Automatische product sync",
+          "Geen technische kennis vereist",
+          "Werkt met elk e-commerce platform"
+        ]
+      },
+      "insights": {
+        "title": "📊 Actiegerichte inzichten",
+        "description": "Zie het volledige plaatje. Begrijp markttrends en neem data-gedreven prijsbeslissingen.",
+        "features": [
+          "Historische prijsgrafieken",
+          "Concurrent positioning analyse",
+          "Identificeer te dure producten",
+          "Vind marge verbeteringskansen",
+          "Wekelijkse performance rapporten (Professional+)"
+        ]
+      },
+      "self_service": {
+        "title": "🎯 Self-service beheer",
+        "description": "Jij kent je concurrenten het beste. Voeg en beheer concurrent URLs zelf—geen wachten.",
+        "features": [
+          "Voeg concurrent URLs toe met één klik",
+          "Direct scrapen wanneer je een URL toevoegt",
+          "Handmatig verversen wanneer je wilt",
+          "Verwijder concurrenten als ze niet meer relevant zijn",
+          "Volledige transparantie (zie scrape kosten & methodes)"
+        ]
+      },
+      "cta": {
+        "title": "Klaar om te winnen op prijs?",
+        "subtitle": "Start je 14-daagse gratis trial. Geen creditcard vereist.",
+        "button": "Start gratis trial →"
+      }
+    },
+    "header": {
+      "nav": {
+        "pricing": "Tarieven",
+        "features": "Features",
+        "dashboard": "Dashboard"
+      },
+      "auth": {
+        "login": "Inloggen",
+        "register": "Start gratis trial"
+      },
+      "account_menu": {
+        "my_account": "Mijn account",
+        "dashboard": "Dashboard",
+        "addresses": "Adressen",
+        "logout": "Uitloggen"
+      }
+    },
+    "dashboard": {
+      "title": "Prijsintelligentie Dashboard",
+      "loading": "Laden...",
+      "error": "Fout bij laden van data",
+      "no_products": "Geen producten gevonden",
+      "competitor_manager": {
+        "title": "Concurrent Tracking",
+        "add_button": "Voeg concurrent URL toe",
+        "limit_info": "concurrenten",
+        "upgrade_link": "Upgrade voor meer →",
+        "empty_state": "Nog geen concurrenten toegevoegd. Klik op \"Voeg concurrent URL toe\" om te beginnen.",
+        "modal": {
+          "title": "Voeg concurrent URL toe",
+          "description": "Plak de URL van de productpagina van je concurrent",
+          "url_label": "Concurrent product URL",
+          "url_placeholder": "https://www.coolblue.nl/product/123456/...",
+          "url_hint": "Voorbeelden: Coolblue, Bol.com, Amazon.nl, MediaMarkt, etc.",
+          "cancel": "Annuleren",
+          "submit": "Toevoegen & direct scrapen",
+          "loading": "⏳ Scrapen..."
+        },
+        "card": {
+          "in_stock": "✓ Op voorraad",
+          "out_stock": "✗ Niet op voorraad",
+          "view_link": "Bekijk →",
+          "last_check": "Laatste check:",
+          "refresh": "Verversen",
+          "delete": "Verwijderen"
+        },
+        "alerts": {
+          "limit_reached": "Concurrent limiet bereikt ({{ max }} max). Upgrade je plan voor meer.",
+          "confirm_delete": "Verwijder {{ retailer }} van tracking?",
+          "delete_failed": "Verwijderen mislukt: {{ error }}",
+          "add_success": "✅ Concurrent toegevoegd!",
+          "add_error": "❌ {{ error }}"
+        }
+      }
+    }
+  }
+}

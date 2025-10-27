@@ -27,6 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "@sentry/node": "^7.85.0",
+    "@shopify/shopify-api": "^12.1.0",
     "axios": "^1.6.0",
     "bcrypt": "^5.1.1",
     "bull": "^4.16.5",

@@ -159,66 +159,6 @@ class ShopifyIntegration {
   }
 
   /**
-   * Create a product with multiple variants in Shopify
-   */
-  async createProductWithVariants(productData) {
-    try {
-      const client = new this.shopify.clients.Rest({ session: this.session });
-
-      const response = await client.post({
-        path: 'products',
-        data: {
-          product: {
-            title: productData.title,
-            body_html: productData.description || '',
-            vendor: productData.brand || '',
-            product_type: productData.category || '',
-            tags: productData.tags || [],
-            status: 'active',
-            options: productData.options || [], // Array of {name, values[]}
-            variants: productData.variants || [], // Array of {option1, option2, option3, price, sku, barcode}
-            images: productData.imageUrl ? [{ src: productData.imageUrl }] : [],
-            metafields: [
-              {
-                namespace: 'priceelephant',
-                key: 'channable_id',
-                value: productData.channableId || '',
-                type: 'single_line_text_field'
-              },
-              {
-                namespace: 'priceelephant',
-                key: 'has_variants',
-                value: 'true',
-                type: 'single_line_text_field'
-              },
-              {
-                namespace: 'priceelephant',
-                key: 'variant_count',
-                value: productData.variants?.length?.toString() || '0',
-                type: 'single_line_text_field'
-              },
-              {
-                namespace: 'priceelephant',
-                key: 'last_scraped',
-                value: productData.lastScraped || new Date().toISOString(),
-                type: 'date_time'
-              }
-            ]
-          }
-        }
-      });
-
-      console.log(`✅ Created Shopify product with variants: ${productData.title} (${productData.variants?.length || 0} variants)`);
-      await this.applyRateLimitDelay(response.headers);
-      return response.body.product;
-
-    } catch (error) {
-      console.error('❌ Shopify product with variants creation failed:', error.message);
-      throw this.wrapShopifyError('product met varianten aanmaken', error);
-    }
-  }
-
-  /**
    * Update existing product
    */
   async updateProduct(shopifyProductId, updateData) {

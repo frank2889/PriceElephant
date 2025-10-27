@@ -14,7 +14,6 @@ class ShopifySyncService {
 
   /**
    * Sync products from database to Shopify
-   * Now supports product variants
    */
   async syncProductsToShopify(customerId, limit = 10) {
     console.log(`\n🔄 Starting Shopify sync for customer ${customerId}...\n`);
@@ -26,14 +25,13 @@ class ShopifySyncService {
       const collectionId = await this.shopify.getOrCreateCustomerCollection(customerId);
       console.log(`✅ Collection ID: ${collectionId}\n`);
 
-      // Get parent products (with variants) and standalone products that haven't been synced yet
+      // Get products that haven't been synced yet
       const products = await db('products')
         .where({
           shopify_customer_id: customerId,
           shopify_product_id: null,
           active: true
         })
-        .whereNull('parent_product_id') // Only get parents or standalone products
         .limit(limit);
 
       if (products.length === 0) {
@@ -51,26 +49,19 @@ class ShopifySyncService {
 
       for (const product of products) {
         try {
-          let shopifyProduct;
-
-          // Check if this is a parent product with variants
-          if (product.is_parent_product) {
-            shopifyProduct = await this.syncProductWithVariants(product, customerId);
-          } else {
-            // Create regular single-variant product in Shopify
-            shopifyProduct = await this.shopify.createProduct({
-              title: product.product_name,
-              description: `${product.brand} - ${product.category}`,
-              brand: product.brand,
-              category: product.category,
-              price: product.own_price,
-              sku: product.product_sku,
-              ean: product.product_ean,
-              imageUrl: product.image_url,
-              channableId: product.channable_product_id,
-              tags: ['PriceElephant', `customer-${customerId}`, product.brand, product.category].filter(Boolean)
-            });
-          }
+          // Create product in Shopify
+          const shopifyProduct = await this.shopify.createProduct({
+            title: product.product_name,
+            description: `${product.brand} - ${product.category}`,
+            brand: product.brand,
+            category: product.category,
+            price: product.own_price,
+            sku: product.product_sku,
+            ean: product.product_ean,
+            imageUrl: product.image_url,
+            channableId: product.channable_product_id,
+            tags: ['PriceElephant', `customer-${customerId}`, product.brand, product.category].filter(Boolean)
+          });
 
           // Add product to customer collection
           await this.shopify.addProductToCollection(shopifyProduct.id, collectionId);
@@ -111,122 +102,6 @@ class ShopifySyncService {
       console.error('❌ Sync failed:', error.message);
       throw error;
     }
-  }
-
-  /**
-   * Sync a parent product with its variants to Shopify
-   */
-  async syncProductWithVariants(parentProduct, customerId) {
-    console.log(`   🔀 Creating product with variants: ${parentProduct.product_name}`);
-
-    // Get all variants for this parent
-    const variants = await db('products')
-      .where({
-        parent_product_id: parentProduct.id,
-        active: true
-      })
-      .orderBy('variant_position', 'asc');
-
-    if (variants.length === 0) {
-      console.log(`   ⚠️  No variants found for parent product ${parentProduct.id}, creating as single product`);
-      
-      return await this.shopify.createProduct({
-        title: parentProduct.product_name,
-        description: `${parentProduct.brand} - ${parentProduct.category}`,
-        brand: parentProduct.brand,
-        category: parentProduct.category,
-        price: parentProduct.own_price,
-        sku: parentProduct.product_sku,
-        ean: parentProduct.product_ean,
-        imageUrl: parentProduct.image_url,
-        channableId: parentProduct.channable_product_id,
-        tags: ['PriceElephant', `customer-${customerId}`, parentProduct.brand, parentProduct.category].filter(Boolean)
-      });
-    }
-
-    console.log(`   📊 Found ${variants.length} variants`);
-
-    // Build Shopify options array (max 3 options)
-    const options = [];
-    const optionValues = {
-      option1: new Set(),
-      option2: new Set(),
-      option3: new Set()
-    };
-
-    // Collect all unique option values from variants
-    variants.forEach(variant => {
-      if (variant.option1_value) optionValues.option1.add(variant.option1_value);
-      if (variant.option2_value) optionValues.option2.add(variant.option2_value);
-      if (variant.option3_value) optionValues.option3.add(variant.option3_value);
-    });
-
-    // Create options array for Shopify
-    if (optionValues.option1.size > 0 && variants[0].option1_name) {
-      options.push({
-        name: variants[0].option1_name,
-        values: Array.from(optionValues.option1)
-      });
-    }
-    if (optionValues.option2.size > 0 && variants[0].option2_name) {
-      options.push({
-        name: variants[0].option2_name,
-        values: Array.from(optionValues.option2)
-      });
-    }
-    if (optionValues.option3.size > 0 && variants[0].option3_name) {
-      options.push({
-        name: variants[0].option3_name,
-        values: Array.from(optionValues.option3)
-      });
-    }
-
-    // Build variants array for Shopify
-    const shopifyVariants = variants.map(variant => ({
-      option1: variant.option1_value || null,
-      option2: variant.option2_value || null,
-      option3: variant.option3_value || null,
-      price: variant.own_price.toString(),
-      sku: variant.product_sku || null,
-      barcode: variant.product_ean || null,
-      inventory_management: 'shopify',
-      inventory_policy: 'deny',
-      fulfillment_service: 'manual'
-    }));
-
-    // Create product with variants in Shopify
-    const shopifyProduct = await this.shopify.createProductWithVariants({
-      title: parentProduct.product_name,
-      description: `${parentProduct.brand} - ${parentProduct.category}`,
-      brand: parentProduct.brand,
-      category: parentProduct.category,
-      imageUrl: parentProduct.image_url,
-      channableId: parentProduct.channable_product_id,
-      tags: ['PriceElephant', `customer-${customerId}`, 'variants', parentProduct.brand, parentProduct.category].filter(Boolean),
-      options: options,
-      variants: shopifyVariants
-    });
-
-    console.log(`   ✅ Created Shopify product with ${shopifyVariants.length} variants`);
-
-    // Update variant records with their corresponding Shopify variant IDs
-    if (shopifyProduct.variants && shopifyProduct.variants.length === variants.length) {
-      for (let i = 0; i < variants.length; i++) {
-        const variant = variants[i];
-        const shopifyVariant = shopifyProduct.variants[i];
-        
-        await db('products')
-          .where({ id: variant.id })
-          .update({
-            shopify_product_id: shopifyProduct.id,
-            shopify_variant_id: shopifyVariant.id,
-            updated_at: db.fn.now()
-          });
-      }
-      console.log(`   ✅ Updated ${variants.length} variant records with Shopify IDs`);
-    }
-
-    return shopifyProduct;
   }
 
   /**

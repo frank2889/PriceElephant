@@ -3,7 +3,8 @@
  * Creates customer with Enterprise tier metafields
  */
 
-require('dotenv').config({ path: __dirname + '/../.env' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const { shopifyApi } = require('@shopify/shopify-api');
 require('@shopify/shopify-api/adapters/node');
 

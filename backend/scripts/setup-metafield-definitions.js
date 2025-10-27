@@ -3,14 +3,15 @@
  * Creates metafield definitions for PriceElephant product data
  */
 
-require('dotenv').config({ path: __dirname + '/../.env' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const { shopifyApi } = require('@shopify/shopify-api');
 require('@shopify/shopify-api/adapters/node');
 
 const shopify = shopifyApi({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET,
-  scopes: ['read_products', 'write_products'],
+  scopes: ['read_products', 'write_products', 'read_customers', 'write_customers'],
   hostName: process.env.HOST || 'localhost',
   apiVersion: '2024-10',
   isEmbeddedApp: false,
@@ -94,8 +95,14 @@ const metafieldDefinitions = [
     name: 'PriceElephant Tier',
     namespace: 'priceelephant',
     key: 'tier',
-    description: 'Subscription tier: trial, starter, professional, enterprise',
+    description: 'Subscription tier',
     type: 'single_line_text_field',
+    validations: [
+      {
+        name: 'choices',
+        value: JSON.stringify(['trial', 'starter', 'professional', 'enterprise'])
+      }
+    ]
   },
   {
     ownerType: 'CUSTOMER',
@@ -169,6 +176,7 @@ async function createMetafieldDefinitions() {
             description: definition.description,
             type: definition.type,
             ownerType: definition.ownerType,
+            ...(definition.validations && { validations: definition.validations })
           }
         };
 
