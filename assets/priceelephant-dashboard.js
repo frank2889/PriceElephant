@@ -531,7 +531,7 @@
 
     const formData = new FormData(sitemapForm);
     const sitemapUrl = formData.get('sitemapUrl')?.trim();
-    const maxProducts = parseInt(formData.get('maxProducts'), 10) || 50;
+    const maxProducts = parseInt(formData.get('maxProducts'), 10) || 500;
     const productUrlPattern = formData.get('productUrlPattern')?.trim();
 
     if (!sitemapUrl) {
