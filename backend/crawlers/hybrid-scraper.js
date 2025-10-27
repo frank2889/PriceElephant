@@ -62,6 +62,57 @@ class HybridScraper {
         }
       }
     };
+
+    // Universal fallback selectors voor onbekende retailers
+    // Werkt met: Shopify, Magento, WooCommerce, Lightspeed, CCV, etc.
+    this.universalSelectors = {
+      price: [
+        // Schema.org
+        '[itemprop="price"]', 'meta[property="product:price:amount"]',
+        // Shopify
+        '.product__price .price-item--regular', '.product-price', '[data-product-price]',
+        // Magento
+        '.price-box .price', '[data-price-type="finalPrice"]', '.product-info-price .price',
+        // WooCommerce
+        '.woocommerce-Price-amount', 'p.price .amount', '.price ins .amount',
+        // Lightspeed
+        '.product-price', '.price-current',
+        // CCV Shop
+        '.productPrice', '.price',
+        // Generic
+        '.price', '[data-price]', '.product-price', '.current-price'
+      ].join(', '),
+      
+      title: [
+        // Schema.org
+        '[itemprop="name"]',
+        // Shopify
+        '.product-single__title', '.product__title', 'h1.product-title',
+        // Magento
+        '.product-info-main .page-title', '.product-name', 'h1.product-name',
+        // WooCommerce
+        '.product_title', 'h1.entry-title',
+        // Lightspeed
+        '.product-title', '.product-name',
+        // CCV Shop
+        '.product-name', '.productTitle',
+        // Generic
+        'h1', '.product-title', '.product-name', '.title'
+      ].join(', '),
+      
+      availability: [
+        // Schema.org
+        '[itemprop="availability"]',
+        // Shopify
+        '.product-form__inventory', '[data-product-available]',
+        // Magento
+        '.stock.available', '.stock-status',
+        // WooCommerce
+        '.stock', '.availability',
+        // Generic
+        '.stock-status', '.availability', '.voorraad', '.in-stock'
+      ].join(', ')
+    };
     
     // Statistics
     this.stats = {
@@ -73,6 +124,23 @@ class HybridScraper {
       failures: 0,
       totalCost: 0
     };
+  }
+
+  /**
+   * Auto-detect retailer from URL
+   * @param {string} url - Product URL
+   * @returns {string|null} Retailer key or null for universal
+   */
+  detectRetailerFromUrl(url) {
+    const urlLower = url.toLowerCase();
+    
+    if (urlLower.includes('coolblue.nl')) return 'coolblue';
+    if (urlLower.includes('bol.com')) return 'bol';
+    if (urlLower.includes('amazon.nl')) return 'amazon';
+    if (urlLower.includes('mediamarkt.nl')) return 'mediamarkt';
+    
+    // Unknown retailer - will use universal selectors
+    return null;
   }
 
   /**
@@ -113,11 +181,19 @@ class HybridScraper {
   /**
    * Scrape product with multi-tier fallback strategy
    */
-  async scrapeProduct(url, ean = null, retailerKey = 'coolblue', productId = null) {
-    const retailer = this.retailers[retailerKey];
-    if (!retailer) {
-      throw new Error(`Unknown retailer: ${retailerKey}`);
+  async scrapeProduct(url, ean = null, retailerKey = null, productId = null) {
+    // Auto-detect retailer from URL if not provided
+    if (!retailerKey) {
+      retailerKey = this.detectRetailerFromUrl(url);
     }
+
+    const retailer = retailerKey ? this.retailers[retailerKey] : null;
+    
+    // Use universal selectors for unknown retailers
+    const selectors = retailer ? retailer.selectors : this.universalSelectors;
+    const retailerName = retailer ? retailer.name : 'Universal (Auto-detect)';
+    
+    console.log(`🏪 Retailer: ${retailerName}`);
 
     this.stats.total++;
     let scrapedData = null;
@@ -130,7 +206,7 @@ class HybridScraper {
       const proxyConfig = await this.proxyPool.getNextProxy();
       await this.init(proxyConfig);
       
-      scrapedData = await this.scrapeWithSelectors(url, retailer);
+      scrapedData = await this.scrapeWithSelectors(url, { selectors, name: retailerName });
       
       if (scrapedData && scrapedData.price > 0) {
         this.proxyPool.recordResult('direct', true, 0);
@@ -153,7 +229,7 @@ class HybridScraper {
         const proxyConfig = await this.proxyPool.getNextProxy();
         await this.init(proxyConfig);
         
-        scrapedData = await this.scrapeWithSelectors(url, retailer);
+        scrapedData = await this.scrapeWithSelectors(url, { selectors, name: retailerName });
         
         if (scrapedData && scrapedData.price > 0) {
           this.proxyPool.recordResult('free', true, 0);
@@ -178,7 +254,7 @@ class HybridScraper {
           }
           
           await this.init(proxyConfig);
-          scrapedData = await this.scrapeWithSelectors(url, retailer);
+          scrapedData = await this.scrapeWithSelectors(url, { selectors, name: retailerName });
           
           if (scrapedData && scrapedData.price > 0) {
             this.proxyPool.recordResult('webshare', true, 0.0003);

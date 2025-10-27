@@ -224,16 +224,117 @@ class SitemapImportService {
 
       await page.waitForTimeout(1000);
 
-      // Default selectors (werkt voor de meeste webshops)
+      // Comprehensive selectors voor alle gangbare e-commerce platforms
       const selectors = {
-        title: customSelectors.title || 'h1, [itemprop="name"], .product-title, .product-name',
-        price: customSelectors.price || '[itemprop="price"], .price, .product-price, [data-price]',
-        ean: customSelectors.ean || '[itemprop="gtin13"], [itemprop="gtin"], .ean, .gtin',
-        sku: customSelectors.sku || '[itemprop="sku"], .sku, .product-code',
-        brand: customSelectors.brand || '[itemprop="brand"], .brand, .manufacturer',
-        category: customSelectors.category || '[itemprop="category"], .category, .breadcrumb',
-        image: customSelectors.image || '[itemprop="image"], .product-image img, .main-image',
-        inStock: customSelectors.inStock || '[itemprop="availability"], .stock-status, .availability'
+        title: customSelectors.title || [
+          // Schema.org (universal)
+          '[itemprop="name"]',
+          // Shopify
+          '.product-single__title', '.product__title', 'h1.product-title',
+          // Magento
+          '.product-info-main .page-title', '.product-name', 'h1.product-name',
+          // WooCommerce
+          '.product_title', 'h1.entry-title',
+          // Lightspeed
+          '.product-title', '.product-name',
+          // CCV Shop
+          '.product-name', '.productTitle',
+          // Generic
+          'h1', '.product-title', '.product-name', '.title'
+        ].join(', '),
+        
+        price: customSelectors.price || [
+          // Schema.org
+          '[itemprop="price"]', 'meta[property="product:price:amount"]',
+          // Shopify
+          '.product__price .price-item--regular', '.product-price', '[data-product-price]',
+          // Magento
+          '.price-box .price', '[data-price-type="finalPrice"]', '.product-info-price .price',
+          // WooCommerce
+          '.woocommerce-Price-amount', 'p.price .amount', '.price ins .amount',
+          // Lightspeed
+          '.product-price', '.price-current',
+          // CCV Shop
+          '.productPrice', '.price',
+          // Generic
+          '.price', '[data-price]', '.product-price', '.current-price'
+        ].join(', '),
+        
+        ean: customSelectors.ean || [
+          // Schema.org
+          '[itemprop="gtin13"]', '[itemprop="gtin"]', '[itemprop="gtin14"]', '[itemprop="gtin8"]',
+          // Shopify
+          '[data-product-ean]',
+          // Magento
+          '.product-info-main .ean', '[data-th="EAN"]',
+          // Generic
+          '.ean', '.gtin', '.barcode', '[data-ean]'
+        ].join(', '),
+        
+        sku: customSelectors.sku || [
+          // Schema.org
+          '[itemprop="sku"]',
+          // Shopify
+          '.product__sku', '[data-product-sku]',
+          // Magento
+          '.product-info-main .sku', '[data-th="SKU"]',
+          // WooCommerce
+          '.sku', '.product_meta .sku',
+          // Generic
+          '.product-code', '.artikelnummer', '[data-sku]'
+        ].join(', '),
+        
+        brand: customSelectors.brand || [
+          // Schema.org
+          '[itemprop="brand"]',
+          // Shopify
+          '.product__vendor', '[data-product-vendor]',
+          // Magento
+          '.product-info-main .brand', '[data-th="Brand"]',
+          // WooCommerce
+          '.product_meta .posted_in a',
+          // Generic
+          '.brand', '.manufacturer', '.merk'
+        ].join(', '),
+        
+        category: customSelectors.category || [
+          // Schema.org
+          '[itemprop="category"]',
+          // Shopify
+          '.product__type',
+          // Magento
+          '.breadcrumbs', '.category-name',
+          // WooCommerce
+          '.posted_in a',
+          // Generic
+          '.breadcrumb', '.breadcrumbs', '.category'
+        ].join(', '),
+        
+        image: customSelectors.image || [
+          // Schema.org
+          '[itemprop="image"]',
+          // Shopify
+          '.product__media img', '.product-single__photo img',
+          // Magento
+          '.product-image-photo', '.fotorama__img',
+          // WooCommerce
+          '.woocommerce-product-gallery__image img',
+          // Generic
+          '.product-image img', '.main-image', '.gallery-image img'
+        ].join(', '),
+        
+        inStock: customSelectors.inStock || [
+          // Schema.org
+          '[itemprop="availability"]',
+          // Shopify
+          '.product-form__inventory', '[data-product-available]',
+          // Magento
+          '.stock.available', '.stock-status',
+          // WooCommerce
+          '.stock', '.availability',
+          // Generic
+          '.stock-status', '.availability', '.voorraad'
+        ].join(', ')
       };
 
       const product = await page.evaluate((selectors) => {
