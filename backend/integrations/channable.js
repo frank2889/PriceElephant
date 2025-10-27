@@ -52,14 +52,21 @@ class ChannableIntegration {
 
         try {
             const response = await axios.get(this.feedUrl);
-            const contentType = response.headers['content-type'];
+            const contentType = response.headers['content-type'] || '';
+            const data = response.data;
 
-            if (contentType.includes('xml')) {
-                return await this.parseXMLFeed(response.data);
-            } else if (contentType.includes('csv')) {
-                return this.parseCSVFeed(response.data);
+            // Detect format by content type OR by analyzing the data
+            const isXML = contentType.includes('xml') || 
+                         (typeof data === 'string' && data.trim().startsWith('<?xml'));
+            const isCSV = contentType.includes('csv') || 
+                         (typeof data === 'string' && !isXML && data.includes(','));
+
+            if (isXML) {
+                return await this.parseXMLFeed(data);
+            } else if (isCSV) {
+                return this.parseCSVFeed(data);
             } else {
-                throw new Error(`Unsupported feed format: ${contentType}`);
+                throw new Error(`Unsupported feed format: ${contentType} (content: ${typeof data})`);
             }
         } catch (error) {
             console.error('Channable feed import error:', error.message);
@@ -111,14 +118,6 @@ class ChannableIntegration {
                 description: this.getXMLValue(item, 'g:description') || this.getXMLValue(item, 'description'),
                 inStock: this.getXMLValue(item, 'g:availability') === 'in stock'
             };
-            
-            // Debug: log parsed product
-            console.log('📦 Parsed product:', {
-                title: product.title,
-                ean: product.ean,
-                price: product.price,
-                brand: product.brand
-            });
             
             return product;
         });

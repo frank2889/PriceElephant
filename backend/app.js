@@ -14,6 +14,7 @@ const channableRoutes = require('./routes/channable-routes');
 const shopifyRoutes = require('./routes/shopify-routes');
 const productRoutes = require('./routes/product-routes');
 const scraperRoutes = require('./routes/scraper-routes');
+const variantRoutes = require('./routes/variant-routes');
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/', limiter);
 app.use('/api/v1/channable', channableRoutes);
 app.use('/api/v1/shopify', shopifyRoutes);
 app.use('/api/v1/products', productRoutes);
+app.use('/api/v1/products', variantRoutes); // Variant management
 app.use('/api/v1/scraper', scraperRoutes);
 
 app.get('/health', (req, res) => {
