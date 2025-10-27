@@ -15,6 +15,7 @@ const shopifyRoutes = require('./routes/shopify-routes');
 const productRoutes = require('./routes/product-routes');
 const scraperRoutes = require('./routes/scraper-routes');
 const variantRoutes = require('./routes/variant-routes');
+const sitemapRoutes = require('./routes/sitemap-routes');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/v1/shopify', shopifyRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/products', variantRoutes); // Variant management
 app.use('/api/v1/scraper', scraperRoutes);
+app.use('/api/v1/sitemap', sitemapRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
