@@ -26,10 +26,16 @@
       </div>
     </div>
     
+    <!-- Product Import Options -->
+    <div style="max-width: 800px; margin: 0 auto 24px;">
+      <h2 style="margin-bottom: 8px;">Product import methode</h2>
+      <p style="color: #64748b; margin-bottom: 16px;">Kies één van de volgende opties om producten te importeren:</p>
+    </div>
+    
     <div class="pe-dashboard__grid">
       <section class="pe-card" id="pe-channable-card">
-        <h2>Channable integratie</h2>
-        <p>Configureer een feed-URL of API credentials om producten automatisch in te lezen.</p>
+        <h2>Optie 1: Channable integratie</h2>
+        <p>Heb je al een Channable feed? Gebruik deze optie.</p>
         <div id="pe-channable-status" class="pe-alert" hidden></div>
         <form id="pe-channable-form" novalidate>
           <div class="pe-field">
@@ -65,8 +71,8 @@
       </section>
 
       <section class="pe-card" id="pe-sitemap-card">
-        <h2>Sitemap import</h2>
-        <p>Importeer producten via jouw webshop sitemap.xml (geen Channable nodig).</p>
+        <h2>Optie 2: Sitemap import</h2>
+        <p>Geen Channable? Gebruik je webshop sitemap.xml.</p>
         <p><small class="pe-text-muted">✨ Intelligente detectie: scant automatisch alle URLs en herkent productpagina's op basis van prijs en titel.</small></p>
         <div id="pe-sitemap-status" class="pe-alert" hidden></div>
         <form id="pe-sitemap-form" novalidate>
@@ -88,6 +94,26 @@
           <div class="pe-card__footer">
             <button type="submit" class="pe-button pe-button--primary" id="pe-sitemap-save">Instellingen opslaan</button>
             <button type="button" class="pe-button pe-button--secondary" id="pe-sitemap-import">Nu importeren</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="pe-card" id="pe-manual-card">
+        <h2>Optie 3: Handmatig toevoegen</h2>
+        <p>Voeg individuele product URLs handmatig toe.</p>
+        <div id="pe-manual-status" class="pe-alert" hidden></div>
+        <form id="pe-manual-form" novalidate>
+          <div class="pe-field">
+            <label for="pe-manual-url">Product URL</label>
+            <input type="url" id="pe-manual-url" name="productUrl" placeholder="https://example.com/product/nike-air-max" required>
+          </div>
+          <div class="pe-field">
+            <label for="pe-manual-name">Product naam (optioneel)</label>
+            <input type="text" id="pe-manual-name" name="productName" placeholder="Nike Air Max 90">
+            <small class="pe-text-muted">Als je dit leeg laat, wordt de naam automatisch opgehaald van de website</small>
+          </div>
+          <div class="pe-card__footer">
+            <button type="submit" class="pe-button pe-button--primary">Product toevoegen</button>
           </div>
         </form>
       </section>

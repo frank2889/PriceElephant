@@ -57,6 +57,8 @@
   const sitemapForm = document.getElementById('pe-sitemap-form');
   const sitemapStatus = document.getElementById('pe-sitemap-status');
   const sitemapImportBtn = document.getElementById('pe-sitemap-import');
+  const manualForm = document.getElementById('pe-manual-form');
+  const manualStatus = document.getElementById('pe-manual-status');
   const productSearchInput = document.getElementById('pe-product-search');
   const productsBody = document.getElementById('pe-products-body');
   const productsEmptyState = document.getElementById('pe-products-empty');
@@ -325,8 +327,9 @@
         setApiStatus('channable', 'skip');
       }
     } catch (error) {
-      showStatus(channableStatus, `Kon Channable-configuratie niet laden: ${error.message}`, 'error');
-      setApiStatus('channable', 'error');
+      console.log('[loadChannableConfig] Error (ignoring):', error.message);
+      // Don't show error - Channable is optional
+      setApiStatus('channable', 'skip');
     }
   }
 
@@ -350,13 +353,8 @@
       }
     } catch (error) {
       console.error('[loadSitemapConfig] Error:', error);
-      // 404 is OK - no config yet
-      if (error.message && !error.message.includes('404')) {
-        showStatus(sitemapStatus, `Kon sitemap-configuratie niet laden: ${error.message}`, 'error');
-        setApiStatus('sitemap', 'error');
-      } else {
-        setApiStatus('sitemap', 'skip');
-      }
+      // 404 or any error is OK - sitemap is optional, just skip
+      setApiStatus('sitemap', 'skip');
     }
   }
 
@@ -374,10 +372,11 @@
       renderProducts();
       setApiStatus('products', 'success');
     } catch (error) {
+      console.log('[loadProducts] Error (showing empty state):', error.message);
       productsBody.innerHTML = '';
       productsEmptyState.hidden = false;
-      productsEmptyState.textContent = `Kon producten niet laden: ${error.message}`;
-      setApiStatus('products', 'error');
+      productsEmptyState.textContent = 'Geen producten gevonden. Importeer producten via Channable of Sitemap.';
+      setApiStatus('products', 'skip');
     }
   }
 
@@ -599,6 +598,48 @@
     }
   }
 
+  async function handleManualSubmit(event) {
+    event.preventDefault();
+    console.log('[handleManualSubmit] STARTED');
+    updateDebug('action', '🔄 Manual product add');
+    
+    const formData = new FormData(manualForm);
+    const productUrl = formData.get('productUrl')?.trim();
+    const productName = formData.get('productName')?.trim();
+    
+    if (!productUrl) {
+      showStatus(manualStatus, 'Product URL is verplicht', 'error');
+      return;
+    }
+    
+    setLoading(manualForm.querySelector('button[type="submit"]'), true);
+    showStatus(manualStatus, 'Product wordt toegevoegd...', null);
+    
+    try {
+      const response = await apiFetch('/api/v1/products/manual', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerId,
+          productUrl,
+          productName: productName || null
+        })
+      });
+      
+      manualForm.reset();
+      const message = response?.message || 'Product toegevoegd';
+      showStatus(manualStatus, `✅ ${message}`, 'success');
+      updateDebug('action', '✅ Manual add successful');
+      
+      await loadProducts(productSearchInput.value.trim());
+    } catch (error) {
+      console.error('[handleManualSubmit] ERROR:', error);
+      showStatus(manualStatus, `Toevoegen mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ Manual add: ${error.message}`);
+    } finally {
+      setLoading(manualForm.querySelector('button[type="submit"]'), false);
+    }
+  }
+
   async function handleCompetitorSubmit(event) {
     event.preventDefault();
     if (!state.selectedProductId) {
@@ -780,6 +821,7 @@
       channableImportBtn: !!channableImportBtn,
       sitemapForm: !!sitemapForm,
       sitemapImportBtn: !!sitemapImportBtn,
+      manualForm: !!manualForm,
       competitorForm: !!competitorForm,
       variantForm: !!variantForm
     });
@@ -807,6 +849,12 @@
     if (sitemapImportBtn) {
       sitemapImportBtn.addEventListener('click', handleSitemapImport);
       console.log('[PriceElephant] Sitemap import button listener attached');
+      listenersCount++;
+    }
+    
+    if (manualForm) {
+      manualForm.addEventListener('submit', handleManualSubmit);
+      console.log('[PriceElephant] Manual form listener attached');
       listenersCount++;
     }
     
@@ -880,7 +928,7 @@
     
     try {
       setupEventListeners();
-      updateDebug('listeners', '✅ 6 listeners');
+      updateDebug('listeners', '✅ 7 listeners');
       
       console.log('[PriceElephant] Loading initial data...');
       
