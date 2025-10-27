@@ -28,8 +28,8 @@
     "homepage": {
       "hero": {
         "title": "Win altijd op prijs",
-        "subtitle": "Monitor concurrenten. Volg trends. Optimaliseer je prijzen.",
-        "cta_trial": "Start gratis trial",
+        "subtitle": "De enige Shopify-native price intelligence tool. Monitor concurrenten. Optimaliseer automatisch. Verhoog je marges.",
+        "cta_trial": "Start gratis trial - 14 dagen",
         "cta_pricing": "Bekijk tarieven",
         "welcome_back": "Welkom terug, {{ name }}!",
         "welcome_subtitle": "Bekijk je dashboard voor de laatste prijsinzichten",
@@ -61,6 +61,50 @@
           "description": "Zie welke producten te duur of te goedkoop zijn. Identificeer kansen om marges te verhogen. Data-gedreven prijsbeslissingen."
         }
       },
+      "usp": {
+        "title": "Waarom PriceElephant?",
+        "subtitle": "De enige Shopify-native price intelligence tool voor Nederlandse webshops",
+        "shopify_native": {
+          "title": "Shopify-native",
+          "description": "Naadloos geïntegreerd in je Shopify Admin. Geen externe tools. Alles op één plek."
+        },
+        "channable_integration": {
+          "title": "Channable integratie",
+          "description": "Hergebruik je bestaande productfeeds. Geen dubbele setup. Importeer 500+ producten in seconden."
+        },
+        "dutch_focus": {
+          "title": "Nederlandse focus",
+          "description": "Bol.com, Coolblue, MediaMarkt out-of-the-box. Optimized voor de Nederlandse markt."
+        },
+        "self_service": {
+          "title": "Self-service platform",
+          "description": "Geen onboarding weken. Geen technische kennis vereist. Start vandaag nog."
+        },
+        "transparent_pricing": {
+          "title": "Transparante pricing",
+          "description": "Geen verrassingen. Geen verborgen kosten. Schaal mee met je groei."
+        },
+        "variant_support": {
+          "title": "Variant support",
+          "description": "Automatische variant detection. Beheer producten met kleuren, maten, types. Uniek in de markt."
+        }
+      },
+      "how_it_works": {
+        "title": "Hoe het werkt",
+        "subtitle": "Start in 3 eenvoudige stappen",
+        "step1": {
+          "title": "Importeer je producten",
+          "description": "Koppel je Channable feed of voeg handmatig producten toe. 500+ producten in enkele seconden."
+        },
+        "step2": {
+          "title": "Voeg concurrenten toe",
+          "description": "Plak concurrent URLs. Onze AI-scraper doet de rest. Geen technische setup nodig."
+        },
+        "step3": {
+          "title": "Ontvang inzichten",
+          "description": "Zie real-time prijsvergelijkingen. Krijg alerts bij wijzigingen. Optimaliseer je prijzen."
+        }
+      },
       "pricing": {
         "title": "Simpel en transparant",
         "subtitle": "Begin gratis. Schaal mee met je groei.",
@@ -68,14 +112,14 @@
           "name": "Trial",
           "price": "€0",
           "period": "14 dagen gratis",
-          "features": "1 concurrent||Max 50 producten||Handmatige import||Email alerts||Basis analytics",
+          "features": "Max 1 concurrent||Max 50 producten||Handmatige input only||Geen Channable feed||Geen email alerts",
           "cta": "Start gratis trial"
         },
         "starter": {
           "name": "Starter",
           "price": "€49",
           "period": "per maand",
-          "features": "3 concurrenten||500 producten||Channable feed sync||Email alerts||Basis analytics||Priority support",
+          "features": "3 concurrenten||Max 500 producten||Channable feed sync||Email alerts (Klaviyo)||Basis analytics||Priority support",
           "cta": "Begin nu"
         },
         "professional": {
@@ -83,14 +127,14 @@
           "price": "€99",
           "period": "per maand",
           "badge": "Populairste keuze",
-          "features": "5 concurrenten||2.500 producten||Channable feed sync||SMS + Email alerts||Geavanceerde analytics||Wekelijkse rapporten||Priority support",
+          "features": "5 concurrenten||Max 2.500 producten||Channable feed sync||Email alerts||Geavanceerde analytics||Wekelijkse rapporten||API access",
           "cta": "Begin nu"
         },
         "enterprise": {
           "name": "Enterprise",
           "price": "€249",
           "period": "per maand",
-          "features": "Onbeperkt concurrenten||Onbeperkt producten||API toegang||White-label optie||Dedicated support||Custom rapporten||SLA garantie",
+          "features": "Onbeperkt concurrenten||Onbeperkt producten||Channable feed sync||API access||White-label optie||Priority support||Dedicated manager",
           "cta": "Neem contact op"
         }
       },
