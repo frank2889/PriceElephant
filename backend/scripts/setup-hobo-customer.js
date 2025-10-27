@@ -27,74 +27,11 @@ async function setupHoboCustomer() {
     
     const client = new shopify.clients.Graphql({ session });
     
-    // Check if customer exists
-    console.log('🔍 Checking if customer exists...');
-    const searchQuery = `
-      query SearchCustomer($query: String!) {
-        customers(first: 1, query: $query) {
-          edges {
-            node {
-              id
-              email
-              firstName
-              lastName
-            }
-          }
-        }
-      }
-    `;
+    // Hobo's Shopify Customer ID (from theme data-customer-id)
+    const customerId = 'gid://shopify/Customer/8557353828568';
     
-    const searchResult = await client.request(searchQuery, {
-      variables: { query: 'email:info@hobo.nl' }
-    });
-    
-    let customerId;
-    const existing = searchResult.data.customers.edges;
-    
-    if (existing.length > 0) {
-      customerId = existing[0].node.id;
-      console.log(`✅ Customer already exists: ${existing[0].node.email}`);
-      console.log(`   ID: ${customerId}\n`);
-    } else {
-      // Create customer
-      console.log('📝 Creating new customer...');
-      const createQuery = `
-        mutation CreateCustomer($input: CustomerInput!) {
-          customerCreate(input: $input) {
-            customer {
-              id
-              email
-              firstName
-              lastName
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `;
-      
-      const createResult = await client.request(createQuery, {
-        variables: {
-          input: {
-            email: 'info@hobo.nl',
-            firstName: 'Hobo',
-            lastName: 'NL',
-            note: 'Enterprise customer - PriceElephant',
-            tags: ['priceelephant', 'enterprise']
-          }
-        }
-      });
-      
-      if (createResult.data.customerCreate.userErrors.length > 0) {
-        throw new Error(createResult.data.customerCreate.userErrors.map(e => e.message).join(', '));
-      }
-      
-      customerId = createResult.data.customerCreate.customer.id;
-      console.log('✅ Customer created successfully');
-      console.log(`   ID: ${customerId}\n`);
-    }
+    console.log(`📋 Customer ID: ${customerId}`);
+    console.log(`   (This is Hobo's Shopify customer account)\n`);
     
     // Set Enterprise tier metafields
     console.log('🏢 Setting Enterprise tier metafields...');
