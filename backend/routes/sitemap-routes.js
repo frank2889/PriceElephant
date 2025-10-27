@@ -14,6 +14,13 @@ const db = require('../config/database');
  */
 router.post('/import', async (req, res) => {
   try {
+    console.log('[Sitemap Import] Request received:', {
+      customerId: req.body.customerId,
+      sitemapUrl: req.body.sitemapUrl,
+      maxProducts: req.body.maxProducts,
+      productUrlPattern: req.body.productUrlPattern
+    });
+    
     const { 
       customerId, 
       sitemapUrl, 
@@ -23,26 +30,38 @@ router.post('/import', async (req, res) => {
     } = req.body;
 
     if (!customerId) {
+      console.error('[Sitemap Import] Error: customerId missing');
       return res.status(400).json({ error: 'customerId is required' });
     }
 
     if (!sitemapUrl) {
+      console.error('[Sitemap Import] Error: sitemapUrl missing');
       return res.status(400).json({ error: 'sitemapUrl is required' });
     }
 
     // Validate URL
     try {
       new URL(sitemapUrl);
+      console.log('[Sitemap Import] URL validation passed');
     } catch (e) {
+      console.error('[Sitemap Import] Invalid URL:', e.message);
       return res.status(400).json({ error: 'Invalid sitemap URL' });
     }
 
+    console.log('[Sitemap Import] Starting import service...');
     const service = new SitemapImportService(customerId);
     
     const results = await service.importFromSitemap(sitemapUrl, {
       maxProducts,
       productUrlPattern,
       selectors
+    });
+
+    console.log('[Sitemap Import] ✅ Import completed:', {
+      scanned: results.scanned,
+      created: results.created,
+      updated: results.updated,
+      errors: results.errors?.length || 0
     });
 
     res.json({
@@ -63,10 +82,15 @@ router.post('/import', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Sitemap import error:', error);
+    console.error('[Sitemap Import] ❌ Fatal error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     res.status(500).json({ 
       error: 'Import failed', 
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -77,6 +101,13 @@ router.post('/import', async (req, res) => {
  */
 router.get('/import-stream', async (req, res) => {
   try {
+    console.log('[Sitemap SSE] Stream request received:', {
+      customerId: req.query.customerId,
+      sitemapUrl: req.query.sitemapUrl,
+      maxProducts: req.query.maxProducts,
+      productUrlPattern: req.query.productUrlPattern
+    });
+    
     const { 
       customerId, 
       sitemapUrl, 
@@ -85,31 +116,38 @@ router.get('/import-stream', async (req, res) => {
     } = req.query;
 
     if (!customerId) {
+      console.error('[Sitemap SSE] Error: customerId missing');
       return res.status(400).json({ error: 'customerId is required' });
     }
 
     if (!sitemapUrl) {
+      console.error('[Sitemap SSE] Error: sitemapUrl missing');
       return res.status(400).json({ error: 'sitemapUrl is required' });
     }
 
     // Validate URL
     try {
       new URL(sitemapUrl);
+      console.log('[Sitemap SSE] URL validation passed');
     } catch (e) {
+      console.error('[Sitemap SSE] Invalid URL:', e.message);
       return res.status(400).json({ error: 'Invalid sitemap URL' });
     }
 
     // Setup SSE
+    console.log('[Sitemap SSE] Setting up SSE stream...');
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
     const sendEvent = (event, data) => {
+      console.log(`[Sitemap SSE] Event: ${event}`, data);
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
+    console.log('[Sitemap SSE] Starting import service...');
     const service = new SitemapImportService(customerId);
     
     // Progress callback
@@ -122,6 +160,13 @@ router.get('/import-stream', async (req, res) => {
         maxProducts: parseInt(maxProducts) || 500,
         productUrlPattern: productUrlPattern || null,
         onProgress
+      });
+
+      console.log('[Sitemap SSE] ✅ Import completed:', {
+        scanned: results.scanned,
+        created: results.created,
+        updated: results.updated,
+        errors: results.errors?.length || 0
       });
 
       // Send final results
@@ -141,15 +186,25 @@ router.get('/import-stream', async (req, res) => {
 
       res.end();
     } catch (error) {
+      console.error('[Sitemap SSE] ❌ Fatal error:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
       sendEvent('error', {
         error: 'Import failed',
-        message: error.message
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
       res.end();
     }
 
   } catch (error) {
-    console.error('Sitemap stream error:', error);
+    console.error('[Sitemap SSE] ❌ Stream setup error:', {
+      message: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ 
       error: 'Stream setup failed', 
       message: error.message 
