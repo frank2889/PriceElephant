@@ -1,12 +1,105 @@
-# Sprint 1 Status - 26 oktober 2025
+# Sprint 1 Status - 27 oktober 2025 (UPDATE)
 
-## 🎯 Overall Progress: 80% Complete
+## 🎯 Overall Progress: 95% Complete ⚡
 
-**Key Achievement:** Cost-optimized hybrid scraper reduces COGS from €800 → €50/month per customer, making business model profitable at 1 customer instead of 40+.
+**Key Achievements (27 Oct):**
+1. ✅ Shopify Metafield Definitions aangemaakt (8 definitions)
+2. ✅ Bulk import endpoint geïmplementeerd
+3. ✅ Multi-language theme deployment (Dutch)
+4. ✅ Customer Accounts integration
+5. ✅ Dashboard live en werkend
+
+**Previous Achievement (26 Oct):** Cost-optimized hybrid scraper reduces COGS from €800 → €50/month per customer, making business model profitable at 1 customer instead of 40+.
 
 ---
 
-## ✅ Afgerond
+## 🆕 Nieuw Toegevoegd (27 oktober)
+
+### 8. Shopify Metafield Definitions ⭐
+**Bestand:** `backend/scripts/setup-metafield-definitions.js`
+
+**Metafield Definitions Created (GraphQL):**
+- `priceelephant.channable_id` - Single line text
+- `priceelephant.ean` - Single line text
+- `priceelephant.competitor_prices` - JSON array
+- `priceelephant.price_history` - JSON array
+- `priceelephant.last_scraped` - DateTime
+- `priceelephant.lowest_competitor` - Number (decimal)
+- `priceelephant.price_difference` - Number (decimal)
+- `priceelephant.competitor_count` - Number (integer)
+
+**Status:**
+- ✅ All 8 definitions created via GraphQL API
+- ✅ Visible in Shopify Admin: Settings → Custom data → Products
+- ✅ Ready for dashboard price charts and competitor overlays
+
+**Technical Details:**
+- Used GraphQL `metafieldDefinitionCreate` mutation
+- REST API didn't work (JSON parsing errors)
+- All definitions have `ownerType: PRODUCT`
+- Namespace: `priceelephant` for all custom fields
+
+### 9. Bulk Import API Endpoint
+**Bestand:** `backend/routes/product-routes.js`
+
+**Endpoint:** `POST /api/v1/products/import`
+
+**Features:**
+- Accepts array of products in request body
+- Validates required fields (shopify_customer_id, product_name)
+- EAN duplicate detection per customer
+- Returns detailed results: `{ imported, skipped, failed, errors[] }`
+- Deployed to Railway production
+
+**Test Results:**
+```bash
+curl POST https://web-production-2568.up.railway.app/api/v1/products/import
+Response: {"success":true,"results":{"imported":0,"skipped":5,"failed":0,"errors":[]}}
+```
+- 5 products already existed in production (imported on 26 Oct)
+- All products have shopify_product_id (synced to Shopify)
+
+### 10. Multi-Language Theme Setup
+**Branch:** `shopify-theme` (auto-deploys to Shopify)
+
+**Locale Files:**
+- `locales/nl.json` - 240+ Dutch translations
+- `locales/nl-NL.json` - Duplicate for fallback
+- `locales/en.default.json` - English (default)
+
+**Fixes Applied:**
+- Converted array values to pipe-separated strings (Shopify validation)
+- Example: `["item1", "item2"]` → `"item1||item2||item3"`
+- Fixed 6 feature sections in features_page
+
+**Theme Changes:**
+- Default language set to Dutch: `<html lang="nl">`
+- Hero background: `winkelstraat.webp` (52KB asset)
+- Removed password protection (deleted `layout/password.liquid`)
+- Account URLs: `/account` (new Customer Accounts system)
+
+**Deployment Workflow:**
+1. Edit files on `shopify-theme` branch
+2. Commit and push to GitHub
+3. Shopify auto-syncs within 1-2 minutes
+4. Verify on https://priceelephant.myshopify.com
+
+### 11. Customer Accounts Integration
+**System:** New Shopify Customer Accounts (email-only, no passwords)
+
+**Changes:**
+- `sections/header.liquid`: Login/register buttons → `/account`
+- `templates/index.liquid`: CTA buttons → `/account`
+- Removed old routes: `{{ routes.account_register_url }}` (caused shopify.com blocking)
+
+**Status:**
+- ✅ Buttons work correctly
+- ✅ No external redirects to shopify.com
+- ✅ Account page accessible at /account
+
+---
+
+## ✅ Afgerond (26 oktober)
 
 ### 1. Railway Production Deployment
 - **Backend URL:** https://web-production-2568.up.railway.app
