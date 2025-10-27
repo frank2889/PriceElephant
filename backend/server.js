@@ -1,14 +1,26 @@
 const app = require('./app');
+const knex = require('./config/database');
 
 const PORT = process.env.PORT || 3000;
 
 let server;
 
 if (process.env.NODE_ENV !== 'test') {
-  server = app.listen(PORT, () => {
-    console.log('🐘 PriceElephant Backend - Port ' + PORT);
-    console.log('Sprint 0: Foundation ✅');
-  });
+  // Run migrations before starting server
+  console.log('🔄 Running database migrations...');
+  knex.migrate.latest()
+    .then(() => {
+      console.log('✅ Database migrations complete');
+      
+      server = app.listen(PORT, () => {
+        console.log('🐘 PriceElephant Backend - Port ' + PORT);
+        console.log('Sprint 0: Foundation ✅');
+      });
+    })
+    .catch((err) => {
+      console.error('❌ Migration failed:', err);
+      process.exit(1);
+    });
 
   // Handle graceful shutdown
   process.on('SIGTERM', () => {
