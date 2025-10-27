@@ -117,11 +117,19 @@
       if (response.ok) {
         const data = await response.json();
         if (data.tier === 'enterprise') {
-          // Auto-set maxProducts to 10000 for Enterprise customers
+          // Auto-set maxProducts to 10000 for Enterprise customers and remove max limit
           const maxProductsInput = document.getElementById('pe-max-products');
-          if (maxProductsInput && maxProductsInput.value === '500') {
+          const maxProductsHint = document.getElementById('pe-max-products-hint');
+          
+          if (maxProductsInput) {
             maxProductsInput.value = '10000';
-            console.log('[PriceElephant] Enterprise customer - maxProducts set to 10000');
+            maxProductsInput.removeAttribute('max'); // Remove max limit
+            console.log('[PriceElephant] Enterprise customer - unlimited products enabled');
+          }
+          
+          if (maxProductsHint) {
+            maxProductsHint.textContent = '✅ Enterprise: Onbeperkt scannen (10000 = alle producten)';
+            maxProductsHint.style.color = '#059669';
           }
         }
         return data;
