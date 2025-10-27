@@ -19,6 +19,9 @@ const sitemapRoutes = require('./routes/sitemap-routes');
 
 const app = express();
 
+// Trust Railway proxy (for rate limiting and real IP detection)
+app.set('trust proxy', true);
+
 if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
