@@ -110,6 +110,29 @@
     }
   }
 
+  // Fetch customer tier and set appropriate defaults
+  async function fetchCustomerTier() {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/v1/customers/${customerId}/tier`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.tier === 'enterprise') {
+          // Auto-set maxProducts to 10000 for Enterprise customers
+          const maxProductsInput = document.getElementById('pe-max-products');
+          if (maxProductsInput && maxProductsInput.value === '500') {
+            maxProductsInput.value = '10000';
+            console.log('[PriceElephant] Enterprise customer - maxProducts set to 10000');
+          }
+        }
+        return data;
+      }
+    } catch (error) {
+      console.warn('[PriceElephant] Could not fetch customer tier:', error.message);
+    }
+    return null;
+  }
+
+
     async function apiFetch(endpoint, options = {}) {
     console.log('[apiFetch] START', { endpoint, method: options.method || 'GET' });
     updateDebug('action', `📡 API: ${endpoint}`);
@@ -1029,6 +1052,10 @@
       updateDebug('listeners', '✅ 7 listeners');
       
       console.log('[PriceElephant] Loading initial data...');
+      
+      // Fetch customer tier and set defaults
+      updateDebug('action', '📡 Fetching customer tier...');
+      await fetchCustomerTier();
       
       // Load configs sequentially to see which one fails
       updateDebug('action', '📡 Loading Channable config...');
