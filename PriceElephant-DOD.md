@@ -500,18 +500,24 @@ Overall success rate: 100.0%
 
 **Shopify-GitHub Auto-Deployment:**
 - ✅ **Integration actief:** Repository `frank2889/PriceElephant` gekoppeld aan Shopify
-- ✅ **Auto-sync:** Elke `git push` naar `main` branch triggert automatische theme deployment
-- ✅ **Theme path:** `/theme` folder in repository root
-- ✅ **Workflow:** Wijziging in code → `git add` + `git commit` + `git push` → Shopify sync binnen 1-2 minuten
-- ⚠️ **Belangrijk:** Geen handmatige ZIP uploads of Shopify CLI nodig - deployment is volledig geautomatiseerd
+- ✅ **Connected branch:** `shopify-theme` (NIET `main`!)
+- ✅ **Theme structure:** Files in ROOT van `shopify-theme` branch (assets/, locales/, templates/, layout/, etc.)
+- ✅ **Workflow voor theme changes:**
+  1. `git checkout shopify-theme`
+  2. Maak wijzigingen in theme files (locales/, templates/, etc.)
+  3. `git add .` + `git commit -m "message"` + `git push origin shopify-theme`
+  4. Shopify sync automatisch binnen 1-2 minuten
+- ⚠️ **KRITIEK:** Theme wijzigingen ALLEEN naar `shopify-theme` pushen, NIET naar `main`
+- ⚠️ **Main branch:** Bevat theme files in `/theme` subfolder (voor development/documentation)
 - ✅ **Status:** Getest en werkend (27 oktober 2025)
 
 **Multi-Language Support:**
-- ✅ **Dutch (nl):** Primaire taal - `theme/locales/nl.json` (240+ keys)
-- ✅ **English (en):** Fallback taal - `theme/locales/en.default.json`
+- ✅ **Dutch (nl):** Primaire taal - `locales/nl.json` + `locales/nl-NL.json` (240+ keys)
+- ✅ **English (en):** Fallback taal - `locales/en.default.json`
 - ✅ **Shopify Settings:** Dutch ingesteld als default in Admin → Settings → Languages
-- ✅ **Theme default:** HTML `lang="nl"` in `theme/layout/theme.liquid`
+- ✅ **Theme default:** HTML `lang="nl"` in `layout/theme.liquid`
 - ✅ **Implementation:** Alle content via Liquid filters `{{ 'priceelephant.homepage.hero.title' | t }}`
+- ✅ **Validation:** Arrays geconverteerd naar pipe-separated strings (`"item1||item2||item3"`)
 - ✅ **Future-ready:** Structuur klaar voor wereldwijde expansie (zie Sprint 4 status)
 
 **Previous updates (25 oktober 2025):**
