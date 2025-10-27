@@ -494,7 +494,27 @@ Overall success rate: 100.0%
 
 **Rollout:** Internal beta with pilot customer team (5 users)
 
-### **Sprint 1 Progress Update (25 oktober 2025)**
+### **Sprint 1 Progress Update (27 oktober 2025)**
+
+**✅ DEPLOYMENT & LOCALIZATION SETUP:**
+
+**Shopify-GitHub Auto-Deployment:**
+- ✅ **Integration actief:** Repository `frank2889/PriceElephant` gekoppeld aan Shopify
+- ✅ **Auto-sync:** Elke `git push` naar `main` branch triggert automatische theme deployment
+- ✅ **Theme path:** `/theme` folder in repository root
+- ✅ **Workflow:** Wijziging in code → `git add` + `git commit` + `git push` → Shopify sync binnen 1-2 minuten
+- ⚠️ **Belangrijk:** Geen handmatige ZIP uploads of Shopify CLI nodig - deployment is volledig geautomatiseerd
+- ✅ **Status:** Getest en werkend (27 oktober 2025)
+
+**Multi-Language Support:**
+- ✅ **Dutch (nl):** Primaire taal - `theme/locales/nl.json` (240+ keys)
+- ✅ **English (en):** Fallback taal - `theme/locales/en.default.json`
+- ✅ **Shopify Settings:** Dutch ingesteld als default in Admin → Settings → Languages
+- ✅ **Theme default:** HTML `lang="nl"` in `theme/layout/theme.liquid`
+- ✅ **Implementation:** Alle content via Liquid filters `{{ 'priceelephant.homepage.hero.title' | t }}`
+- ✅ **Future-ready:** Structuur klaar voor wereldwijde expansie (zie Sprint 4 status)
+
+**Previous updates (25 oktober 2025):**
 
 - Shopify theme verplaatst naar `theme/` in de root en gekoppeld via bestaande `main` + `shopify-theme` branches zodat GitHub ↔ Shopify integratie actief blijft.
 - Nieuwe `priceelephant-dashboard` section, template en assets live (Liquid + JS + CSS) met login-gating (`{% if customer %}`) en customer context (`data-customer-id`).
