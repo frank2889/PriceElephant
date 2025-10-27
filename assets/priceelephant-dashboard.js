@@ -401,6 +401,14 @@
         if (config.productUrlPattern) {
           sitemapForm.productUrlPattern.value = config.productUrlPattern;
         }
+        // Load saved maxProducts if available
+        if (config.maxProducts) {
+          const maxProductsInput = document.getElementById('pe-max-products');
+          if (maxProductsInput) {
+            maxProductsInput.value = config.maxProducts;
+            console.log('[loadSitemapConfig] Set maxProducts to:', config.maxProducts);
+          }
+        }
         showStatus(sitemapStatus, 'Sitemap configuratie geladen.', 'success');
         setApiStatus('sitemap', 'success');
       } else {
