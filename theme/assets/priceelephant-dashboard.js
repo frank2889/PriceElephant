@@ -541,97 +541,144 @@
     }
 
     try {
-      console.log('[handleSitemapImport] Calling import API...');
+      console.log('[handleSitemapImport] Setting up SSE stream...');
       
       // Show progress bar
       progressContainer.hidden = false;
-      progressFill.style.width = '10%';
-      progressText.textContent = '📡 Sitemap wordt opgehaald...';
+      progressFill.style.width = '0%';
+      progressText.textContent = 'Verbinding maken...';
       
-      // Simulate progress updates (since we can't get real-time updates from backend)
-      const progressInterval = setInterval(() => {
-        const currentWidth = parseInt(progressFill.style.width) || 0;
-        if (currentWidth < 90) {
-          progressFill.style.width = `${currentWidth + 5}%`;
-          if (currentWidth < 30) {
-            progressText.textContent = '🔍 URLs scannen voor productpagina\'s...';
-          } else if (currentWidth < 60) {
-            progressText.textContent = '🛍️ Productinformatie ophalen...';
-          } else {
-            progressText.textContent = '💾 Data opslaan in database...';
-          }
-        }
-      }, 800);
-      
-      const response = await apiFetch('/api/v1/sitemap/import', {
-        method: 'POST',
-        body: JSON.stringify({ 
+      // Use EventSource for real-time progress
+      const eventSource = new EventSource(
+        `${API_BASE_URL}/api/v1/sitemap/import-stream?` + new URLSearchParams({
           customerId,
           sitemapUrl,
-          maxProducts,
-          productUrlPattern
-        }),
+          maxProducts: maxProducts.toString(),
+          productUrlPattern: productUrlPattern || ''
+        })
+      );
+
+      // Handle progress events
+      eventSource.addEventListener('progress', (event) => {
+        const data = JSON.parse(event.data);
+        console.log('[SSE Progress]', data);
+        
+        progressFill.style.width = `${data.percentage || 0}%`;
+        progressText.textContent = data.message || 'Bezig...';
+        
+        // Update debug info
+        if (data.scanned) {
+          updateDebug('action', `📊 Scan: ${data.scanned} | Detected: ${data.detectedProducts || 0}`);
+        }
       });
-      
-      clearInterval(progressInterval);
-      progressFill.style.width = '100%';
-      progressText.textContent = '✅ Scan voltooid!';
-      
-      console.log('[handleSitemapImport] Success:', response);
-      
-      const message = response?.message || 'Import uitgevoerd.';
-      const results = response?.results;
-      
-      if (results) {
-        const scanInfo = `📊 Gescand: ${results.scanned} URLs | ✅ Producten gedetecteerd: ${results.detectedProducts}`;
-        const importInfo = `📦 Nieuw: ${results.created} | 🔄 Bijgewerkt: ${results.updated} | ⏭️ Overgeslagen: ${results.skipped}`;
+
+      // Handle completion
+      eventSource.addEventListener('complete', async (event) => {
+        const data = JSON.parse(event.data);
+        console.log('[SSE Complete]', data);
         
-        // Count metadata extraction stats
-        const metadataStats = [];
-        let imagesCount = 0, ratingsCount = 0, brandsCount = 0, stockCount = 0, deliveryCount = 0, bundleCount = 0;
+        eventSource.close();
         
-        if (results.products) {
-          results.products.forEach(p => {
-            if (p.image_url) imagesCount++;
-            if (p.rating) ratingsCount++;
-            if (p.brand) brandsCount++;
-            if (p.stock_level !== null && p.stock_level !== undefined) stockCount++;
-            if (p.delivery_time) deliveryCount++;
-            if (p.bundle_info) bundleCount++;
-          });
+        progressFill.style.width = '100%';
+        progressText.textContent = '✅ Scan voltooid!';
+        
+        const results = data.results;
+        if (results) {
+          const scanInfo = `📊 Gescand: ${results.scanned} URLs | ✅ Producten gedetecteerd: ${results.detectedProducts}`;
+          const importInfo = `📦 Nieuw: ${results.created} | 🔄 Bijgewerkt: ${results.updated} | ⏭️ Overgeslagen: ${results.skipped}`;
           
-          if (imagesCount) metadataStats.push(`🖼️ ${imagesCount}`);
-          if (ratingsCount) metadataStats.push(`⭐ ${ratingsCount}`);
-          if (brandsCount) metadataStats.push(`🏷️ ${brandsCount}`);
-          if (stockCount) metadataStats.push(`📦 ${stockCount}`);
-          if (deliveryCount) metadataStats.push(`⏱️ ${deliveryCount}`);
-          if (bundleCount) metadataStats.push(`🎁 ${bundleCount}`);
+          // Count metadata
+          const metadataStats = [];
+          let imagesCount = 0, ratingsCount = 0, brandsCount = 0, stockCount = 0, deliveryCount = 0, bundleCount = 0;
+          
+          if (results.products) {
+            results.products.forEach(p => {
+              if (p.image_url) imagesCount++;
+              if (p.rating) ratingsCount++;
+              if (p.brand) brandsCount++;
+              if (p.stock_level !== null && p.stock_level !== undefined) stockCount++;
+              if (p.delivery_time) deliveryCount++;
+              if (p.bundle_info) bundleCount++;
+            });
+            
+            if (imagesCount) metadataStats.push(`🖼️ ${imagesCount}`);
+            if (ratingsCount) metadataStats.push(`⭐ ${ratingsCount}`);
+            if (brandsCount) metadataStats.push(`🏷️ ${brandsCount}`);
+            if (stockCount) metadataStats.push(`📦 ${stockCount}`);
+            if (deliveryCount) metadataStats.push(`⏱️ ${deliveryCount}`);
+            if (bundleCount) metadataStats.push(`🎁 ${bundleCount}`);
+          }
+          
+          const metadataInfo = metadataStats.length ? `\n📋 Metadata: ${metadataStats.join(' · ')}` : '';
+          const errorInfo = results.errors?.length > 0 ? ` | ⚠️ Errors: ${results.errors.length}` : '';
+          
+          showStatus(sitemapStatus, `Import voltooid!\n${scanInfo}\n${importInfo}${metadataInfo}${errorInfo}`, results.errors?.length > 0 ? 'error' : 'success');
+          updateDebug('action', `✅ Sitemap: ${results.detectedProducts} detected, ${results.created} imported`);
         }
         
-        const metadataInfo = metadataStats.length ? `\n📋 Metadata: ${metadataStats.join(' · ')}` : '';
-        const errorInfo = results.errors?.length > 0 ? ` | ⚠️ Errors: ${results.errors.length}` : '';
+        await loadProducts(productSearchInput.value.trim());
         
-        showStatus(sitemapStatus, `${message}\n${scanInfo}\n${importInfo}${metadataInfo}${errorInfo}`, results.errors?.length > 0 ? 'error' : 'success');
-        updateDebug('action', `✅ Sitemap: ${results.detectedProducts} detected, ${results.created} imported`);
-      } else {
-        showStatus(sitemapStatus, message, 'success');
-      }
-      
-      await loadProducts(productSearchInput.value.trim());
-      
-      // Hide progress bar after 2 seconds
-      setTimeout(() => {
-        progressContainer.hidden = true;
-        progressFill.style.width = '0%';
-      }, 2000);
+        // Hide progress bar after 2 seconds
+        setTimeout(() => {
+          progressContainer.hidden = true;
+          progressFill.style.width = '0%';
+        }, 2000);
+        
+        setLoading(sitemapImportBtn, false);
+      });
+
+      // Handle errors
+      eventSource.addEventListener('error', (event) => {
+        console.error('[SSE Error]', event);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(event.data);
+        } catch (e) {
+          errorData = { message: 'Verbinding verbroken' };
+        }
+        
+        eventSource.close();
+        
+        progressFill.style.width = '100%';
+        progressFill.style.background = 'var(--pe-danger)';
+        progressText.textContent = '❌ Fout opgetreden';
+        
+        showStatus(sitemapStatus, `Import mislukt: ${errorData.message || 'Onbekende fout'}`, 'error');
+        updateDebug('error', `❌ Import: ${errorData.message}`);
+        
+        setTimeout(() => {
+          progressContainer.hidden = true;
+          progressFill.style.width = '0%';
+          progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
+        }, 3000);
+        
+        setLoading(sitemapImportBtn, false);
+      });
+
+      // Handle connection errors
+      eventSource.onerror = () => {
+        console.error('[SSE] Connection error');
+        eventSource.close();
+        
+        progressFill.style.width = '100%';
+        progressFill.style.background = 'var(--pe-danger)';
+        progressText.textContent = '❌ Verbinding verloren';
+        
+        showStatus(sitemapStatus, 'Verbinding met server verloren', 'error');
+        
+        setTimeout(() => {
+          progressContainer.hidden = true;
+          progressFill.style.width = '0%';
+          progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
+        }, 3000);
+        
+        setLoading(sitemapImportBtn, false);
+      };
       
     } catch (error) {
       console.error('[handleSitemapImport] ERROR:', error);
       
-      // Stop progress and show error
-      if (typeof progressInterval !== 'undefined') {
-        clearInterval(progressInterval);
-      }
       progressFill.style.width = '100%';
       progressFill.style.background = 'var(--pe-danger)';
       progressText.textContent = '❌ Fout opgetreden';
@@ -639,14 +686,12 @@
       showStatus(sitemapStatus, `Import mislukt: ${error.message}`, 'error');
       updateDebug('error', `❌ Import: ${error.message}`);
       
-      // Hide progress bar after 3 seconds
       setTimeout(() => {
         progressContainer.hidden = true;
         progressFill.style.width = '0%';
         progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
       }, 3000);
       
-    } finally {
       setLoading(sitemapImportBtn, false);
     }
   }

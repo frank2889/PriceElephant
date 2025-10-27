@@ -53,6 +53,9 @@ router.post('/import', async (req, res) => {
         created: results.created,
         updated: results.updated,
         skipped: results.skipped,
+        scanned: results.scanned,
+        detectedProducts: results.detectedProducts,
+        products: results.products,
         errors: results.errors.length,
         errorDetails: results.errors,
         total: results.created + results.updated + results.skipped
@@ -63,6 +66,92 @@ router.post('/import', async (req, res) => {
     console.error('Sitemap import error:', error);
     res.status(500).json({ 
       error: 'Import failed', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/v1/sitemap/import-stream
+ * Import products from sitemap with real-time progress via SSE
+ */
+router.get('/import-stream', async (req, res) => {
+  try {
+    const { 
+      customerId, 
+      sitemapUrl, 
+      maxProducts,
+      productUrlPattern
+    } = req.query;
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'customerId is required' });
+    }
+
+    if (!sitemapUrl) {
+      return res.status(400).json({ error: 'sitemapUrl is required' });
+    }
+
+    // Validate URL
+    try {
+      new URL(sitemapUrl);
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid sitemap URL' });
+    }
+
+    // Setup SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendEvent = (event, data) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const service = new SitemapImportService(customerId);
+    
+    // Progress callback
+    const onProgress = (progressData) => {
+      sendEvent('progress', progressData);
+    };
+
+    try {
+      const results = await service.importFromSitemap(sitemapUrl, {
+        maxProducts: parseInt(maxProducts) || 50,
+        productUrlPattern: productUrlPattern || null,
+        onProgress
+      });
+
+      // Send final results
+      sendEvent('complete', {
+        success: true,
+        results: {
+          created: results.created,
+          updated: results.updated,
+          skipped: results.skipped,
+          scanned: results.scanned,
+          detectedProducts: results.detectedProducts,
+          products: results.products,
+          scrapingStats: results.scrapingStats,
+          errors: results.errors
+        }
+      });
+
+      res.end();
+    } catch (error) {
+      sendEvent('error', {
+        error: 'Import failed',
+        message: error.message
+      });
+      res.end();
+    }
+
+  } catch (error) {
+    console.error('Sitemap stream error:', error);
+    res.status(500).json({ 
+      error: 'Stream setup failed', 
       message: error.message 
     });
   }

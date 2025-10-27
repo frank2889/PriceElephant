@@ -35,12 +35,26 @@ class SitemapImportService {
     const {
       maxProducts = 100,
       productUrlPattern = null,
+      onProgress = null
     } = options;
 
     console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
     console.log(`[SitemapImport] Max products target: ${maxProducts}`);
 
+    // Helper to send progress updates
+    const sendProgress = (data) => {
+      if (onProgress) {
+        onProgress(data);
+      }
+    };
+
     try {
+      sendProgress({
+        stage: 'fetching',
+        message: 'Sitemap wordt opgehaald...',
+        percentage: 5
+      });
+
       // Get Sitemapper class via dynamic import
       const SitemapperClass = await getSitemapper();
       const sitemap = new SitemapperClass({
@@ -51,15 +65,35 @@ class SitemapImportService {
       const { sites } = await sitemap.fetch();
       console.log(`[SitemapImport] Found ${sites.length} URLs in sitemap`);
 
+      sendProgress({
+        stage: 'parsing',
+        message: `${sites.length} URLs gevonden in sitemap`,
+        percentage: 10,
+        totalUrls: sites.length
+      });
+
       let candidateUrls = sites;
       
       if (productUrlPattern) {
         const regex = new RegExp(productUrlPattern, 'i');
         candidateUrls = sites.filter(url => regex.test(url));
         console.log(`[SitemapImport] Pre-filtered to ${candidateUrls.length} candidate URLs`);
+        
+        sendProgress({
+          stage: 'filtering',
+          message: `${candidateUrls.length} URLs na filtering`,
+          percentage: 15,
+          candidateUrls: candidateUrls.length
+        });
       }
 
       console.log(`[SitemapImport] Starting intelligent product detection with HybridScraper...`);
+
+      sendProgress({
+        stage: 'scanning',
+        message: 'Intelligente scan gestart...',
+        percentage: 20
+      });
 
       const results = {
         created: 0,
@@ -84,6 +118,19 @@ class SitemapImportService {
         const url = candidateUrls[i];
         results.scanned++;
         
+        // Calculate real-time percentage (20% reserved for final steps)
+        const scanProgress = Math.floor(20 + (i / candidateUrls.length) * 60);
+        
+        sendProgress({
+          stage: 'scanning',
+          message: `Scan ${i + 1}/${Math.min(candidateUrls.length, maxProducts)} - ${url.substring(0, 50)}...`,
+          percentage: scanProgress,
+          scanned: results.scanned,
+          detectedProducts: results.detectedProducts,
+          created: results.created,
+          currentUrl: url
+        });
+        
         console.log(`[SitemapImport] [${i+1}/${candidateUrls.length}] Scanning: ${url}`);
 
         try {
@@ -92,12 +139,32 @@ class SitemapImportService {
           if (!scrapedData || !scrapedData.price || !scrapedData.title) {
             console.log(`[SitemapImport] ❌ Not a product page (no price/title found)`);
             results.skipped++;
+            
+            sendProgress({
+              stage: 'scanning',
+              message: `❌ Geen product: ${url.substring(0, 50)}...`,
+              percentage: scanProgress,
+              scanned: results.scanned,
+              detectedProducts: results.detectedProducts,
+              skipped: results.skipped
+            });
+            
             continue;
           }
 
           console.log(`[SitemapImport] ✅ Product detected: ${scrapedData.title} - €${scrapedData.price}`);
           results.detectedProducts++;
           productsFound++;
+
+          sendProgress({
+            stage: 'scanning',
+            message: `✅ Product gevonden: ${scrapedData.title}`,
+            percentage: scanProgress,
+            scanned: results.scanned,
+            detectedProducts: results.detectedProducts,
+            productName: scrapedData.title,
+            price: scrapedData.price
+          });
 
           if (scrapedData.extractedBy === 'selectors') {
             results.scrapingStats.direct++;
@@ -171,6 +238,14 @@ class SitemapImportService {
             if (scrapedData.rating) badges.push(`⭐${scrapedData.rating}`);
             if (scrapedData.brand) badges.push(scrapedData.brand);
             console.log(`[SitemapImport] Created: ${scrapedData.title} ${badges.join(' ')}`);
+            
+            sendProgress({
+              stage: 'saving',
+              message: `💾 Opgeslagen: ${scrapedData.title}`,
+              percentage: scanProgress,
+              created: results.created,
+              updated: results.updated
+            });
           }
 
         } catch (error) {
@@ -180,8 +255,21 @@ class SitemapImportService {
             error: error.message
           });
           results.skipped++;
+          
+          sendProgress({
+            stage: 'scanning',
+            message: `⚠️ Error bij ${url.substring(0, 50)}...`,
+            percentage: scanProgress,
+            errors: results.errors.length
+          });
         }
       }
+
+      sendProgress({
+        stage: 'finalizing',
+        message: 'Import afronden...',
+        percentage: 90
+      });
 
       const scraperStats = this.scraper.getStats();
       results.scrapingStats = {
@@ -191,6 +279,20 @@ class SitemapImportService {
         aiVision: scraperStats.aiVisionSuccess || 0,
         totalCost: parseFloat(scraperStats.totalCost) || 0
       };
+
+      sendProgress({
+        stage: 'complete',
+        message: '✅ Import voltooid!',
+        percentage: 100,
+        results: {
+          scanned: results.scanned,
+          detectedProducts: results.detectedProducts,
+          created: results.created,
+          updated: results.updated,
+          skipped: results.skipped,
+          errors: results.errors.length
+        }
+      });
 
       console.log(`[SitemapImport] ✅ Complete!`);
       console.log(`[SitemapImport] Scanned: ${results.scanned} URLs`);
