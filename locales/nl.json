@@ -286,6 +286,24 @@
           "add_success": "✅ Concurrent toegevoegd!",
           "add_error": "❌ {{ error }}"
         }
+      },
+      "footer": {
+        "tagline": "De slimste manier om concurrent prijzen te monitoren",
+        "product": "Product",
+        "features": "Features",
+        "pricing": "Prijzen",
+        "dashboard": "Dashboard",
+        "api_docs": "API Documentatie",
+        "company": "Bedrijf",
+        "about": "Over Webelephant",
+        "contact": "Contact",
+        "privacy": "Privacy",
+        "terms": "Voorwaarden",
+        "support": "Support",
+        "documentation": "Documentatie",
+        "faq": "Veelgestelde vragen",
+        "email_support": "Email support",
+        "powered_by": "Powered by"
       }
     }
   }
