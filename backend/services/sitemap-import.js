@@ -8,6 +8,7 @@
 
 const HybridScraper = require('../crawlers/hybrid-scraper');
 const db = require('../config/database');
+const ShopifyIntegration = require('../integrations/shopify');
 
 // Dynamic import for ES Module compatibility
 let Sitemapper;
@@ -23,6 +24,7 @@ class SitemapImportService {
   constructor(customerId) {
     this.customerId = customerId;
     this.scraper = new HybridScraper();
+    this.shopify = new ShopifyIntegration();
   }
 
   /**
@@ -238,6 +240,31 @@ class SitemapImportService {
             if (scrapedData.rating) badges.push(`⭐${scrapedData.rating}`);
             if (scrapedData.brand) badges.push(scrapedData.brand);
             console.log(`[SitemapImport] Created: ${scrapedData.title} ${badges.join(' ')}`);
+            
+            // Auto-sync to Shopify
+            try {
+              const shopifyProduct = await this.shopify.createProduct({
+                title: scrapedData.title,
+                description: `${scrapedData.brand || 'Product'} - imported from sitemap`,
+                brand: scrapedData.brand,
+                price: scrapedData.price,
+                imageUrl: scrapedData.imageUrl,
+                tags: ['PriceElephant', `customer-${this.customerId}`, scrapedData.brand].filter(Boolean)
+              });
+              
+              // Update with Shopify product ID
+              await db('products')
+                .where({ id: newProduct.id })
+                .update({ 
+                  shopify_product_id: shopifyProduct.id,
+                  updated_at: new Date()
+                });
+              
+              console.log(`[SitemapImport] ✅ Synced to Shopify: ${shopifyProduct.id}`);
+            } catch (shopifyError) {
+              console.error(`[SitemapImport] ⚠️ Shopify sync failed: ${shopifyError.message}`);
+              // Continue even if Shopify sync fails - product is still in DB
+            }
             
             sendProgress({
               stage: 'saving',

@@ -6,10 +6,12 @@
 require('dotenv').config();
 const db = require('../config/database');
 const ChannableIntegration = require('../integrations/channable');
+const ShopifyIntegration = require('../integrations/shopify');
 
 class ProductImportService {
   constructor(customerId) {
     this.customerId = customerId;
+    this.shopify = new ShopifyIntegration();
   }
 
   /**
@@ -127,7 +129,7 @@ class ProductImportService {
    * Create new product
    */
   async createProduct(product) {
-    const [productId] = await db('products').insert({
+    const [newProduct] = await db('products').insert({
       shopify_customer_id: this.customerId,
       shopify_product_id: null, // Will be set when synced to Shopify
       product_name: product.title,
@@ -140,10 +142,40 @@ class ProductImportService {
       image_url: product.imageUrl,
       channable_product_id: product.externalId,
       active: true
-    }).returning('id');
+    }).returning('*');
 
-    console.log(`   → Database ID: ${productId}`);
-    return productId;
+    console.log(`   → Database ID: ${newProduct.id}`);
+    
+    // Auto-sync to Shopify
+    try {
+      const shopifyProduct = await this.shopify.createProduct({
+        title: product.title,
+        description: `${product.brand || 'Product'} - ${product.category || ''}`,
+        brand: product.brand,
+        category: product.category,
+        price: product.price,
+        sku: product.sku,
+        ean: product.ean,
+        imageUrl: product.imageUrl,
+        channableId: product.externalId,
+        tags: ['PriceElephant', `customer-${this.customerId}`, product.brand, product.category].filter(Boolean)
+      });
+      
+      // Update with Shopify product ID
+      await db('products')
+        .where({ id: newProduct.id })
+        .update({ 
+          shopify_product_id: shopifyProduct.id,
+          updated_at: db.fn.now()
+        });
+      
+      console.log(`   → Shopify ID: ${shopifyProduct.id}`);
+    } catch (shopifyError) {
+      console.error(`   ⚠️ Shopify sync failed: ${shopifyError.message}`);
+      // Continue even if Shopify sync fails - product is still in DB
+    }
+    
+    return newProduct.id;
   }
 
   /**

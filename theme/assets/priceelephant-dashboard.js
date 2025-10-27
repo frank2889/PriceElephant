@@ -271,12 +271,20 @@
         </td>
         <td>
           <span class="pe-status-chip pe-status-chip--${product.syncStatus === 'synced' ? 'success' : 'pending'}">
-            ${product.syncStatus === 'synced' ? 'Synced' : 'Pending'}
+            ${product.syncStatus === 'synced' ? '✅ Synced' : '⏳ Pending'}
           </span>
         </td>
         <td style="text-align: right;">
+          ${product.syncStatus !== 'synced' ? `
+            <button
+              class="pe-button pe-button--primary pe-button--small"
+              data-action="sync-to-shopify"
+              data-product-id="${product.id}"
+              style="margin-right: 4px;"
+            >Sync to Shopify</button>
+          ` : ''}
           <button
-            class="pe-button pe-button--secondary"
+            class="pe-button pe-button--secondary pe-button--small"
             data-action="manage-competitors"
             data-product-id="${product.id}"
           >Beheer</button>
