@@ -114,6 +114,12 @@ class SitemapImportService {
                 shipping_info: scrapedData.shippingInfo || existing.shipping_info,
                 in_stock: scrapedData.inStock !== false,
                 image_url: scrapedData.imageUrl || existing.image_url,
+                brand: scrapedData.brand || existing.brand,
+                rating: scrapedData.rating || existing.rating,
+                review_count: scrapedData.reviewCount || existing.review_count,
+                stock_level: scrapedData.stockLevel || existing.stock_level,
+                delivery_time: scrapedData.deliveryTime || existing.delivery_time,
+                bundle_info: scrapedData.bundleInfo || existing.bundle_info,
                 updated_at: new Date()
               });
             
@@ -133,9 +139,14 @@ class SitemapImportService {
               shipping_info: scrapedData.shippingInfo || null,
               product_url: url,
               in_stock: scrapedData.inStock !== false,
-              brand: null,
+              brand: scrapedData.brand || null,
               category: null,
               image_url: scrapedData.imageUrl || null,
+              rating: scrapedData.rating || null,
+              review_count: scrapedData.reviewCount || null,
+              stock_level: scrapedData.stockLevel || null,
+              delivery_time: scrapedData.deliveryTime || null,
+              bundle_info: scrapedData.bundleInfo || null,
               import_source: 'sitemap',
               created_at: new Date()
             }).returning('*');
@@ -146,6 +157,8 @@ class SitemapImportService {
             if (scrapedData.imageUrl) badges.push('🖼️');
             if (scrapedData.discountPercentage) badges.push(`-${scrapedData.discountPercentage}%`);
             if (scrapedData.hasFreeShipping) badges.push('🚚 Free');
+            if (scrapedData.rating) badges.push(`⭐${scrapedData.rating}`);
+            if (scrapedData.brand) badges.push(scrapedData.brand);
             console.log(`[SitemapImport] Created: ${scrapedData.title} ${badges.join(' ')}`);
           }
 

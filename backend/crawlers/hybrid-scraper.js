@@ -120,6 +120,78 @@ class HybridScraper {
         '.shipping-info', '.delivery-info', '.free-shipping', '.shipping-message'
       ].join(', '),
       
+      // Brand/Manufacturer
+      brand: [
+        // Schema.org
+        '[itemprop="brand"]',
+        // Shopify
+        '.product__vendor', '[data-product-vendor]',
+        // Magento
+        '.product-info-main .brand', '[data-th="Brand"]',
+        // WooCommerce
+        '.product_meta .posted_in a',
+        // Generic
+        '.brand', '.manufacturer', '.merk', '.vendor'
+      ].join(', '),
+      
+      // Product ratings/reviews
+      rating: [
+        // Schema.org
+        '[itemprop="ratingValue"]', '[itemprop="aggregateRating"]',
+        // Shopify
+        '.product-rating', '.spr-badge-starrating',
+        // Magento
+        '.rating-result', '[itemprop="ratingValue"]',
+        // WooCommerce
+        '.star-rating', '.woocommerce-product-rating',
+        // Generic
+        '.rating', '.review-rating', '.product-rating', '[data-rating]'
+      ].join(', '),
+      
+      // Review count
+      reviewCount: [
+        // Schema.org
+        '[itemprop="reviewCount"]', '[itemprop="ratingCount"]',
+        // Shopify
+        '.spr-badge-caption',
+        // Magento
+        '.reviews-actions a',
+        // WooCommerce
+        '.woocommerce-review-link',
+        // Generic
+        '.review-count', '.rating-count', '[data-review-count]'
+      ].join(', '),
+      
+      // Stock quantity/urgency
+      stockLevel: [
+        // Shopify
+        '.product__inventory-quantity', '[data-stock-level]',
+        // Magento
+        '.stock.qty', '.qty-available',
+        // WooCommerce
+        '.stock-quantity',
+        // Generic
+        '.stock-level', '.quantity-available', '.items-left'
+      ].join(', '),
+      
+      // Delivery time
+      deliveryTime: [
+        // Shopify
+        '.product__delivery', '.delivery-time', '[data-delivery]',
+        // Magento
+        '.delivery-info', '.estimated-delivery',
+        // WooCommerce
+        '.delivery-estimate',
+        // Generic
+        '.delivery-time', '.shipping-time', '.delivery-estimate', '.levertijd'
+      ].join(', '),
+      
+      // Bundle/combo deals
+      bundleInfo: [
+        // Generic
+        '.bundle-info', '.combo-deal', '.package-deal', '.product-bundle', '.inclusief'
+      ].join(', '),
+      
       title: [
         // Schema.org
         '[itemprop="name"]',
@@ -400,6 +472,12 @@ class HybridScraper {
         const imageElement = trySelectors(selectors.image);
         const discountElement = trySelectors(selectors.discount);
         const shippingElement = trySelectors(selectors.shipping);
+        const brandElement = trySelectors(selectors.brand);
+        const ratingElement = trySelectors(selectors.rating);
+        const reviewCountElement = trySelectors(selectors.reviewCount);
+        const stockLevelElement = trySelectors(selectors.stockLevel);
+        const deliveryTimeElement = trySelectors(selectors.deliveryTime);
+        const bundleInfoElement = trySelectors(selectors.bundleInfo);
 
         if (!priceElement) {
           return null; // Trigger fallback
@@ -444,6 +522,47 @@ class HybridScraper {
           }
         }
 
+        // Parse rating (1-5 scale)
+        let rating = null;
+        if (ratingElement) {
+          const ratingText = ratingElement.textContent || ratingElement.content || ratingElement.getAttribute('content');
+          const ratingMatch = ratingText?.match(/[\d.]+/);
+          if (ratingMatch) {
+            rating = parseFloat(ratingMatch[0]);
+            if (rating > 5) rating = rating / 10; // Convert 10-scale to 5-scale
+            rating = Math.min(5, Math.max(0, rating)); // Clamp to 0-5
+          }
+        }
+
+        // Parse review count
+        let reviewCount = null;
+        if (reviewCountElement) {
+          const reviewText = reviewCountElement.textContent || reviewCountElement.content;
+          const reviewMatch = reviewText?.match(/\d+/);
+          if (reviewMatch) {
+            reviewCount = parseInt(reviewMatch[0], 10);
+          }
+        }
+
+        // Extract brand
+        const brand = brandElement?.textContent?.trim() || brandElement?.content || null;
+
+        // Extract stock level (numeric quantity if available)
+        let stockLevel = null;
+        if (stockLevelElement) {
+          const stockText = stockLevelElement.textContent || stockLevelElement.value;
+          const stockMatch = stockText?.match(/\d+/);
+          if (stockMatch) {
+            stockLevel = parseInt(stockMatch[0], 10);
+          }
+        }
+
+        // Extract delivery time
+        const deliveryTime = deliveryTimeElement?.textContent?.trim() || null;
+
+        // Extract bundle info
+        const bundleInfo = bundleInfoElement?.textContent?.trim() || null;
+
         return {
           title: titleElement?.textContent?.trim() || 'Unknown Product',
           price: price,
@@ -454,6 +573,12 @@ class HybridScraper {
           shippingInfo: shippingText || null,
           inStock: stockElement ? !stockElement.textContent.toLowerCase().includes('niet beschikbaar') : true,
           imageUrl: imageUrl,
+          brand: brand,
+          rating: rating,
+          reviewCount: reviewCount,
+          stockLevel: stockLevel,
+          deliveryTime: deliveryTime,
+          bundleInfo: bundleInfo,
           currency: 'EUR',
           extractedBy: 'selectors',
           scrapedAt: new Date().toISOString()
