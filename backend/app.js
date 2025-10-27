@@ -15,7 +15,7 @@ const shopifyRoutes = require('./routes/shopify-routes');
 const productRoutes = require('./routes/product-routes');
 const scraperRoutes = require('./routes/scraper-routes');
 const variantRoutes = require('./routes/variant-routes');
-const adminRoutes = require('./routes/admin-routes');
+const competitorRoutes = require('./routes/product-competitor-routes');
 
 const app = express();
 
@@ -46,8 +46,8 @@ app.use('/api/v1/channable', channableRoutes);
 app.use('/api/v1/shopify', shopifyRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/products', variantRoutes); // Variant management
+app.use('/api/v1/products', competitorRoutes); // Competitor management
 app.use('/api/v1/scraper', scraperRoutes);
-app.use('/api/v1/admin', adminRoutes); // Admin endpoints (protected)
 
 app.get('/health', (req, res) => {
   res.status(200).json({
