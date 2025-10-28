@@ -113,6 +113,39 @@
     }
   }
 
+  function applyEnterpriseSitemapDefaults() {
+    state.isEnterprise = true;
+
+    const maxProductsInput = document.getElementById('pe-max-products');
+    const maxProductsHint = document.getElementById('pe-max-products-hint');
+    const sitemapFormElement = document.querySelector('#pe-sitemap-form');
+    const sitemapCard = sitemapFormElement ? sitemapFormElement.closest('.pe-card') : null;
+
+    if (maxProductsInput) {
+      maxProductsInput.value = '10000';
+      maxProductsInput.setAttribute('readonly', 'readonly');
+      maxProductsInput.classList.add('pe-input--readonly');
+
+      const maxProductsField = maxProductsInput.closest('.pe-field');
+      if (maxProductsField) {
+        maxProductsField.style.display = 'none';
+      }
+    }
+
+    if (maxProductsHint) {
+      maxProductsHint.textContent = 'Enterprise: Onbeperkt producten';
+    }
+
+    if (sitemapCard && !document.getElementById('pe-enterprise-badge')) {
+      const badge = document.createElement('div');
+      badge.id = 'pe-enterprise-badge';
+      badge.style.cssText = 'background: #059669; color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; font-weight: 600; text-align: center;';
+      badge.textContent = '✨ Enterprise: Onbeperkt producten';
+      const cardBody = sitemapCard.querySelector('.pe-card-body') || sitemapCard;
+      cardBody.prepend(badge);
+    }
+  }
+
   // Fetch customer tier and set appropriate defaults
   async function fetchCustomerTier() {
     try {
@@ -128,43 +161,19 @@
         console.log('[PriceElephant] Customer tier data:', data);
         
         state.tier = data.tier;
-        state.productLimit = data.product_limit;
+        const tierProductLimit = Number(data.product_limit);
+        state.productLimit = Number.isFinite(tierProductLimit) ? tierProductLimit : null;
 
         // Enterprise customers (product_limit = 0) get unlimited products
-        if (data.tier === 'enterprise' && data.product_limit === 0) {
-          state.isEnterprise = true;
-
-          const maxProductsInput = document.getElementById('pe-max-products');
-          const maxProductsField = maxProductsInput ? maxProductsInput.closest('.pe-field') : null;
-          const maxProductsHint = document.getElementById('pe-max-products-hint');
-
-          if (maxProductsInput) {
-            maxProductsInput.value = '10000';
-            maxProductsInput.setAttribute('readonly', 'readonly');
-            maxProductsInput.classList.add('pe-input--readonly');
-          }
-
-          if (maxProductsField) {
-            maxProductsField.style.display = 'none';
-            console.log('[PriceElephant] ✅ Enterprise tier - max products field hidden');
-          }
-
-          if (maxProductsHint) {
-            maxProductsHint.textContent = 'Enterprise: Onbeperkt producten';
-          }
-
-          // Show unlimited badge instead
-          const sitemapFormElement = document.querySelector('#pe-sitemap-form');
-          const sitemapCard = sitemapFormElement ? sitemapFormElement.closest('.pe-card') : null;
-          if (sitemapCard && !document.getElementById('pe-enterprise-badge')) {
-            const badge = document.createElement('div');
-            badge.id = 'pe-enterprise-badge';
-            badge.style.cssText = 'background: #059669; color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; font-weight: 600; text-align: center;';
-            badge.innerHTML = '✨ Enterprise: Onbeperkt producten';
-            sitemapCard.querySelector('.pe-card-body').prepend(badge);
-          }
+        if (data.tier === 'enterprise' && tierProductLimit === 0) {
+          console.log('[PriceElephant] ✅ Enterprise tier - applying unlimited defaults');
+          applyEnterpriseSitemapDefaults();
         } else {
           console.log('[PriceElephant] Customer tier:', data.tier, '- using tier limits');
+          const maxProductsHint = document.getElementById('pe-max-products-hint');
+          if (maxProductsHint && Number.isFinite(tierProductLimit) && tierProductLimit > 0) {
+            maxProductsHint.textContent = `Maximaal ${tierProductLimit} producten volgens abonnement`;
+          }
         }
         return data;
       } else {
@@ -420,12 +429,17 @@
       console.log('[loadSitemapConfig] Config loaded:', config);
       
       if (config?.sitemapUrl) {
+        if (config.enterprise) {
+          console.log('[loadSitemapConfig] Enterprise flag received from API');
+          applyEnterpriseSitemapDefaults();
+        }
+
         sitemapForm.sitemapUrl.value = config.sitemapUrl;
         if (config.productUrlPattern) {
           sitemapForm.productUrlPattern.value = config.productUrlPattern;
         }
         // Always load maxProducts from config (respects tier limits set in customer_configs)
-        if (config.maxProducts) {
+        if (config.maxProducts !== undefined && config.maxProducts !== null) {
           const maxProductsInput = document.getElementById('pe-max-products');
           if (maxProductsInput) {
             if (state.isEnterprise) {
