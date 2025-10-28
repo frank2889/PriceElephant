@@ -126,18 +126,29 @@
         
         // Enterprise customers (product_limit = 0) get unlimited products
         if (data.tier === 'enterprise' && data.product_limit === 0) {
+          const maxProductsField = document.querySelector('.pe-field:has(#pe-max-products)');
           const maxProductsInput = document.getElementById('pe-max-products');
           const maxProductsHint = document.getElementById('pe-max-products-hint');
           
-          if (maxProductsInput) {
-            // Remove max limit for Enterprise - will be loaded from customer_configs
-            maxProductsInput.removeAttribute('max');
-            console.log('[PriceElephant] ✅ Enterprise tier - unlimited products (max removed)');
+          if (maxProductsField) {
+            // Hide the entire max products field for Enterprise
+            maxProductsField.style.display = 'none';
+            console.log('[PriceElephant] ✅ Enterprise tier - max products field hidden');
           }
           
-          if (maxProductsHint) {
-            maxProductsHint.textContent = '✅ Enterprise: Onbeperkt producten';
-            maxProductsHint.style.color = '#059669';
+          if (maxProductsInput) {
+            // Set to a high value that backend will recognize as unlimited
+            maxProductsInput.value = '999999';
+          }
+          
+          // Show unlimited badge instead
+          const sitemapCard = document.querySelector('#pe-sitemap-form').closest('.pe-card');
+          if (sitemapCard && !document.getElementById('pe-enterprise-badge')) {
+            const badge = document.createElement('div');
+            badge.id = 'pe-enterprise-badge';
+            badge.style.cssText = 'background: #059669; color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; font-weight: 600; text-align: center;';
+            badge.innerHTML = '✨ Enterprise: Onbeperkt producten';
+            sitemapCard.querySelector('.pe-card-body').prepend(badge);
           }
         } else {
           console.log('[PriceElephant] Customer tier:', data.tier, '- using tier limits');
