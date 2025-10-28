@@ -464,7 +464,7 @@ class HybridScraper {
       const productData = await page.evaluate((selectors) => {
         // Helper function to try multiple selectors
         const trySelectors = (selectorString) => {
-          const selectors = selectorString.split(',').map(s => s.trim());
+          const selectors = selectorString.split(',').map(s => s.trim()).filter(Boolean);
           for (const selector of selectors) {
             const el = document.querySelector(selector);
             if (el) return el;
@@ -472,10 +472,50 @@ class HybridScraper {
           return null;
         };
 
+        const readElementValue = (el) => {
+          if (!el) return null;
+          const attrCandidates = ['content', 'data-price', 'data-value', 'data-amount', 'value'];
+          for (const attr of attrCandidates) {
+            const attrValue = el.getAttribute && el.getAttribute(attr);
+            if (attrValue) {
+              return attrValue;
+            }
+          }
+          if (el.dataset) {
+            if (el.dataset.price) return el.dataset.price;
+            if (el.dataset.value) return el.dataset.value;
+            if (el.dataset.amount) return el.dataset.amount;
+          }
+          return el.textContent;
+        };
+
         // Helper to parse price from text
-        const parsePrice = (text) => {
+        const parsePrice = (raw) => {
+          if (!raw) return null;
+          const text = raw.trim();
           if (!text) return null;
-          const cleaned = text.replace('€', '').replace(',', '.').replace(/[^\d.]/g, '').trim();
+
+          let cleaned = text
+            .replace(/[^0-9.,-]/g, '')
+            .replace(/\s+/g, '');
+
+          if (!cleaned) return null;
+
+          const commaCount = (cleaned.match(/,/g) || []).length;
+          const dotCount = (cleaned.match(/\./g) || []).length;
+
+          if (commaCount && dotCount) {
+            if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
+              cleaned = cleaned.replace(/\.(?=\d{3}(?:\D|$))/g, '').replace(',', '.');
+            } else {
+              cleaned = cleaned.replace(/,/g, '');
+            }
+          } else if (commaCount === 1 && dotCount === 0) {
+            cleaned = cleaned.replace(',', '.');
+          } else if (dotCount > 1 && commaCount === 0) {
+            cleaned = cleaned.replace(/\.(?=\d{3}(?:\D|$))/g, '');
+          }
+
           const price = parseFloat(cleaned);
           return (isNaN(price) || price <= 0) ? null : price;
         };
@@ -495,17 +535,27 @@ class HybridScraper {
         const bundleInfoElement = trySelectors(selectors.bundleInfo);
 
         if (!priceElement) {
+          const diagnostic = {
+            reason: 'PRICE_SELECTOR_MISSED',
+            selectorsTried: selectors.price,
+            htmlSample: document.body.innerHTML.slice(0, 1000)
+          };
+          console.log('[HybridScraper][Selectors] No price element found', diagnostic);
           return null; // Trigger fallback
         }
 
         // Parse current price (actual selling price)
-        const price = parsePrice(priceElement.textContent);
+        const price = parsePrice(readElementValue(priceElement));
         if (!price) {
+          console.log('[HybridScraper][Selectors] Invalid price parsed', {
+            raw: readElementValue(priceElement),
+            selector: priceElement ? priceElement.outerHTML?.slice(0, 200) : null
+          });
           return null; // Invalid price
         }
 
         // Parse original price (if on sale)
-        const originalPrice = originalPriceElement ? parsePrice(originalPriceElement.textContent) : null;
+        const originalPrice = originalPriceElement ? parsePrice(readElementValue(originalPriceElement)) : null;
         
         // Calculate discount percentage
         let discountPercentage = null;
@@ -578,7 +628,7 @@ class HybridScraper {
         // Extract bundle info
         const bundleInfo = bundleInfoElement?.textContent?.trim() || null;
 
-        return {
+        const payload = {
           title: titleElement?.textContent?.trim() || 'Unknown Product',
           price: price,
           originalPrice: originalPrice,
@@ -598,6 +648,16 @@ class HybridScraper {
           extractedBy: 'selectors',
           scrapedAt: new Date().toISOString()
         };
+
+        console.log('[HybridScraper][Selectors] Extracted product payload', {
+          title: payload.title,
+          price: payload.price,
+          hasOriginalPrice: Boolean(payload.originalPrice),
+          hasImage: Boolean(payload.imageUrl),
+          hasBrand: Boolean(payload.brand)
+        });
+
+        return payload;
       }, retailer.selectors);
 
       await page.close();
