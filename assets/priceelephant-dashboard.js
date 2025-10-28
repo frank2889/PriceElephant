@@ -86,6 +86,9 @@
     products: [],
     pagination: null,
     selectedProductId: null,
+    tier: null,
+    productLimit: null,
+    isEnterprise: false,
   };
 
   const currencyFormatter = new Intl.NumberFormat('nl-NL', {
@@ -124,25 +127,35 @@
         const data = await response.json();
         console.log('[PriceElephant] Customer tier data:', data);
         
+        state.tier = data.tier;
+        state.productLimit = data.product_limit;
+
         // Enterprise customers (product_limit = 0) get unlimited products
         if (data.tier === 'enterprise' && data.product_limit === 0) {
-          const maxProductsField = document.querySelector('.pe-field:has(#pe-max-products)');
+          state.isEnterprise = true;
+
           const maxProductsInput = document.getElementById('pe-max-products');
+          const maxProductsField = maxProductsInput ? maxProductsInput.closest('.pe-field') : null;
           const maxProductsHint = document.getElementById('pe-max-products-hint');
-          
+
+          if (maxProductsInput) {
+            maxProductsInput.value = '10000';
+            maxProductsInput.setAttribute('readonly', 'readonly');
+            maxProductsInput.classList.add('pe-input--readonly');
+          }
+
           if (maxProductsField) {
-            // Hide the entire max products field for Enterprise
             maxProductsField.style.display = 'none';
             console.log('[PriceElephant] ✅ Enterprise tier - max products field hidden');
           }
-          
-          if (maxProductsInput) {
-            // Set to a high value that backend will recognize as unlimited
-            maxProductsInput.value = '999999';
+
+          if (maxProductsHint) {
+            maxProductsHint.textContent = 'Enterprise: Onbeperkt producten';
           }
-          
+
           // Show unlimited badge instead
-          const sitemapCard = document.querySelector('#pe-sitemap-form').closest('.pe-card');
+          const sitemapFormElement = document.querySelector('#pe-sitemap-form');
+          const sitemapCard = sitemapFormElement ? sitemapFormElement.closest('.pe-card') : null;
           if (sitemapCard && !document.getElementById('pe-enterprise-badge')) {
             const badge = document.createElement('div');
             badge.id = 'pe-enterprise-badge';
@@ -415,8 +428,13 @@
         if (config.maxProducts) {
           const maxProductsInput = document.getElementById('pe-max-products');
           if (maxProductsInput) {
-            maxProductsInput.value = config.maxProducts;
-            console.log('[loadSitemapConfig] Set maxProducts to:', config.maxProducts);
+            if (state.isEnterprise) {
+              maxProductsInput.value = '10000';
+              console.log('[loadSitemapConfig] Enterprise detected, forced maxProducts field to 10000');
+            } else {
+              maxProductsInput.value = config.maxProducts;
+              console.log('[loadSitemapConfig] Set maxProducts to:', config.maxProducts);
+            }
           }
         }
         showStatus(sitemapStatus, 'Sitemap configuratie geladen.', 'success');
