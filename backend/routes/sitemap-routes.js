@@ -224,6 +224,7 @@ router.post('/configure', async (req, res) => {
       customerId, 
       sitemapUrl,
       productUrlPattern,
+      maxProducts,
       selectors
     } = req.body;
 
@@ -235,34 +236,54 @@ router.post('/configure', async (req, res) => {
       return res.status(400).json({ error: 'sitemapUrl is required' });
     }
 
+    // Check customer tier to determine maxProducts limit
+    let finalMaxProducts = maxProducts || 500;
+    
+    try {
+      const tier = await db('customer_tiers')
+        .where({ customer_id: customerId })
+        .first();
+      
+      if (tier && tier.tier === 'enterprise' && tier.product_limit === 0) {
+        // Enterprise unlimited - use provided maxProducts or default to 10000
+        finalMaxProducts = maxProducts || 10000;
+        console.log('[Sitemap Config] Enterprise customer detected - maxProducts:', finalMaxProducts);
+      }
+    } catch (tierError) {
+      console.log('[Sitemap Config] Tier check skipped (table might not exist yet)');
+    }
+
     // Save configuration to customer_configs table
     const existing = await db('customer_configs')
       .where({ customer_id: customerId })
       .first();
 
+    const configData = {
+      sitemap_url: sitemapUrl,
+      sitemap_product_url_pattern: productUrlPattern,
+      sitemap_max_products: finalMaxProducts,
+      updated_at: new Date()
+    };
+
     if (existing) {
       await db('customer_configs')
         .where({ customer_id: customerId })
-        .update({
-          sitemap_url: sitemapUrl,
-          sitemap_product_url_pattern: productUrlPattern,
-          updated_at: new Date()
-        });
-      console.log('[Sitemap Config] ✅ Updated config for customer:', customerId);
+        .update(configData);
+      console.log('[Sitemap Config] ✅ Updated config for customer:', customerId, 'maxProducts:', finalMaxProducts);
     } else {
       await db('customer_configs')
         .insert({
           customer_id: customerId,
-          sitemap_url: sitemapUrl,
-          sitemap_product_url_pattern: productUrlPattern,
+          ...configData,
           created_at: new Date()
         });
-      console.log('[Sitemap Config] ✅ Created config for customer:', customerId);
+      console.log('[Sitemap Config] ✅ Created config for customer:', customerId, 'maxProducts:', finalMaxProducts);
     }
 
     res.json({
       success: true,
-      message: 'Sitemap configuration saved'
+      message: 'Sitemap configuration saved',
+      maxProducts: finalMaxProducts
     });
 
   } catch (error) {
