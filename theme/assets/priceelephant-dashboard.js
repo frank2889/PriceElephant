@@ -124,24 +124,23 @@
         const data = await response.json();
         console.log('[PriceElephant] Customer tier data:', data);
         
-        if (data.tier === 'enterprise') {
-          // Auto-set maxProducts to 10000 for Enterprise customers and remove max limit
+        // Enterprise customers (product_limit = 0) get unlimited products
+        if (data.tier === 'enterprise' && data.product_limit === 0) {
           const maxProductsInput = document.getElementById('pe-max-products');
           const maxProductsHint = document.getElementById('pe-max-products-hint');
           
           if (maxProductsInput) {
-            maxProductsInput.value = '10000';
-            maxProductsInput.removeAttribute('max'); // Remove max limit
-            console.log('[PriceElephant] ✅ Enterprise customer - unlimited products enabled');
+            // Remove max limit for Enterprise - will be loaded from customer_configs
+            maxProductsInput.removeAttribute('max');
+            console.log('[PriceElephant] ✅ Enterprise tier - unlimited products (max removed)');
           }
           
           if (maxProductsHint) {
-            maxProductsHint.textContent = '✅ Enterprise: Onbeperkt scannen (10000 = alle producten)';
+            maxProductsHint.textContent = '✅ Enterprise: Onbeperkt producten';
             maxProductsHint.style.color = '#059669';
-            console.log('[PriceElephant] ✅ Enterprise hint updated');
           }
         } else {
-          console.log('[PriceElephant] Customer tier:', data.tier, '- using default limits');
+          console.log('[PriceElephant] Customer tier:', data.tier, '- using tier limits');
         }
         return data;
       } else {
@@ -401,7 +400,7 @@
         if (config.productUrlPattern) {
           sitemapForm.productUrlPattern.value = config.productUrlPattern;
         }
-        // Load saved maxProducts if available
+        // Always load maxProducts from config (respects tier limits set in customer_configs)
         if (config.maxProducts) {
           const maxProductsInput = document.getElementById('pe-max-products');
           if (maxProductsInput) {

@@ -1,5 +1,7 @@
 -- Customer Configurations
 -- Stores sitemap URLs, Channable settings, and other customer-specific configs
+-- sitemap_max_products respects tier limits:
+--   Trial: 50, Starter: 500, Professional: 2500, Enterprise: 10000+ (unlimited)
 
 CREATE TABLE IF NOT EXISTS customer_configs (
   id SERIAL PRIMARY KEY,
@@ -8,7 +10,7 @@ CREATE TABLE IF NOT EXISTS customer_configs (
   -- Sitemap configuration
   sitemap_url VARCHAR(500),
   sitemap_product_url_pattern VARCHAR(200),
-  sitemap_max_products INTEGER DEFAULT 500,
+  sitemap_max_products INTEGER DEFAULT 500, -- Tier-specific limit
   sitemap_last_import TIMESTAMP,
   
   -- Channable configuration  
@@ -28,7 +30,8 @@ CREATE TABLE IF NOT EXISTS customer_configs (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Hobo configuration
+-- Example: Enterprise customer configuration
+-- Enterprise tier gets 10000 max (effectively unlimited for most use cases)
 INSERT INTO customer_configs (
   customer_id, 
   sitemap_url, 
@@ -38,7 +41,7 @@ INSERT INTO customer_configs (
   8557353828568, 
   'https://www.hobo.nl/sitemap/sitemap.xml',
   'Hobo.nl',
-  10000
+  10000  -- Enterprise unlimited
 ) ON CONFLICT (customer_id) DO UPDATE SET
   sitemap_url = EXCLUDED.sitemap_url,
   company_name = EXCLUDED.company_name,
