@@ -1179,19 +1179,22 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
 - API responses with full data
 - Error messages with stack traces
 
-**8. Migration Scripts**
+### 8. Tier & Config Sync Scripts
 
 **Script 1:** `backend/scripts/setup-metafield-definitions.js`
-- ✅ Purpose: Setup Shopify metafield definitions for competitor data
-- ❌ Result: Blocked by Shopify paid plan requirement
-- ✅ Workaround: Database-only tier system (no Shopify metafields)
+
+- ✅ Purpose: Provision Shopify metafield definitions (tier, product_limit, competitor_limit, api_access, monthly_price)
+- ✅ Result: Runs against stores with metafield permissions enabled (Storefront API access switched on)
+- ✅ Outcome: Single source of truth lives in `priceelephant.*` customer metafields
 
 **Script 2:** `backend/scripts/run-customer-tiers-migration.js`
-- ✅ Purpose: Run customer_tiers migration locally
-- ✅ Executed: Created table and inserted Hobo Enterprise config
-- ✅ Verified: Database query confirmed tier='enterprise', product_limit=0
+
+- ✅ Purpose: Seed/refresh local cache table `customer_tiers`
+- ✅ Executed: Creates table and inserts Hobo Enterprise config when Shopify data absent
+- ✅ Verified: Postgres row matches latest Shopify values after API sync
 
 **Script 3:** Database migration via node -e
+
 - ✅ Purpose: Run customer_configs migration
 - ✅ Executed: Created table and inserted Hobo sitemap config
 - ✅ Verified: sitemap_url and sitemap_max_products=10000 saved
@@ -1199,55 +1202,56 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
 **📊 Architecture - Tier Enforcement Flow:**
 
 ```
-┌──────────────────────────────────────────────────────┐
-│           Frontend Dashboard Load                    │
-│  1. fetchCustomerTier() → Detect Enterprise         │
-│  2. loadSitemapConfig() → Load saved maxProducts    │
-│  3. Auto-update UI with unlimited/saved values       │
-└──────────────┬───────────────────────────────────────┘
-               │
-         ┌─────▼──────────────────────────────┐
-         │  Customer Tier API                 │
-         │  GET /customers/:id/tier           │
-         │  → Query customer_tiers table      │
-         │  → Return tier + limits            │
-         └────────────────────────────────────┘
-               │
-         ┌─────▼──────────────────────────────┐
-         │  Sitemap Config API                │
-         │  GET /sitemap/config/:id           │
-         │  → Query customer_configs table    │
-         │  → Return sitemap_url + maxProducts│
-         └────────────────────────────────────┘
-               │
-         ┌─────▼──────────────────────────────┐
-         │  Sitemap Import Service            │
-         │  1. Scrape products from sitemap   │
-         │  2. Save to PostgreSQL products    │
-         │  3. Auto-sync to Shopify           │
-         │  4. Update shopify_product_id      │
-         └────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│           Frontend Dashboard Load                            │
+│  1. fetchCustomerTier() → calls API → pulls Shopify metafield│
+│  2. loadSitemapConfig() → Load saved maxProducts             │
+│  3. UI toggles unlimited badge / limits based on tier        │
+└──────────────┬──────────────────────────────────────────────┘
+       │
+     ┌─────▼────────────────────────────────────────┐
+     │  Customer Tier API                           │
+     │  GET /customers/:id/tier                     │
+     │  → Fetch Shopify metafields (priceelephant.*)│
+     │  → Normalize & cache into customer_tiers     │
+     │  → Return tier + limits + source indicator   │
+     └──────────────────────────────────────────────┘
+       │
+     ┌─────▼──────────────────────────────┐
+     │  Sitemap Config API                │
+     │  GET /sitemap/config/:id           │
+     │  → Query customer_configs table    │
+     │  → Return sitemap_url + maxProducts│
+     └────────────────────────────────────┘
+       │
+     ┌─────▼──────────────────────────────┐
+     │  Sitemap Import Service            │
+     │  1. Scrape products from sitemap   │
+     │  2. Save to PostgreSQL products    │
+     │  3. Auto-sync to Shopify           │
+     │  4. Update shopify_product_id      │
+     └────────────────────────────────────┘
 ```
 
 **📈 Benefits:**
 
-1. **Production-grade tier system:** Database-driven, no Shopify plan dependency
+1. **Shopify-aligned tier system:** Shopify metafields drive limits so Stripe/Shopify stay in sync
 2. **Persistent configuration:** Sitemap settings survive page refreshes
 3. **Enterprise unlimited:** Hobo gets 10000 max products automatically
 4. **Auto-sync workflow:** No manual "Sync to Shopify" button needed
-5. **Centralized config:** Single source of truth for customer settings
+5. **Centralized config:** Shopify metafield + cached DB row for analytics
 6. **Debug visibility:** Comprehensive logging for troubleshooting
 7. **Scalable storage:** Can store Channable credentials, API tokens, etc.
 8. **Multi-tenant ready:** Isolated configs per customer_id
 
 **🎯 Technical Decisions:**
 
-**Why database over Shopify metafields?**
-- Shopify customer metafields require paid plan (€29/month minimum)
-- Database approach works on all Shopify plans (including trial)
-- More flexible schema (can add fields without Shopify API calls)
-- Faster reads (no Shopify API rate limits)
-- Better debugging (direct SQL queries)
+**Why Shopify metafields as source of truth?**
+
+- Tier changes happen in Shopify Admin (aligned with Stripe billing workflows)
+- One metafield update cascades to dashboard, backend limits, and future invoices
+- Cached Postgres table keeps analytics fast while respecting Shopify truth
+- Works with Storefront API access toggle (no extra app required)
 
 **Why auto-sync instead of manual button?**
 - User feedback: "all products need to be pushed to our shopify backend no extra sync"
