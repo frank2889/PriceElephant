@@ -91,6 +91,19 @@
     isEnterprise: false,
   };
 
+  const telemetry = {
+    sitemapEvents: [],
+    push(event) {
+      if (this.sitemapEvents.length > 100) {
+        this.sitemapEvents.shift();
+      }
+      this.sitemapEvents.push(event);
+      window.priceElephantTelemetry = window.priceElephantTelemetry || {};
+      window.priceElephantTelemetry.sitemap = this.sitemapEvents;
+      console.debug('[PriceElephant][Telemetry]', event);
+    }
+  };
+
   const currencyFormatter = new Intl.NumberFormat('nl-NL', {
     style: 'currency',
     currency: 'EUR',
@@ -668,13 +681,20 @@
       eventSource.addEventListener('progress', (event) => {
         const data = JSON.parse(event.data);
         console.log('[SSE Progress]', data);
+        telemetry.push({
+          type: 'progress',
+          at: new Date().toISOString(),
+          payload: data
+        });
         
         progressFill.style.width = `${data.percentage || 0}%`;
         progressText.textContent = data.message || 'Bezig...';
+  updateDebug('sitemap', `Progress ${data.percentage || 0}% · scanned ${data.scanned || 0}`);
         
         // Show last error if available
         if (data.lastError) {
           console.error('[Scraper Error]', data.lastError);
+          updateDebug('error', `⚠️ ${data.lastError}`);
         }
         
         // Update debug info
@@ -687,6 +707,11 @@
       eventSource.addEventListener('complete', async (event) => {
         const data = JSON.parse(event.data);
         console.log('[SSE Complete]', data);
+        telemetry.push({
+          type: 'complete',
+          at: new Date().toISOString(),
+          payload: data
+        });
         
         eventSource.close();
         
@@ -725,6 +750,7 @@
           
           showStatus(sitemapStatus, `Import voltooid!\n${scanInfo}\n${importInfo}${metadataInfo}${errorInfo}`, results.errors?.length > 0 ? 'error' : 'success');
           updateDebug('action', `✅ Sitemap: ${results.detectedProducts} detected, ${results.created} imported`);
+          updateDebug('sitemap', `Done · detected ${results.detectedProducts} · errors ${results.errors?.length || 0}`);
         }
         
         await loadProducts(productSearchInput.value.trim());
@@ -741,6 +767,11 @@
       // Handle errors
       eventSource.addEventListener('error', (event) => {
         console.error('[SSE Error]', event);
+        telemetry.push({
+          type: 'error',
+          at: new Date().toISOString(),
+          payload: event.data || null
+        });
         
         let errorData;
         try {
@@ -757,6 +788,7 @@
         
         showStatus(sitemapStatus, `Import mislukt: ${errorData.message || 'Onbekende fout'}`, 'error');
         updateDebug('error', `❌ Import: ${errorData.message}`);
+  updateDebug('sitemap', `Error · ${errorData.message || 'Onbekend'}`);
         
         setTimeout(() => {
           progressContainer.hidden = true;
@@ -770,6 +802,10 @@
       // Handle connection errors
       eventSource.onerror = () => {
         console.error('[SSE] Connection error');
+        telemetry.push({
+          type: 'connection-error',
+          at: new Date().toISOString()
+        });
         eventSource.close();
         
         progressFill.style.width = '100%';
@@ -777,6 +813,7 @@
         progressText.textContent = '❌ Verbinding verloren';
         
         showStatus(sitemapStatus, 'Verbinding met server verloren', 'error');
+  updateDebug('sitemap', 'Error · verbinding verloren');
         
         setTimeout(() => {
           progressContainer.hidden = true;
@@ -796,6 +833,7 @@
       
       showStatus(sitemapStatus, `Import mislukt: ${error.message}`, 'error');
       updateDebug('error', `❌ Import: ${error.message}`);
+  updateDebug('sitemap', `Error · ${error.message}`);
       
       setTimeout(() => {
         progressContainer.hidden = true;
