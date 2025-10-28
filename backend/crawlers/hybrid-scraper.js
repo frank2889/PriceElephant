@@ -269,6 +269,19 @@ class HybridScraper {
     return null;
   }
 
+  getRetailerLabel(url, fallbackName = 'unknown') {
+    if (fallbackName && fallbackName !== 'Universal (Auto-detect)') {
+      return fallbackName;
+    }
+
+    try {
+      const hostname = new URL(url).hostname || fallbackName;
+      return hostname.replace(/^www\./, '') || fallbackName;
+    } catch (error) {
+      return fallbackName;
+    }
+  }
+
   /**
    * Initialize browser with proxy config
    */
@@ -313,11 +326,12 @@ class HybridScraper {
       retailerKey = this.detectRetailerFromUrl(url);
     }
 
-    const retailer = retailerKey ? this.retailers[retailerKey] : null;
-    
-    // Use universal selectors for unknown retailers
-    const selectors = retailer ? retailer.selectors : this.universalSelectors;
-    const retailerName = retailer ? retailer.name : 'Universal (Auto-detect)';
+  const retailer = retailerKey ? this.retailers[retailerKey] : null;
+
+  // Use universal selectors for unknown retailers
+  const selectors = retailer ? retailer.selectors : this.universalSelectors;
+  const retailerName = retailer ? retailer.name : 'Universal (Auto-detect)';
+  const retailerLabel = this.getRetailerLabel(url, retailerName);
     
     console.log(`🏪 Retailer: ${retailerName}`);
 
@@ -420,14 +434,15 @@ class HybridScraper {
 
     // Save to database if productId provided
     if (productId && scrapedData) {
-      await this.savePriceSnapshot(productId, retailerKey, scrapedData, tier, cost);
+      await this.savePriceSnapshot(productId, retailerLabel, scrapedData, tier, cost);
     }
 
     return {
       ...scrapedData,
       tier,
       cost,
-      retailer: retailer.name
+      retailer: retailerLabel,
+      retailerKey: retailerKey || retailerLabel
     };
   }
 
@@ -597,11 +612,11 @@ class HybridScraper {
   /**
    * Save price snapshot to database
    */
-  async savePriceSnapshot(productId, retailerKey, data, tier, cost) {
+  async savePriceSnapshot(productId, retailerLabel, data, tier, cost) {
     try {
       await db('price_snapshots').insert({
         product_id: productId,
-        retailer: retailerKey,
+        retailer: retailerLabel,
         price: data.price,
         currency: data.currency || 'EUR',
         in_stock: data.inStock,
@@ -614,7 +629,7 @@ class HybridScraper {
         })
       });
       
-      console.log(`💾 Saved ${retailerKey} price: €${data.price} (method: ${tier})`);
+      console.log(`💾 Saved ${retailerLabel} price: €${data.price} (method: ${tier})`);
     } catch (error) {
       console.error('Failed to save price snapshot:', error.message);
     }

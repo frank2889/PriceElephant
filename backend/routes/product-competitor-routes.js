@@ -8,7 +8,16 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const IntelligentScraper = require('../crawlers/intelligent-scraper');
+const HybridScraper = require('../crawlers/hybrid-scraper');
+
+function normaliseRetailer(url) {
+  try {
+    const hostname = new URL(url).hostname || 'unknown';
+    return hostname.replace(/^www\./, '');
+  } catch (error) {
+    return 'unknown';
+  }
+}
 
 /**
  * GET /api/v1/products/:productId/competitors
@@ -87,11 +96,26 @@ router.post('/:productId/competitors', async (req, res) => {
       });
     }
 
-    // Scrape immediately with intelligent scraper
     console.log(`🔍 Scraping new competitor URL: ${url}`);
-    const scraper = new IntelligentScraper();
-    
-    const result = await scraper.scrape(url, productId, product.client_id);
+    const scraper = new HybridScraper();
+
+    const result = await scraper.scrapeProduct(url, null, null, productId);
+
+    if (!result || !result.price) {
+      throw new Error('No price detected on competitor page');
+    }
+
+    const retailer = normaliseRetailer(url);
+
+    await db('competitor_prices').insert({
+      product_id: productId,
+      retailer,
+      price: result.price,
+      url,
+      in_stock: result.inStock !== false,
+      scraped_at: new Date(),
+      created_at: new Date()
+    });
 
     res.json({
       success: true,
@@ -99,9 +123,10 @@ router.post('/:productId/competitors', async (req, res) => {
       data: {
         url,
         price: result.price,
-        in_stock: result.inStock,
-        method: result.method,
-        cost: result.cost
+        retailer,
+        in_stock: result.inStock !== false,
+        method: result.tier,
+        cost: result.cost || 0
       }
     });
 
@@ -169,20 +194,32 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
     }
 
     // Scrape each
-    const scraper = new IntelligentScraper();
+    const scraper = new HybridScraper();
     const results = [];
 
     for (const comp of competitors) {
       try {
         console.log(`Scraping ${comp.retailer}...`);
-        const result = await scraper.scrape(comp.url, productId, product.client_id);
+        const result = await scraper.scrapeProduct(comp.url, null, null, productId);
+
+        if (result?.price) {
+          await db('competitor_prices').insert({
+            product_id: productId,
+            retailer: comp.retailer || normaliseRetailer(comp.url),
+            price: result.price,
+            url: comp.url,
+            in_stock: result.inStock !== false,
+            scraped_at: new Date(),
+            created_at: new Date()
+          });
+        }
         
         results.push({
           retailer: comp.retailer,
           success: true,
           price: result.price,
-          method: result.method,
-          cost: result.cost
+          method: result.tier,
+          cost: result.cost || 0
         });
 
         // Rate limit

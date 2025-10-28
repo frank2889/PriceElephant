@@ -128,7 +128,7 @@ router.post('/products/:id/check-now', authenticateClient, async (req, res) => {
     const productId = parseInt(req.params.id);
     
     // TODO: Trigger scraper job
-    // const CompetitorScraper = require('../crawlers/competitor-scraper');
+  // Competitor scraping uses HybridScraper shared engine (see product-competitor-routes)
     // const scraper = new CompetitorScraper();
     // const results = await scraper.scrapeProduct(productName, ean);
     
