@@ -245,9 +245,13 @@ router.post('/configure', async (req, res) => {
         .first();
       
       if (tier && tier.tier === 'enterprise' && tier.product_limit === 0) {
-        // Enterprise unlimited - use provided maxProducts or default to 10000
-        finalMaxProducts = maxProducts || 10000;
-        console.log('[Sitemap Config] Enterprise customer detected - maxProducts:', finalMaxProducts);
+        // Enterprise unlimited - interpret 999999 or very high numbers as unlimited (0)
+        if (!maxProducts || maxProducts >= 999999) {
+          finalMaxProducts = 0; // 0 = unlimited in database
+        } else {
+          finalMaxProducts = maxProducts;
+        }
+        console.log('[Sitemap Config] Enterprise customer - maxProducts:', finalMaxProducts === 0 ? 'unlimited' : finalMaxProducts);
       }
     } catch (tierError) {
       console.log('[Sitemap Config] Tier check skipped (table might not exist yet)');
