@@ -824,12 +824,13 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
 - ✅ **Console logging:** Shows migration progress (🔄 Running... → ✅ Complete)
 - ✅ **Zero downtime:** Railway auto-deploys with migrations
 
-**5. Sitemap Configuration API** (`backend/routes/sitemap-routes.js` - 160 lines)
+**5. Sitemap Configuration API** (`backend/routes/sitemap-routes.js` - 200 lines)
 - ✅ `POST /api/v1/sitemap/import` - Start sitemap crawl & import
 - ✅ `POST /api/v1/sitemap/configure` - Save customer sitemap settings
-- ✅ `GET /api/v1/sitemap/config/:customerId` - Retrieve saved config
-- ✅ **Validation:** URL format, max products limits
-- ✅ **Multi-tenant:** Customer isolation via customer_id
+- ✅ `GET /api/v1/sitemap/config/:customerId` - Retrieve saved config (includes tier metadata)
+- ✅ **Validation:** URL format, product-pattern optional, max-products sanitation
+- ✅ **Enterprise logic:** Tier lookup auto-forces 10.000 max for enterprise (product_limit = 0) and clamps other tiers to their DB limit
+- ✅ **Multi-tenant:** Customer isolation via customer_id + consistent timestamps
 
 **6. Dashboard UI Integration** (`theme/sections/priceelephant-dashboard.liquid`)
 - ✅ **Sitemap Import Card:** New UI section naast Channable import
@@ -837,14 +838,16 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
 - ✅ **Form Fields:**
   - Sitemap URL input (required)
   - Product URL pattern filter (optional pre-filter voor snelheid)
-  - Max products slider (default: 50)
+  - Max products input (default: 500, hidden & locked to 10.000 for enterprise tiers)
 - ✅ **Action Buttons:**
   - "Instellingen opslaan" - Test & save settings
   - "Nu importeren" - Start import process
 - ✅ **Status Display:** Detailed progress with scanned/detected/imported stats
 
 **7. Frontend JavaScript** (`theme/assets/priceelephant-dashboard.js`)
-- ✅ `loadSitemapConfig()` - Load saved configuration on init
+- ✅ `fetchCustomerTier()` - Loads tier data, stores in state, triggers enterprise adjustments
+- ✅ `applyEnterpriseSitemapDefaults()` - Hides max-products field, shows unlimited badge, locks value to 10.000
+- ✅ `loadSitemapConfig()` - Load saved configuration on init (honours backend `enterprise` flag)
 - ✅ `handleSitemapSubmit()` - Save & test sitemap configuration
 - ✅ `handleSitemapImport()` - Trigger product import with detailed feedback
 - ✅ **Event Listeners:** Form submit + import button
@@ -852,6 +855,7 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
 - ✅ **Detailed feedback:** Shows URLs scanned, products detected, cost breakdown
 - ✅ **Enhanced product display:** Shows brand, rating, stock badges in product list
 - ✅ **Console output badges:** 🖼️ image, -25% discount, 🚚 free shipping, ⭐4.5 rating, 🏷️ brand
+- ✅ **Single dashboard asset:** One template dynamically adapts for all tiers via JS state
 
 **8. Enhanced Product Metadata UI** (`theme/assets/priceelephant-dashboard.js`)
 - ✅ **Product List Columns:**
