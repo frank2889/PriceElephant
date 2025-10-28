@@ -219,13 +219,12 @@ router.get('/import-stream', async (req, res) => {
 router.post('/configure', async (req, res) => {
   try {
     console.log('[Sitemap Config] Save request:', req.body);
-    
-    const { 
-      customerId, 
+
+    const {
+      customerId,
       sitemapUrl,
       productUrlPattern,
-      maxProducts,
-      selectors
+      maxProducts
     } = req.body;
 
     if (!customerId) {
@@ -236,38 +235,50 @@ router.post('/configure', async (req, res) => {
       return res.status(400).json({ error: 'sitemapUrl is required' });
     }
 
-    // Check customer tier to determine maxProducts limit
-    let finalMaxProducts = maxProducts || 500;
-    
+    let parsedMaxProducts = parseInt(maxProducts, 10);
+    if (!Number.isFinite(parsedMaxProducts) || parsedMaxProducts <= 0) {
+      parsedMaxProducts = 500;
+    }
+
+    if (parsedMaxProducts >= 999999) {
+      parsedMaxProducts = 10000;
+    }
+
+    let finalMaxProducts = parsedMaxProducts;
+    let isEnterprise = false;
+
     try {
       const tier = await db('customer_tiers')
         .where({ customer_id: customerId })
         .first();
-      
-      if (tier && tier.tier === 'enterprise' && tier.product_limit === 0) {
-        // Enterprise unlimited - interpret 999999 or very high numbers as unlimited (0)
-        if (!maxProducts || maxProducts >= 999999) {
-          finalMaxProducts = 0; // 0 = unlimited in database
-        } else {
-          finalMaxProducts = maxProducts;
+
+      if (tier) {
+        const tierProductLimit = Number(tier.product_limit);
+
+        if (tier.tier === 'enterprise' && tierProductLimit === 0) {
+          isEnterprise = true;
+          finalMaxProducts = 10000; // enterprise accounts should always import everything
+          console.log('[Sitemap Config] Enterprise customer detected - forcing maxProducts to 10000');
+        } else if (Number.isFinite(tierProductLimit) && tierProductLimit > 0) {
+          finalMaxProducts = Math.min(parsedMaxProducts, tierProductLimit);
+          console.log('[Sitemap Config] Applying tier product limit:', tierProductLimit);
         }
-        console.log('[Sitemap Config] Enterprise customer - maxProducts:', finalMaxProducts === 0 ? 'unlimited' : finalMaxProducts);
       }
     } catch (tierError) {
-      console.log('[Sitemap Config] Tier check skipped (table might not exist yet)');
+      console.log('[Sitemap Config] Tier lookup skipped:', tierError.message);
     }
 
-    // Save configuration to customer_configs table
-    const existing = await db('customer_configs')
-      .where({ customer_id: customerId })
-      .first();
-
+    const timestamp = new Date();
     const configData = {
       sitemap_url: sitemapUrl,
       sitemap_product_url_pattern: productUrlPattern,
       sitemap_max_products: finalMaxProducts,
-      updated_at: new Date()
+      updated_at: timestamp
     };
+
+    const existing = await db('customer_configs')
+      .where({ customer_id: customerId })
+      .first();
 
     if (existing) {
       await db('customer_configs')
@@ -279,7 +290,7 @@ router.post('/configure', async (req, res) => {
         .insert({
           customer_id: customerId,
           ...configData,
-          created_at: new Date()
+          created_at: timestamp
         });
       console.log('[Sitemap Config] ✅ Created config for customer:', customerId, 'maxProducts:', finalMaxProducts);
     }
@@ -287,21 +298,21 @@ router.post('/configure', async (req, res) => {
     res.json({
       success: true,
       message: 'Sitemap configuration saved',
-      maxProducts: finalMaxProducts
+      maxProducts: finalMaxProducts,
+      enterprise: isEnterprise
     });
-
   } catch (error) {
     console.error('[Sitemap Config] ❌ Error:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to save configuration', 
-      message: error.message 
+    res.status(500).json({
+      error: 'Failed to save configuration',
+      message: error.message
     });
   }
 });
 
 /**
  * GET /api/v1/sitemap/config/:customerId
- * Get sitemap configuration
+ * Load sitemap configuration
  */
 router.get('/config/:customerId', async (req, res) => {
   try {
@@ -314,27 +325,54 @@ router.get('/config/:customerId', async (req, res) => {
 
     if (!config) {
       console.log('[Sitemap Config] No config found for customer:', customerId);
-      return res.status(404).json({ 
-        error: 'No sitemap configuration found' 
+      return res.status(404).json({
+        error: 'No sitemap configuration found'
       });
+    }
+
+    let maxProducts = Number(config.sitemap_max_products);
+    if (!Number.isFinite(maxProducts) || maxProducts <= 0) {
+      maxProducts = 500;
+    }
+
+    let isEnterprise = false;
+
+    try {
+      const tier = await db('customer_tiers')
+        .where({ customer_id: customerId })
+        .first();
+
+      if (tier) {
+        const tierProductLimit = Number(tier.product_limit);
+
+        if (tier.tier === 'enterprise' && tierProductLimit === 0) {
+          isEnterprise = true;
+          maxProducts = 10000;
+        } else if (Number.isFinite(tierProductLimit) && tierProductLimit > 0) {
+          maxProducts = Math.min(maxProducts, tierProductLimit);
+        }
+      }
+    } catch (tierError) {
+      console.log('[Sitemap Config] Tier lookup skipped on load:', tierError.message);
     }
 
     console.log('[Sitemap Config] ✅ Loaded config:', {
       sitemapUrl: config.sitemap_url,
-      maxProducts: config.sitemap_max_products
+      maxProducts,
+      enterprise: isEnterprise
     });
 
     res.json({
       sitemapUrl: config.sitemap_url,
       productUrlPattern: config.sitemap_product_url_pattern,
-      maxProducts: config.sitemap_max_products
+      maxProducts,
+      enterprise: isEnterprise
     });
-
   } catch (error) {
     console.error('[Sitemap Config] ❌ Load error:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to fetch configuration', 
-      message: error.message 
+    res.status(500).json({
+      error: 'Failed to fetch configuration',
+      message: error.message
     });
   }
 });
