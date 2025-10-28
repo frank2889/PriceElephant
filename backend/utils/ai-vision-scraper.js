@@ -12,6 +12,7 @@
 
 require('dotenv').config();
 const OpenAI = require('openai');
+const { chromium } = require('playwright');
 
 class AIVisionScraper {
   constructor() {
@@ -101,6 +102,46 @@ class AIVisionScraper {
     } catch (error) {
       console.error('❌ AI Vision extraction failed:', error.message);
       throw error;
+    }
+  }
+
+  /**
+   * Convenience wrapper used by HybridScraper: navigates to the product URL,
+   * captures a screenshot, and feeds it to the vision extractor.
+   */
+  async scrape(url) {
+    if (!this.enabled) {
+      throw new Error('AI Vision is disabled - OPENAI_API_KEY not configured');
+    }
+
+    if (!url) {
+      throw new Error('AI Vision scrape requires a URL');
+    }
+
+    let browser;
+    let page;
+
+    try {
+      browser = await chromium.launch({ headless: true });
+      page = await browser.newPage({
+        locale: 'nl-NL',
+        timezoneId: 'Europe/Amsterdam',
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      });
+
+      console.log('🤖 [AI Vision] Navigating to URL for fallback:', url);
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
+      await page.waitForTimeout(3000);
+
+      const data = await this.scrapeWithVision(page);
+      return data;
+    } finally {
+      if (page) {
+        await page.close().catch(() => {});
+      }
+      if (browser) {
+        await browser.close().catch(() => {});
+      }
     }
   }
 
