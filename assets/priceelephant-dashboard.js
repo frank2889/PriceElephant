@@ -564,7 +564,8 @@
         body: JSON.stringify({ 
           customerId, 
           sitemapUrl,
-          productUrlPattern
+          productUrlPattern,
+          maxProducts: parseInt(maxProducts) || 500
         }),
       });
       console.log('[handleSitemapSubmit] Success:', response);
