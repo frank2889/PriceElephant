@@ -1073,7 +1073,7 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
   - sitemap_max_products: 10000 (Enterprise unlimited)
   - company_name: 'Hobo.nl'
 
-**3. Customer Tier API** (`backend/routes/customer-routes.js` - NEW)
+**3. Customer Tier API** (`backend/routes/customer-routes.js` - UPDATED)
 - ✅ **Endpoint:** `GET /api/v1/customers/:customerId/tier`
 - ✅ **Response:**
   ```json
@@ -1082,14 +1082,15 @@ ALTER TABLE products ADD COLUMN bundle_info TEXT;
     "product_limit": 0,
     "competitor_limit": 0,
     "api_access": true,
-    "monthly_price": 249.00
+    "monthly_price": 249,
+    "source": "shopify"
   }
   ```
 - ✅ **Features:**
-  - Returns customer tier from database
-  - Comprehensive debug logging: `[Customer Tier API]` prefix
-  - Logs: request customer ID, database result, response data
-  - Error handling with stack traces
+  - Fetches Shopify metafields (`priceelephant.tier`, `product_limit`, `competitor_limit`, `api_access`, `monthly_price`) as the source of truth
+  - Normalizes values (int/bool/decimal) and upserts into `customer_tiers` for caching & analytics
+  - Falls back to cached database row, then trial defaults if Shopify data missing
+  - Comprehensive debug logging (`source` included) and graceful Shopify error handling
 
 **4. Sitemap Configuration API** (`backend/routes/sitemap-routes.js` - UPDATED)
 - ✅ **Endpoint:** `POST /api/v1/sitemap/configure`
