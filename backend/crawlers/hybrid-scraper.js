@@ -463,8 +463,17 @@ class HybridScraper {
 
       const productData = await page.evaluate((selectors) => {
         // Helper function to try multiple selectors
-        const trySelectors = (selectorString) => {
-          const selectors = selectorString.split(',').map(s => s.trim()).filter(Boolean);
+        const normalizeSelectorList = (value) => {
+          if (!value) return [];
+          if (Array.isArray(value)) return value.map((item) => item.trim()).filter(Boolean);
+          if (typeof value === 'string') {
+            return value.split(',').map((s) => s.trim()).filter(Boolean);
+          }
+          return [];
+        };
+
+        const trySelectors = (selectorValue) => {
+          const selectors = normalizeSelectorList(selectorValue);
           for (const selector of selectors) {
             const el = document.querySelector(selector);
             if (el) return el;
@@ -520,11 +529,147 @@ class HybridScraper {
           return (isNaN(price) || price <= 0) ? null : price;
         };
 
+        const toAbsoluteUrl = (value) => {
+          if (!value) return null;
+          try {
+            return new URL(value, window.location.origin).href;
+          } catch (error) {
+            return value;
+          }
+        };
+
+        const flattenNodes = (node) => {
+          if (!node) return [];
+          if (Array.isArray(node)) {
+            return node.flatMap(flattenNodes);
+          }
+          if (typeof node === 'object') {
+            const items = [node];
+            if (node['@graph']) items.push(...flattenNodes(node['@graph']));
+            if (node.itemListElement) items.push(...flattenNodes(node.itemListElement));
+            if (node.offers) items.push(...flattenNodes(node.offers));
+            return items;
+          }
+          return [];
+        };
+
+          const extractImage = (source) => {
+            if (!source) return null;
+            if (typeof source === 'string') return source;
+            if (Array.isArray(source)) {
+              for (const item of source) {
+                const candidate = extractImage(item);
+                if (candidate) return candidate;
+              }
+              return null;
+            }
+            if (typeof source === 'object') {
+              if (source.url) return extractImage(source.url);
+              if (source.contentUrl) return extractImage(source.contentUrl);
+              if (source.image) return extractImage(source.image);
+            }
+            return null;
+          };
+
+        const extractFromJsonLd = () => {
+          const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+          if (!scripts.length) return null;
+
+          const parsed = [];
+          for (const script of scripts) {
+            if (!script.textContent) continue;
+            try {
+              parsed.push(JSON.parse(script.textContent));
+            } catch (error) {
+              continue;
+            }
+          }
+
+          if (!parsed.length) return null;
+
+          const nodes = parsed.flatMap(flattenNodes);
+          const productNode = nodes.find((node) => {
+            if (!node || typeof node !== 'object') return false;
+            const type = node['@type'];
+            if (!type) return false;
+            if (Array.isArray(type)) return type.includes('Product');
+            return type === 'Product';
+          });
+
+          if (!productNode) return null;
+
+          const offerNodes = flattenNodes(productNode.offers || []);
+          const offer = offerNodes.find((candidate) => candidate && (candidate.price || (candidate.priceSpecification && candidate.priceSpecification.price))) || offerNodes[0] || null;
+
+          const priceCandidate = offer?.priceSpecification?.price ?? offer?.price ?? productNode.offers?.price ?? productNode.price;
+          const price = parsePrice(priceCandidate != null ? `${priceCandidate}` : null);
+          if (!price) return null;
+
+          const originalCandidate = offer?.priceSpecification?.compareAtPrice ?? offer?.priceSpecification?.highPrice ?? offer?.priceSpecification?.referencePrice ?? productNode.offers?.priceSpecification?.highPrice;
+          const originalPrice = parsePrice(originalCandidate != null ? `${originalCandidate}` : null);
+
+          const availabilityRaw = (offer?.availability || '').toString().toLowerCase();
+          const inStock = availabilityRaw ? availabilityRaw.includes('instock') || availabilityRaw.includes('preorder') : true;
+
+          const imageValue = extractImage(productNode.image) || extractImage(productNode.offers?.image) || extractImage(productNode.offers?.itemOffered?.image);
+          const brandNode = productNode.brand;
+          const brand = typeof brandNode === 'string' ? brandNode : brandNode?.name || null;
+
+          const aggregate = productNode.aggregateRating || {};
+          const rating = aggregate.ratingValue ? parseFloat(aggregate.ratingValue) : null;
+          const reviewCount = aggregate.reviewCount ? parseInt(aggregate.reviewCount, 10) : (aggregate.ratingCount ? parseInt(aggregate.ratingCount, 10) : null);
+
+          const shippingDetails = productNode.shippingDetails || productNode.offers?.shippingDetails || null;
+          const shippingText = typeof shippingDetails === 'string'
+            ? shippingDetails
+            : (
+                shippingDetails?.shippingRate?.name ||
+                shippingDetails?.shippingRate?.description ||
+                shippingDetails?.deliveryTime?.handlingTime ||
+                shippingDetails?.deliveryTime?.transitTimeLabel ||
+                ''
+              );
+          const hasFreeShipping = typeof shippingText === 'string' && shippingText.toLowerCase().includes('gratis');
+
+          const payload = {
+            title: productNode.name || document.querySelector('h1')?.textContent?.trim() || 'Unknown Product',
+            price,
+            originalPrice,
+            discountPercentage: (originalPrice && originalPrice > price) ? Math.round(((originalPrice - price) / originalPrice) * 100) : null,
+            discountBadge: null,
+            hasFreeShipping,
+            shippingInfo: shippingText || null,
+            inStock,
+            imageUrl: imageValue ? toAbsoluteUrl(imageValue) : null,
+            brand,
+            rating: rating || null,
+            reviewCount: reviewCount || null,
+            stockLevel: null,
+            deliveryTime: productNode.offers?.deliveryLeadTime?.transitTimeLabel || productNode.offers?.availabilityStarts || null,
+            bundleInfo: null,
+            currency: offer?.priceCurrency || offer?.priceSpecification?.priceCurrency || productNode.priceCurrency || 'EUR',
+            extractedBy: 'json-ld',
+            scrapedAt: new Date().toISOString()
+          };
+
+          console.log('[HybridScraper][JSON-LD] Extracted product payload', {
+            title: payload.title,
+            price: payload.price
+          });
+
+          return payload;
+        };
+
+        const schemaPayload = extractFromJsonLd();
+        if (schemaPayload) {
+          return schemaPayload;
+        }
+
         const priceElement = trySelectors(selectors.price);
         const originalPriceElement = trySelectors(selectors.originalPrice);
         const titleElement = trySelectors(selectors.title);
         const stockElement = trySelectors(selectors.availability);
-        const imageElement = trySelectors(selectors.image);
+  const imageElement = trySelectors(selectors.image);
         const discountElement = trySelectors(selectors.discount);
         const shippingElement = trySelectors(selectors.shipping);
         const brandElement = trySelectors(selectors.brand);
@@ -576,16 +721,34 @@ class HybridScraper {
         let imageUrl = null;
         if (imageElement) {
           if (imageElement.tagName === 'IMG') {
-            imageUrl = imageElement.src || imageElement.dataset.src || imageElement.getAttribute('data-lazy-src');
-          } else if (imageElement.tagName === 'META') {
-            imageUrl = imageElement.content;
+            imageUrl = imageElement.src || imageElement.dataset.src || imageElement.getAttribute('data-lazy-src') || imageElement.getAttribute('data-srcset');
+            if (!imageUrl && imageElement.srcset) {
+              imageUrl = imageElement.srcset.split(',').map((entry) => entry.trim().split(' ')[0]).find(Boolean) || null;
+            }
+          } else if (imageElement.tagName === 'SOURCE' || imageElement.tagName === 'SOURCESET') {
+            const srcset = imageElement.srcset || imageElement.getAttribute('data-srcset');
+            if (srcset) {
+              imageUrl = srcset.split(',').map((entry) => entry.trim().split(' ')[0]).find(Boolean) || null;
+            }
+          } else if (imageElement.tagName === 'META' || imageElement.tagName === 'LINK') {
+            imageUrl = imageElement.content || imageElement.getAttribute('href');
+          } else {
+            imageUrl = imageElement.getAttribute('data-src') || imageElement.dataset?.src || imageElement.style?.backgroundImage?.replace(/url\(("|')?(.*?)("|')?\)/, '$2');
           }
-          
-          // Convert relative URLs to absolute
-          if (imageUrl && !imageUrl.startsWith('http')) {
-            imageUrl = new URL(imageUrl, window.location.origin).href;
+
+          if (imageUrl && imageUrl.startsWith('data:image')) {
+            imageUrl = null;
           }
         }
+
+        if (!imageUrl) {
+          const ogImage = document.querySelector('meta[property="og:image"], meta[property="og:image:secure_url"], meta[name="twitter:image"], link[rel="image_src"]');
+          if (ogImage) {
+            imageUrl = ogImage.getAttribute('content') || ogImage.getAttribute('href');
+          }
+        }
+
+        imageUrl = imageUrl ? toAbsoluteUrl(imageUrl) : null;
 
         // Parse rating (1-5 scale)
         let rating = null;

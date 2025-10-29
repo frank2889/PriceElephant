@@ -12,7 +12,8 @@
     "db:seed": "knex seed:run --knexfile knexfile.js",
     "db:reset": "npm run db:rollback && npm run db:migrate && npm run db:seed",
     "test": "NODE_ENV=test jest --coverage --runInBand",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "npx playwright install --with-deps"
   },
   "keywords": [
     "price-intelligence",
