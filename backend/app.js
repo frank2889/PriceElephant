@@ -21,7 +21,8 @@ const customerRoutes = require('./routes/customer-routes');
 const app = express();
 
 // Trust Railway proxy (for rate limiting and real IP detection)
-app.set('trust proxy', true);
+// Use specific proxy count instead of 'true' for security
+app.set('trust proxy', process.env.RAILWAY_ENVIRONMENT ? 1 : false);
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
