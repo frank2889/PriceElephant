@@ -5,16 +5,13 @@
     },
     "install": {
       "cmds": [
-        "npm install --production",
-        "npx playwright install chromium --with-deps",
-        "./node_modules/.bin/knex migrate:latest --knexfile knexfile.js"
+        "cd backend && npm install --production",
+        "cd backend && npx playwright install chromium --with-deps",
+        "cd backend && npx knex migrate:latest --knexfile knexfile.js"
       ]
     }
   },
   "start": {
-    "cmd": "node server.js"
-  },
-  "variables": {
-    "NIXPACKS_BUILD_DIR": "backend"
+    "cmd": "cd backend && node server.js"
   }
 }
