@@ -37,21 +37,46 @@ echo ""
 # Push theme/ folder to shopify-theme branch
 echo -e "${BLUE}🚀 Syncing theme/ to shopify-theme branch...${NC}"
 
-# Use split + force push method (more reliable, no timeout issues)
-echo "Using git subtree split method..."
-SPLIT_BRANCH="theme-temp-$(date +%s)"
+# Simple method: checkout shopify-theme, copy files, commit, push
+echo "Switching to shopify-theme branch..."
 
-# Split theme folder into temporary branch
-echo "Splitting theme/ folder..."
-git subtree split --prefix=theme -b $SPLIT_BRANCH
+# Stash current changes (if any)
+git stash save "temp-stash-before-theme-sync" >/dev/null 2>&1 || true
 
-# Force push to shopify-theme
-echo "Pushing to shopify-theme..."
-git push -f origin $SPLIT_BRANCH:shopify-theme
+# Checkout or create shopify-theme branch
+if git show-ref --verify --quiet refs/heads/shopify-theme; then
+    git checkout shopify-theme
+else
+    git checkout --orphan shopify-theme
+    git rm -rf . >/dev/null 2>&1 || true
+fi
 
-# Clean up temporary branch
-echo "Cleaning up temporary branch..."
-git branch -D $SPLIT_BRANCH
+# Pull latest from remote (if exists)
+git pull origin shopify-theme --rebase 2>/dev/null || true
+
+# Copy theme files from main
+echo "Copying theme files..."
+git checkout main -- theme/
+mv theme/* . 2>/dev/null || true
+rmdir theme 2>/dev/null || true
+
+# Commit and push
+echo "Committing changes..."
+git add -A
+if git diff --staged --quiet; then
+    echo "No changes to sync"
+else
+    git commit -m "$COMMIT_MSG"
+    echo "Pushing to origin..."
+    git push -f origin shopify-theme
+fi
+
+# Return to main branch
+echo "Returning to main branch..."
+git checkout main
+
+# Restore stash if exists
+git stash pop >/dev/null 2>&1 || true
 
 echo ""
 echo -e "${GREEN}✅ Theme synced successfully!${NC}"
