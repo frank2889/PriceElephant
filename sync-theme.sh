@@ -37,21 +37,21 @@ echo ""
 # Push theme/ folder to shopify-theme branch
 echo -e "${BLUE}🚀 Syncing theme/ to shopify-theme branch...${NC}"
 
-# Method 1: Try git subtree push with timeout
-echo "Attempting git subtree push (30s timeout)..."
-if timeout 30s git subtree push --prefix=theme origin shopify-theme 2>/dev/null; then
-    echo -e "${GREEN}✅ Subtree push successful${NC}"
-else
-    echo -e "${BLUE}⚠️  Subtree push timeout/failed, using split method...${NC}"
-    
-    # Method 2: Fallback to split + push (more reliable)
-    SPLIT_BRANCH="theme-temp-$(date +%s)"
-    git subtree split --prefix=theme -b $SPLIT_BRANCH
-    git push -f origin $SPLIT_BRANCH:shopify-theme
-    git branch -D $SPLIT_BRANCH
-    
-    echo -e "${GREEN}✅ Split method successful${NC}"
-fi
+# Use split + force push method (more reliable, no timeout issues)
+echo "Using git subtree split method..."
+SPLIT_BRANCH="theme-temp-$(date +%s)"
+
+# Split theme folder into temporary branch
+echo "Splitting theme/ folder..."
+git subtree split --prefix=theme -b $SPLIT_BRANCH
+
+# Force push to shopify-theme
+echo "Pushing to shopify-theme..."
+git push -f origin $SPLIT_BRANCH:shopify-theme
+
+# Clean up temporary branch
+echo "Cleaning up temporary branch..."
+git branch -D $SPLIT_BRANCH
 
 echo ""
 echo -e "${GREEN}✅ Theme synced successfully!${NC}"
