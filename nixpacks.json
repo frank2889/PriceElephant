@@ -6,6 +6,7 @@
     "install": {
       "cmds": [
         "npm install --production",
+        "npm install knex",
         "npx playwright install chromium --with-deps",
         "npx knex migrate:latest"
       ]
