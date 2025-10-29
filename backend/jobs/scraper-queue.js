@@ -7,12 +7,23 @@
  * - Retry logic (3 attempts)
  * - Job status tracking
  * - Multi-tenant deduplication
+ * - Adaptive throttling per retailer
  */
 
 const Bull = require('bull');
 const redis = require('../config/redis');
 const HybridScraper = require('../crawlers/hybrid-scraper');
+const AdaptiveThrottler = require('../utils/adaptive-throttling');
 const db = require('../config/database');
+
+// Shared throttler instance across all workers
+// This ensures consistent throttling even with 5 concurrent workers
+const sharedThrottler = new AdaptiveThrottler({ 
+  verbose: true,
+  minDelay: 500,
+  maxDelay: 30000,
+  defaultDelay: 2000
+});
 
 // Create queue
 const scraperQueue = new Bull('price-scraping', {
@@ -34,13 +45,23 @@ const scraperQueue = new Bull('price-scraping', {
 
 /**
  * Job Processor - Scrapes a single product from a single retailer
+ * Now with adaptive throttling
  */
 scraperQueue.process(5, async (job) => {
   const { productId, retailer, url, ean, customerId } = job.data;
   
   console.log(`[Job ${job.id}] Processing scrape: ${retailer} - ${ean || productId}`);
   
+  // Apply adaptive throttling BEFORE creating scraper
+  // This ensures delays are respected across all workers
+  await sharedThrottler.beforeRequest(retailer);
+  
   const scraper = new HybridScraper();
+  // Use shared throttler instead of scraper's own instance
+  scraper.throttler = sharedThrottler;
+  
+  const scrapeStartTime = Date.now();
+  let scrapeError = null;
   
   try {
     // Check if this EAN was recently scraped (multi-tenant optimization)
@@ -66,6 +87,14 @@ scraperQueue.process(5, async (job) => {
           cost: 0
         });
         
+        // Update throttler (cached = fast success)
+        const responseTime = Date.now() - scrapeStartTime;
+        await sharedThrottler.afterRequest(retailer, {
+          success: true,
+          responseTime,
+          status: 200
+        });
+        
         return {
           productId,
           retailer,
@@ -88,7 +117,17 @@ scraperQueue.process(5, async (job) => {
     return result;
     
   } catch (error) {
+    scrapeError = error;
     console.error(`[Job ${job.id}] Failed:`, error.message);
+    
+    // Update throttler with error
+    const responseTime = Date.now() - scrapeStartTime;
+    await sharedThrottler.afterRequest(retailer, {
+      error: error.message,
+      responseTime,
+      status: error.message.includes('429') ? 429 : 500,
+      success: false
+    });
     
     // Log failure
     await db('scrape_jobs').insert({
@@ -167,6 +206,7 @@ async function queueAllProducts(customerId = null) {
 
 /**
  * Get queue statistics
+ * Now includes adaptive throttling metrics
  */
 async function getQueueStats() {
   const [waiting, active, completed, failed] = await Promise.all([
@@ -177,12 +217,35 @@ async function getQueueStats() {
   ]);
   
   return {
-    waiting,
-    active,
-    completed,
-    failed,
-    total: waiting + active + completed + failed
+    queue: {
+      waiting,
+      active,
+      completed,
+      failed,
+      total: waiting + active + completed + failed
+    },
+    throttling: sharedThrottler.getAllStats() // Per-retailer throttling stats
   };
+}
+
+/**
+ * Get throttling stats only
+ */
+function getThrottlingStats() {
+  return sharedThrottler.getAllStats();
+}
+
+/**
+ * Reset throttling for a specific retailer
+ */
+function resetThrottling(retailer) {
+  if (retailer) {
+    sharedThrottler.reset(retailer);
+    console.log(`✅ Throttling reset for ${retailer}`);
+  } else {
+    sharedThrottler.resetAll();
+    console.log('✅ All throttling reset');
+  }
 }
 
 /**
@@ -210,5 +273,8 @@ module.exports = {
   scraperQueue,
   queueAllProducts,
   getQueueStats,
-  clearQueue
+  getThrottlingStats,
+  resetThrottling,
+  clearQueue,
+  sharedThrottler // Export for testing
 };

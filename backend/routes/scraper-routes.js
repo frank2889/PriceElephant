@@ -214,4 +214,56 @@ router.post('/test', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/v1/scraper/throttling
+ * Get adaptive throttling statistics
+ */
+router.get('/throttling', async (req, res) => {
+  try {
+    const { getThrottlingStats } = require('../jobs/scraper-queue');
+    const stats = getThrottlingStats();
+    
+    res.json({
+      success: true,
+      throttling: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Throttling stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get throttling stats',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/v1/scraper/throttling/reset
+ * Reset adaptive throttling for a retailer
+ */
+router.post('/throttling/reset', async (req, res) => {
+  try {
+    const { retailer } = req.body;
+    const { resetThrottling } = require('../jobs/scraper-queue');
+    
+    resetThrottling(retailer); // Pass null to reset all
+    
+    res.json({
+      success: true,
+      message: retailer 
+        ? `Throttling reset for ${retailer}` 
+        : 'All throttling reset',
+      retailer: retailer || 'all'
+    });
+  } catch (error) {
+    console.error('Throttling reset error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reset throttling',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

@@ -14,12 +14,18 @@ require('dotenv').config();
 const { chromium } = require('playwright');
 const ProxyPool = require('../utils/proxy-pool');
 const AIVisionScraper = require('../utils/ai-vision-scraper');
+const AdaptiveThrottler = require('../utils/adaptive-throttling');
+const BrowserProfiles = require('../utils/browser-profiles');
+const HttpCacheManager = require('../utils/http-cache-manager');
 const db = require('../config/database');
 
 class HybridScraper {
   constructor() {
     this.proxyPool = new ProxyPool();
     this.aiVision = new AIVisionScraper();
+    this.throttler = new AdaptiveThrottler({ verbose: true }); // Enable logging
+    this.browserProfiles = new BrowserProfiles();
+    this.httpCache = new HttpCacheManager({ verbose: true });
     this.browser = null;
     this.context = null;
     
@@ -247,8 +253,18 @@ class HybridScraper {
       freeProxySuccess: 0,
       paidProxySuccess: 0,
       aiVisionSuccess: 0,
+      httpCacheHits: 0,
       failures: 0,
-      totalCost: 0
+      totalCost: 0,
+      platformDetections: {
+        shopify: 0,
+        magento: 0,
+        woocommerce: 0,
+        lightspeed: 0,
+        ccv: 0,
+        custom: 0,
+        unknown: 0
+      }
     };
   }
 
@@ -269,6 +285,187 @@ class HybridScraper {
     return null;
   }
 
+  /**
+   * Detect e-commerce platform from HTML
+   * Analyzes meta tags, scripts, and URL patterns to identify platform
+   * @param {Object} page - Playwright page instance
+   * @returns {Object} { platform: string, confidence: number, features: array }
+   */
+  async detectPlatform(page) {
+    try {
+      const detection = await page.evaluate(() => {
+        const html = document.documentElement.outerHTML.toLowerCase();
+        const head = document.head?.innerHTML?.toLowerCase() || '';
+        const body = document.body?.innerHTML?.toLowerCase() || '';
+
+        const platforms = {
+          shopify: {
+            score: 0,
+            features: []
+          },
+          magento: {
+            score: 0,
+            features: []
+          },
+          woocommerce: {
+            score: 0,
+            features: []
+          },
+          lightspeed: {
+            score: 0,
+            features: []
+          },
+          ccv: {
+            score: 0,
+            features: []
+          },
+          custom: {
+            score: 0,
+            features: []
+          }
+        };
+
+        // Shopify detection
+        if (html.includes('shopify')) {
+          platforms.shopify.score += 30;
+          platforms.shopify.features.push('shopify-mention');
+        }
+        if (html.includes('cdn.shopify.com')) {
+          platforms.shopify.score += 40;
+          platforms.shopify.features.push('shopify-cdn');
+        }
+        if (html.includes('shopify.theme')) {
+          platforms.shopify.score += 20;
+          platforms.shopify.features.push('shopify-theme');
+        }
+        if (document.querySelector('meta[name="shopify-checkout-api-token"]')) {
+          platforms.shopify.score += 50;
+          platforms.shopify.features.push('shopify-meta');
+        }
+
+        // Magento detection
+        if (html.includes('magento')) {
+          platforms.magento.score += 30;
+          platforms.magento.features.push('magento-mention');
+        }
+        if (html.includes('mage/') || html.includes('magento_')) {
+          platforms.magento.score += 40;
+          platforms.magento.features.push('magento-scripts');
+        }
+        if (document.querySelector('[data-mage-init]') || document.querySelector('[x-magento-init]')) {
+          platforms.magento.score += 50;
+          platforms.magento.features.push('magento-attributes');
+        }
+
+        // WooCommerce detection
+        if (html.includes('woocommerce')) {
+          platforms.woocommerce.score += 40;
+          platforms.woocommerce.features.push('woocommerce-mention');
+        }
+        if (html.includes('wp-content')) {
+          platforms.woocommerce.score += 20;
+          platforms.woocommerce.features.push('wordpress');
+        }
+        if (document.querySelector('.woocommerce') || document.querySelector('[class*="wc-"]')) {
+          platforms.woocommerce.score += 50;
+          platforms.woocommerce.features.push('woocommerce-classes');
+        }
+        if (document.querySelector('meta[name="generator"][content*="WooCommerce"]')) {
+          platforms.woocommerce.score += 40;
+          platforms.woocommerce.features.push('woocommerce-meta');
+        }
+
+        // Lightspeed detection
+        if (html.includes('lightspeed') || html.includes('webshopapp')) {
+          platforms.lightspeed.score += 50;
+          platforms.lightspeed.features.push('lightspeed-mention');
+        }
+        if (html.includes('seoshop.') || html.includes('lightspeedhq.')) {
+          platforms.lightspeed.score += 40;
+          platforms.lightspeed.features.push('lightspeed-domain');
+        }
+
+        // CCV Shop detection
+        if (html.includes('ccvshop') || html.includes('ccv.shop')) {
+          platforms.ccv.score += 50;
+          platforms.ccv.features.push('ccv-mention');
+        }
+        if (html.includes('ccv-') || html.includes('data-ccv')) {
+          platforms.ccv.score += 40;
+          platforms.ccv.features.push('ccv-attributes');
+        }
+
+        // Find highest scoring platform
+        let detected = { platform: 'custom', score: 0, features: [] };
+        for (const [name, data] of Object.entries(platforms)) {
+          if (data.score > detected.score) {
+            detected = { platform: name, score: data.score, features: data.features };
+          }
+        }
+
+        return detected;
+      });
+
+      // Calculate confidence (0-100%)
+      const confidence = Math.min(100, detection.score);
+
+      console.log(`🔍 Platform detection: ${detection.platform} (${confidence}% confidence)`, {
+        features: detection.features
+      });
+
+      return {
+        platform: detection.platform,
+        confidence,
+        features: detection.features
+      };
+
+    } catch (error) {
+      console.warn(`⚠️ Platform detection failed: ${error.message}`);
+      return { platform: 'unknown', confidence: 0, features: [] };
+    }
+  }
+
+  /**
+   * Select optimal selector set based on platform
+   * @param {string} platform - Detected platform name
+   * @param {Object} fallbackSelectors - Default selectors to use
+   * @returns {Object} Optimized selector set
+   */
+  getOptimizedSelectors(platform, fallbackSelectors) {
+    // Platform-specific optimized selectors (prioritize most reliable)
+    const platformSelectors = {
+      shopify: {
+        price: '[itemprop="price"], .product__price .price-item--regular, .product__price .price-item--sale, .product-price, [data-product-price]',
+        originalPrice: '.product__price .price-item--regular s, .price--compare, .was-price',
+        title: '[itemprop="name"], .product-single__title, .product__title, h1.product-title',
+        availability: '[itemprop="availability"], .product-form__inventory, [data-product-available]',
+        image: '[itemprop="image"], .product__media img, .product-single__photo img'
+      },
+      magento: {
+        price: '[itemprop="price"], .price-box .price, [data-price-type="finalPrice"], .special-price .price',
+        originalPrice: '.old-price .price, .price-box .old-price',
+        title: '[itemprop="name"], .product-info-main .page-title, .product-name, h1.product-name',
+        availability: '[itemprop="availability"], .stock.available, .stock-status',
+        image: '[itemprop="image"], .product-image-photo, .fotorama__img'
+      },
+      woocommerce: {
+        price: '[itemprop="price"], .woocommerce-Price-amount, p.price ins .amount, p.price .amount',
+        originalPrice: 'p.price del .amount, .price del .amount',
+        title: '[itemprop="name"], .product_title, h1.entry-title',
+        availability: '[itemprop="availability"], .stock, .availability',
+        image: '[itemprop="image"], .woocommerce-product-gallery__image img, .wp-post-image'
+      }
+    };
+
+    if (platformSelectors[platform]) {
+      console.log(`✅ Using optimized ${platform} selectors`);
+      return platformSelectors[platform];
+    }
+
+    console.log(`📋 Using universal selectors for ${platform}`);
+    return fallbackSelectors;
+  }
+
   getRetailerLabel(url, fallbackName = 'unknown') {
     if (fallbackName && fallbackName !== 'Universal (Auto-detect)') {
       return fallbackName;
@@ -286,6 +483,9 @@ class HybridScraper {
    * Initialize browser with proxy config
    */
   async init(proxyConfig = null) {
+    // Get random browser profile for unique fingerprint
+    const profile = this.browserProfiles.getRandomProfile();
+    
     const launchOptions = {
       headless: true,
       args: [
@@ -299,26 +499,40 @@ class HybridScraper {
     // Add proxy if provided
     if (proxyConfig && proxyConfig.proxy) {
       launchOptions.proxy = proxyConfig.proxy;
-      console.log(`✅ Using ${proxyConfig.tier} proxy (cost: €${proxyConfig.cost}/req)`);
+      console.log(`✅ Using ${proxyConfig.tier} proxy (cost: €${proxyConfig.cost}/req) + ${profile.type} profile`);
     } else {
-      console.log('🚀 Direct scraping (no proxy)');
+      console.log(`🚀 Direct scraping (no proxy) + ${profile.type} profile`);
     }
 
     this.browser = await chromium.launch(launchOptions);
 
     this.context = await this.browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 },
+      userAgent: profile.userAgent,
+      viewport: profile.viewport,
       locale: 'nl-NL',
       timezoneId: 'Europe/Amsterdam',
-      extraHTTPHeaders: {
-        'Accept-Language': 'nl-NL,nl;q=0.9,en;q=0.8'
+      extraHTTPHeaders: profile.headers
+    });
+
+    // Resource blocking: block images, stylesheets, fonts, media
+    // Target: 50%+ page load speed improvement
+    await this.context.route('**/*', (route) => {
+      const resourceType = route.request().resourceType();
+      const blockedTypes = ['image', 'stylesheet', 'font', 'media'];
+      
+      if (blockedTypes.includes(resourceType)) {
+        // Abort blocked resources
+        route.abort();
+      } else {
+        // Allow HTML, scripts, XHR, fetch (needed for scraping)
+        route.continue();
       }
     });
   }
 
   /**
    * Scrape product with multi-tier fallback strategy
+   * Now with adaptive throttling per retailer + HTTP caching
    */
   async scrapeProduct(url, ean = null, retailerKey = null, productId = null) {
     // Auto-detect retailer from URL if not provided
@@ -335,10 +549,66 @@ class HybridScraper {
     
     console.log(`🏪 Retailer: ${retailerName}`);
 
+    // Apply adaptive throttling BEFORE scraping
+    await this.throttler.beforeRequest(retailerLabel);
+
     this.stats.total++;
     let scrapedData = null;
     let tier = null;
     let cost = 0;
+    let scrapeStartTime = Date.now();
+    let scrapeError = null;
+    let cacheHit = false;
+
+    // Check HTTP cache first (ETag/Last-Modified)
+    try {
+      const proxyConfig = await this.proxyPool.getNextProxy();
+      await this.init(proxyConfig);
+      const page = await this.context.newPage();
+      
+      const cacheCheck = await this.httpCache.checkIfModified(url, page);
+      await page.close();
+      
+      if (!cacheCheck.changed && cacheCheck.cached) {
+        console.log(`✅ HTTP Cache Hit (304 Not Modified) - using cached data`);
+        scrapedData = cacheCheck.cached;
+        tier = 'http-cache';
+        cost = 0; // Free!
+        cacheHit = true;
+        this.stats.httpCacheHits++;
+        
+        await this.close();
+        
+        // Update throttler with fast cache hit
+        const responseTime = Date.now() - scrapeStartTime;
+        await this.throttler.afterRequest(retailerLabel, {
+          responseTime,
+          status: 304,
+          success: true
+        });
+        
+        this.stats.totalCost += cost;
+        
+        if (productId) {
+          await this.savePriceSnapshot(productId, retailerLabel, scrapedData, tier, cost);
+        }
+        
+        return {
+          ...scrapedData,
+          tier,
+          cost,
+          retailer: retailerLabel,
+          retailerKey: retailerKey || retailerLabel,
+          responseTime,
+          cacheHit: true
+        };
+      }
+      
+      await this.close();
+    } catch (cacheError) {
+      console.log(`⚠️ Cache check failed, continuing with normal scrape: ${cacheError.message}`);
+      await this.close();
+    }
 
     // Try Tier 1: Direct (no proxy)
     try {
@@ -358,6 +628,7 @@ class HybridScraper {
         throw new Error('No valid price found');
       }
     } catch (error) {
+      scrapeError = error;
       this.proxyPool.recordResult('direct', false, 0);
       console.log(`❌ Tier 1 failed: ${error.message}`);
       await this.close();
@@ -376,11 +647,13 @@ class HybridScraper {
           this.stats.freeProxySuccess++;
           tier = 'free';
           cost = 0;
+          scrapeError = null; // Success clears error
           console.log(`✅ Tier 2 success: €${scrapedData.price}`);
         } else {
           throw new Error('No valid price found');
         }
       } catch (error2) {
+        scrapeError = error2;
         this.proxyPool.recordResult('free', false, 0);
         console.log(`❌ Tier 2 failed: ${error2.message}`);
         await this.close();
@@ -401,11 +674,13 @@ class HybridScraper {
             this.stats.paidProxySuccess++;
             tier = 'webshare';
             cost = 0.0003;
+            scrapeError = null; // Success clears error
             console.log(`✅ Tier 3 success: €${scrapedData.price} (cost: €${cost})`);
           } else {
             throw new Error('No valid price found');
           }
         } catch (error3) {
+          scrapeError = error3;
           this.proxyPool.recordResult('webshare', false, 0);
           console.log(`❌ Tier 3 failed: ${error3.message}`);
           await this.close();
@@ -417,8 +692,10 @@ class HybridScraper {
             this.stats.aiVisionSuccess++;
             tier = 'ai-vision';
             cost = 0.02; // GPT-4V API cost
+            scrapeError = null; // Success clears error
             console.log(`✅ Tier 4 AI success: €${scrapedData.price} (cost: €${cost})`);
           } catch (error4) {
+            scrapeError = error4;
             console.error(`❌ All tiers failed for ${url}:`, error4.message);
             this.stats.failures++;
             throw new Error(`All scraping methods failed: ${error4.message}`);
@@ -429,8 +706,38 @@ class HybridScraper {
 
     await this.close();
 
+    // Calculate response time
+    const responseTime = Date.now() - scrapeStartTime;
+
+    // Update adaptive throttler with result
+    await this.throttler.afterRequest(retailerLabel, {
+      error: scrapeError?.message,
+      responseTime,
+      status: scrapeError ? (scrapeError.message.includes('429') ? 429 : 500) : 200,
+      success: !scrapeError
+    });
+
     // Update stats
     this.stats.totalCost += cost;
+
+    // Store in HTTP cache if successful (for future 304 checks)
+    if (scrapedData && !cacheHit) {
+      try {
+        // Re-open browser briefly to get response headers
+        const proxyConfig = await this.proxyPool.getNextProxy();
+        await this.init(proxyConfig);
+        const page = await this.context.newPage();
+        const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+        const headers = response.headers();
+        await page.close();
+        await this.close();
+        
+        await this.httpCache.store(url, headers, scrapedData);
+      } catch (cacheStoreError) {
+        console.log(`⚠️ Failed to store HTTP cache: ${cacheStoreError.message}`);
+        await this.close();
+      }
+    }
 
     // Save to database if productId provided
     if (productId && scrapedData) {
@@ -442,7 +749,9 @@ class HybridScraper {
       tier,
       cost,
       retailer: retailerLabel,
-      retailerKey: retailerKey || retailerLabel
+      retailerKey: retailerKey || retailerLabel,
+      responseTime,
+      cacheHit
     };
   }
 
@@ -460,6 +769,23 @@ class HybridScraper {
 
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
+
+      // Detect platform for unknown retailers (optimize selector set)
+      let optimizedSelectors = retailer.selectors;
+      let detectedPlatform = null;
+      
+      if (retailer.name === 'Universal (Auto-detect)') {
+        detectedPlatform = await this.detectPlatform(page);
+        if (detectedPlatform.confidence >= 50) {
+          optimizedSelectors = this.getOptimizedSelectors(detectedPlatform.platform, retailer.selectors);
+          // Track platform detection stats
+          if (this.stats.platformDetections[detectedPlatform.platform] !== undefined) {
+            this.stats.platformDetections[detectedPlatform.platform]++;
+          } else {
+            this.stats.platformDetections.unknown++;
+          }
+        }
+      }
 
       const productData = await page.evaluate((selectors) => {
         // Helper function to try multiple selectors
@@ -821,7 +1147,13 @@ class HybridScraper {
         });
 
         return payload;
-      }, retailer.selectors);
+      }, optimizedSelectors);
+
+      // Add platform detection info to result if detected
+      if (detectedPlatform && productData) {
+        productData.detectedPlatform = detectedPlatform.platform;
+        productData.platformConfidence = detectedPlatform.confidence;
+      }
 
       await page.close();
       return productData;
@@ -889,6 +1221,7 @@ class HybridScraper {
 
   /**
    * Get scraping statistics
+   * Now includes adaptive throttling metrics + Sprint 2.9 features
    */
   getStats() {
     const successRate = this.stats.total > 0 
@@ -897,6 +1230,10 @@ class HybridScraper {
     
     const avgCost = this.stats.total > 0
       ? (this.stats.totalCost / this.stats.total).toFixed(4)
+      : 0;
+
+    const cacheHitRate = this.stats.total > 0
+      ? ((this.stats.httpCacheHits / this.stats.total) * 100).toFixed(1)
       : 0;
 
     return {
@@ -910,9 +1247,18 @@ class HybridScraper {
         direct: this.stats.directSuccess,
         freeProxy: this.stats.freeProxySuccess,
         paidProxy: this.stats.paidProxySuccess,
-        aiVision: this.stats.aiVisionSuccess
+        aiVision: this.stats.aiVisionSuccess,
+        httpCache: this.stats.httpCacheHits
       },
-      proxyPoolStats: this.proxyPool.getStats()
+      sprint29Features: {
+        httpCacheHits: this.stats.httpCacheHits,
+        cacheHitRate: `${cacheHitRate}%`,
+        platformDetections: this.stats.platformDetections,
+        browserProfiles: this.browserProfiles.getStats(),
+        adaptiveThrottling: this.throttler.getAllStats()
+      },
+      proxyPoolStats: this.proxyPool.getStats(),
+      throttlingStats: this.throttler.getAllStats()
     };
   }
 
