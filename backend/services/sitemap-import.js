@@ -102,19 +102,55 @@ class SitemapImportService {
         });
       }
 
+      console.log(`[SitemapImport] Starting FAST URL pre-filter...`);
+
+      sendProgress({
+        stage: 'pre-filtering',
+        message: 'Snelle URL analyse (categorie paginas filteren)...',
+        percentage: 15
+      });
+
+      // FAST PRE-FILTER: URL pattern analysis only (no browser, instant)
+      const productUrlCandidates = [];
+      const categoryPatterns = [
+        '/categor', '/collection', '/shop/', '/products/', '/zoeken',
+        '/search', '/filter', '/browse', '/overzicht', '/alle-',
+        '?page=', '&page=', '/page/', '?q=', '&q=',
+        '/tag/', '/tags/', '/brand/', '/brands/', '/merk/'
+      ];
+      
+      for (const url of candidateUrls) {
+        const urlLower = url.toLowerCase();
+        const isCategory = categoryPatterns.some(pattern => urlLower.includes(pattern));
+        
+        if (!isCategory) {
+          productUrlCandidates.push(url);
+        }
+      }
+      
+      console.log(`[SitemapImport] Fast pre-filter: ${candidateUrls.length} URLs → ${productUrlCandidates.length} potential products (${candidateUrls.length - productUrlCandidates.length} categories filtered)`);
+
+      sendProgress({
+        stage: 'pre-filtering',
+        message: `${productUrlCandidates.length} potentiële producten na snelle filtering`,
+        percentage: 20,
+        preScanFiltered: candidateUrls.length - productUrlCandidates.length,
+        candidateUrls: productUrlCandidates.length
+      });
+
       console.log(`[SitemapImport] Starting intelligent product detection with HybridScraper...`);
 
       sendProgress({
         stage: 'scanning',
         message: 'Intelligente scan gestart...',
-        percentage: 20
+        percentage: 25
       });
 
       const results = {
         created: 0,
         updated: 0,
         skipped: 0,
-        preScanFiltered: 0, // Category pages filtered by pre-scan
+        preScanFiltered: candidateUrls.length - productUrlCandidates.length, // Already filtered
         errors: [],
         products: [],
         scanned: 0,
@@ -130,27 +166,28 @@ class SitemapImportService {
 
       let productsFound = 0;
       
-      for (let i = 0; i < candidateUrls.length && productsFound < maxProducts; i++) {
+      // Use pre-filtered URLs instead of all candidate URLs
+      for (let i = 0; i < productUrlCandidates.length && productsFound < maxProducts; i++) {
         if (isCancelled()) {
           console.log('[SitemapImport] Cancellation detected before scanning URL index', i);
           results.cancelled = true;
           notifyCancelled({
-            percentage: Math.floor(20 + (i / candidateUrls.length) * 60),
+            percentage: Math.floor(25 + (i / productUrlCandidates.length) * 55),
             scanned: results.scanned,
             detectedProducts: results.detectedProducts
           });
           break;
         }
 
-        const url = candidateUrls[i];
+        const url = productUrlCandidates[i];
         results.scanned++;
         
-        // Calculate real-time percentage (20% reserved for final steps)
-        const scanProgress = Math.floor(20 + (i / candidateUrls.length) * 60);
+        // Calculate real-time percentage (25% to 80% for scanning)
+        const scanProgress = Math.floor(25 + (i / productUrlCandidates.length) * 55);
         
         sendProgress({
           stage: 'scanning',
-          message: `Scan ${i + 1}/${Math.min(candidateUrls.length, maxProducts)} - ${url.substring(0, 50)}...`,
+          message: `Scan ${i + 1}/${Math.min(productUrlCandidates.length, maxProducts)} - ${url.substring(0, 50)}...`,
           percentage: scanProgress,
           scanned: results.scanned,
           detectedProducts: results.detectedProducts,
@@ -158,16 +195,17 @@ class SitemapImportService {
           currentUrl: url
         });
         
-        console.log(`[SitemapImport] [${i+1}/${candidateUrls.length}] Scanning: ${url}`);
+        console.log(`[SitemapImport] [${i+1}/${productUrlCandidates.length}] Scraping: ${url}`);
 
         try {
-          const scrapedData = await this.scraper.scrapeProduct(url, null, null, null);
+          // Skip pre-scan in scrapeProduct (already done via URL patterns)
+          const scrapedData = await this.scraper.scrapeProduct(url, null, null, null, true);
 
           if (isCancelled()) {
             console.log('[SitemapImport] Cancellation detected after scraping URL', url);
             results.cancelled = true;
             notifyCancelled({
-              percentage: Math.floor(20 + (i / candidateUrls.length) * 60),
+              percentage: Math.floor(25 + (i / productUrlCandidates.length) * 55),
               scanned: results.scanned,
               detectedProducts: results.detectedProducts
             });
