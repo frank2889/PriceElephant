@@ -114,6 +114,7 @@ class SitemapImportService {
         created: 0,
         updated: 0,
         skipped: 0,
+        preScanFiltered: 0, // Category pages filtered by pre-scan
         errors: [],
         products: [],
         scanned: 0,
@@ -319,22 +320,41 @@ class SitemapImportService {
           }
 
         } catch (error) {
-          console.error(`[SitemapImport] Error scanning ${url}:`, error.message);
-          console.error(`[SitemapImport] Error stack:`, error.stack);
-          results.errors.push({
-            url,
-            error: error.message,
-            stack: error.stack?.substring(0, 200) // First 200 chars of stack
-          });
-          results.skipped++;
+          // Check if this is a pre-scan filter (category page detected)
+          const isPreScanFilter = error.message.includes('Not a product page');
           
-          sendProgress({
-            stage: 'scanning',
-            message: `⚠️ Error: ${error.message.substring(0, 50)}`,
-            percentage: scanProgress,
-            errors: results.errors.length,
-            lastError: error.message
-          });
+          if (isPreScanFilter) {
+            console.log(`[SitemapImport] 🔍 Pre-scan filtered: ${url} - ${error.message}`);
+            results.skipped++;
+            results.preScanFiltered++; // Track pre-scan filters separately
+            
+            sendProgress({
+              stage: 'scanning',
+              message: `🔍 Gefilterd: category/listing page`,
+              percentage: scanProgress,
+              scanned: results.scanned,
+              skipped: results.skipped,
+              preScanFiltered: results.preScanFiltered
+            });
+          } else {
+            // Real error (not a pre-scan filter)
+            console.error(`[SitemapImport] Error scanning ${url}:`, error.message);
+            console.error(`[SitemapImport] Error stack:`, error.stack);
+            results.errors.push({
+              url,
+              error: error.message,
+              stack: error.stack?.substring(0, 200) // First 200 chars of stack
+            });
+            results.skipped++;
+            
+            sendProgress({
+              stage: 'scanning',
+              message: `⚠️ Error: ${error.message.substring(0, 50)}`,
+              percentage: scanProgress,
+              errors: results.errors.length,
+              lastError: error.message
+            });
+          }
         }
       }
 
@@ -363,6 +383,7 @@ class SitemapImportService {
           created: results.created,
           updated: results.updated,
           skipped: results.skipped,
+          preScanFiltered: results.preScanFiltered,
           errors: results.errors.length
         }
       });
@@ -371,7 +392,8 @@ class SitemapImportService {
       console.log(`[SitemapImport] Scanned: ${results.scanned} URLs`);
       console.log(`[SitemapImport] Products detected: ${results.detectedProducts}`);
       console.log(`[SitemapImport] Created: ${results.created}, Updated: ${results.updated}`);
-      console.log(`[SitemapImport] Skipped: ${results.skipped}, Errors: ${results.errors.length}`);
+      console.log(`[SitemapImport] Skipped: ${results.skipped} (Pre-scan filtered: ${results.preScanFiltered})`);
+      console.log(`[SitemapImport] Errors: ${results.errors.length}`);
       console.log(`[SitemapImport] Scraping cost: €${results.scrapingStats.totalCost.toFixed(4)}`);
 
       return results;
