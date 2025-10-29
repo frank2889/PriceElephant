@@ -6,12 +6,11 @@
     "install": {
       "cmds": [
         "cd backend && npm install --production",
-        "cd backend && npx playwright install chromium --with-deps",
-        "cd backend && npx knex migrate:latest --knexfile knexfile.js"
+        "cd backend && npx playwright install chromium --with-deps"
       ]
     }
   },
   "start": {
-    "cmd": "cd backend && node server.js"
+    "cmd": "cd backend && npm run db:migrate && npm start"
   }
 }
