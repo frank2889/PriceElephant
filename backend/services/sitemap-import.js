@@ -65,8 +65,48 @@ class SitemapImportService {
         timeout: 15000
       });
 
-      const { sites } = await sitemap.fetch();
+      let { sites } = await sitemap.fetch();
       console.log(`[SitemapImport] Found ${sites.length} URLs in sitemap`);
+
+      // Check if this is a sitemap index (contains other sitemaps)
+      if (sites.length > 0 && sites[0].includes('.xml')) {
+        const firstUrl = sites[0];
+        // Check if URLs are sitemap files (not product URLs)
+        const isSitemapIndex = sites.every(url => 
+          url.endsWith('.xml') || url.includes('sitemap')
+        );
+        
+        if (isSitemapIndex) {
+          console.log(`[SitemapImport] 🔍 Detected sitemap index with ${sites.length} sub-sitemaps`);
+          
+          // Try to find product sitemap
+          const productSitemap = sites.find(url => 
+            url.includes('product') || 
+            url.includes('artikel') || 
+            url.includes('items')
+          );
+          
+          if (productSitemap) {
+            console.log(`[SitemapImport] ✅ Found product sitemap: ${productSitemap}`);
+            sendProgress({
+              stage: 'parsing',
+              message: `Sitemap index gedetecteerd, gebruik product sitemap...`,
+              percentage: 8
+            });
+            
+            // Fetch the product sitemap
+            const productSitemapParser = new SitemapperClass({
+              url: productSitemap,
+              timeout: 15000
+            });
+            const productResult = await productSitemapParser.fetch();
+            sites = productResult.sites;
+            console.log(`[SitemapImport] Found ${sites.length} product URLs in ${productSitemap}`);
+          } else {
+            console.log(`[SitemapImport] ⚠️ No product sitemap found, using all sub-sitemaps`);
+          }
+        }
+      }
 
       sendProgress({
         stage: 'parsing',
