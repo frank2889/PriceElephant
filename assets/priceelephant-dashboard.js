@@ -576,9 +576,12 @@
     }
   }
 
-  async function loadProducts(searchTerm) {
+  async function loadProducts(searchTerm, page = 1) {
     setApiStatus('products', 'loading');
-    const params = new URLSearchParams({ limit: '50' });
+    const params = new URLSearchParams({ 
+      limit: '20', // 20 producten per pagina
+      offset: String((page - 1) * 20)
+    });
     if (searchTerm) {
       params.set('search', searchTerm);
     }
@@ -586,8 +589,9 @@
     try {
       const data = await apiFetch(`/api/v1/products/${customerId}?${params.toString()}`, { method: 'GET' });
       state.products = data?.products || [];
-      state.pagination = data?.pagination || null;
+      state.pagination = data?.pagination || { page, limit: 20, total: state.products.length };
       renderProducts();
+      renderPagination(page);
       setApiStatus('products', 'success');
     } catch (error) {
       console.log('[loadProducts] Error (showing empty state):', error.message);
@@ -596,6 +600,77 @@
       productsEmptyState.textContent = 'Geen producten gevonden. Importeer producten via Channable of Sitemap.';
       setApiStatus('products', 'skip');
     }
+  }
+
+  function renderPagination(currentPage) {
+    const paginationEl = document.getElementById('pe-products-pagination');
+    if (!paginationEl) return;
+
+    const total = state.pagination?.total || 0;
+    const limit = state.pagination?.limit || 20;
+    const totalPages = Math.ceil(total / limit);
+
+    if (totalPages <= 1) {
+      paginationEl.hidden = true;
+      return;
+    }
+
+    paginationEl.hidden = false;
+    paginationEl.innerHTML = '';
+
+    // Previous button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pe-pagination__button';
+    prevBtn.textContent = '←';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => loadProducts(productSearchInput.value.trim(), currentPage - 1);
+    paginationEl.appendChild(prevBtn);
+
+    // Page buttons (max 7: 1 ... 4 5 6 ... 10)
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      
+      if (currentPage < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+
+    pages.forEach(page => {
+      if (page === '...') {
+        const span = document.createElement('span');
+        span.className = 'pe-pagination__info';
+        span.textContent = '...';
+        paginationEl.appendChild(span);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = 'pe-pagination__button';
+        if (page === currentPage) btn.classList.add('pe-pagination__button--active');
+        btn.textContent = page;
+        btn.onclick = () => loadProducts(productSearchInput.value.trim(), page);
+        paginationEl.appendChild(btn);
+      }
+    });
+
+    // Next button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pe-pagination__button';
+    nextBtn.textContent = '→';
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => loadProducts(productSearchInput.value.trim(), currentPage + 1);
+    paginationEl.appendChild(nextBtn);
+
+    // Info text
+    const info = document.createElement('span');
+    info.className = 'pe-pagination__info';
+    info.textContent = `Pagina ${currentPage} van ${totalPages}`;
+    paginationEl.appendChild(info);
   }
 
   async function openCompetitorManager(productId) {
@@ -796,6 +871,9 @@
       activeSitemapSource = eventSource;
 
       // Handle progress events
+      let lastProductRefresh = 0;
+      const PRODUCT_REFRESH_INTERVAL = 3000; // Refresh elke 3 seconden
+
       eventSource.addEventListener('progress', (event) => {
         const data = JSON.parse(event.data);
         console.log('[SSE Progress]', data);
@@ -821,6 +899,16 @@
         progressText.textContent = data.message || 'Bezig...';
         updateDebug('sitemap', `Progress ${data.percentage || 0}% · scanned ${data.scanned || 0}`);
 
+        // LIVE UPDATE: Refresh productenlijst elke 3 seconden
+        const now = Date.now();
+        if (data.created > 0 && now - lastProductRefresh > PRODUCT_REFRESH_INTERVAL) {
+          lastProductRefresh = now;
+          console.log('[SSE] Refreshing product list...');
+          loadProducts(productSearchInput.value.trim()).catch(err => {
+            console.warn('[SSE] Product refresh failed:', err.message);
+          });
+        }
+
         // Show last error if available
         if (data.lastError) {
           console.error('[Scraper Error]', data.lastError);
@@ -834,7 +922,7 @@
 
         // Update debug info
         if (data.scanned) {
-          updateDebug('action', `📊 Scan: ${data.scanned} | Detected: ${data.detectedProducts || 0} | Errors: ${data.errors || 0}`);
+          updateDebug('action', `📊 Scan: ${data.scanned} | Detected: ${data.detectedProducts || 0} | Created: ${data.created || 0} | Errors: ${data.errors || 0}`);
         }
       });
 

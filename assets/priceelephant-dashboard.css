@@ -185,6 +185,55 @@
   text-align: center;
 }
 
+.pe-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 0;
+  margin-top: 16px;
+}
+
+.pe-pagination__button {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--pe-border);
+  background: var(--pe-card-bg);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pe-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pe-pagination__button:hover {
+  background: #f5f3ff;
+  border-color: var(--pe-primary);
+}
+
+.pe-pagination__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pe-pagination__button--active {
+  background: var(--pe-primary);
+  color: white;
+  border-color: var(--pe-primary);
+}
+
+.pe-pagination__button--active:hover {
+  background: var(--pe-primary-dark);
+}
+
+.pe-pagination__info {
+  font-size: 14px;
+  color: var(--pe-text-muted);
+  margin: 0 8px;
+}
+
 .pe-alert {
   border-radius: 12px;
   padding: 12px;
