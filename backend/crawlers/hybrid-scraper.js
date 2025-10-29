@@ -498,12 +498,6 @@ class HybridScraper {
       ]
     };
 
-    // Use system Chromium on Railway/Render if available
-    if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
-      launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-      console.log(`🌐 Using system Chromium: ${launchOptions.executablePath}`);
-    }
-
     // Add proxy if provided
     if (proxyConfig && proxyConfig.proxy) {
       launchOptions.proxy = proxyConfig.proxy;

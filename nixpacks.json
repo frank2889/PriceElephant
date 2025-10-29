@@ -1,15 +1,12 @@
 {
   "phases": {
     "setup": {
-      "nixPkgs": ["nodejs-18_x"],
-      "aptPkgs": ["chromium", "chromium-driver"]
+      "nixPkgs": ["nodejs-18_x"]
     },
     "install": {
       "cmds": [
-        "echo 'Checking for package-lock.json...'",
-        "ls -la package*.json",
         "npm install --production",
-        "npx playwright install-deps chromium"
+        "npx playwright install chromium --with-deps"
       ]
     }
   },
@@ -17,7 +14,6 @@
     "cmd": "node server.js"
   },
   "variables": {
-    "NIXPACKS_BUILD_DIR": "backend",
-    "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": "/usr/bin/chromium"
+    "NIXPACKS_BUILD_DIR": "backend"
   }
 }
