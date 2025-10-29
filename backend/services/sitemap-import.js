@@ -176,7 +176,7 @@ class SitemapImportService {
 
           const existing = await db('products')
             .where({ 
-              customer_id: this.customerId,
+              shopify_customer_id: this.customerId,
               product_url: url
             })
             .first();
@@ -207,7 +207,7 @@ class SitemapImportService {
             console.log(`[SitemapImport] Updated: ${scrapedData.title}${scrapedData.discountPercentage ? ` (-${scrapedData.discountPercentage}%)` : ''}`);
           } else {
             const [newProduct] = await db('products').insert({
-              customer_id: this.customerId,
+              shopify_customer_id: this.customerId,
               product_name: scrapedData.title,
               product_ean: null,
               product_sku: null,

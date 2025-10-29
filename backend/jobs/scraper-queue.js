@@ -116,14 +116,14 @@ async function queueAllProducts(customerId = null) {
     .select(
       'p.id as productId',
       'p.product_ean as ean',
-      'p.customer_id as customerId',
+      'p.shopify_customer_id as customerId',
       'mc.retailer',
       'mc.competitor_url as url'
     )
     .where('mc.competitor_url', '!=', '');
   
   if (customerId) {
-    query = query.where('p.customer_id', customerId);
+    query = query.where('p.shopify_customer_id', customerId);
   }
   
   const products = await query;
