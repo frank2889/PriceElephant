@@ -28,6 +28,8 @@ class HybridScraper {
     this.httpCache = new HttpCacheManager({ verbose: true });
     this.browser = null;
     this.context = null;
+    this.browserInitialized = false;
+    this.browserLock = null; // Prevent concurrent browser launches
     
     // Retailer configurations
     this.retailers = {
@@ -485,51 +487,77 @@ class HybridScraper {
    * Initialize browser with proxy config
    */
   async init(proxyConfig = null) {
-    // Get random browser profile for unique fingerprint
-    const profile = this.browserProfiles.getRandomProfile();
-    
-    const launchOptions = {
-      headless: true,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox',
-        '--disable-web-security'
-      ]
-    };
-
-    // Add proxy if provided
-    if (proxyConfig && proxyConfig.proxy) {
-      launchOptions.proxy = proxyConfig.proxy;
-      console.log(`✅ Using ${proxyConfig.tier} proxy (cost: €${proxyConfig.cost}/req) + ${profile.type} profile`);
-    } else {
-      console.log(`🚀 Direct scraping (no proxy) + ${profile.type} profile`);
+    // Reuse existing browser if already initialized
+    if (this.browserInitialized && this.browser) {
+      console.log('♻️ Reusing existing browser instance');
+      return;
     }
 
-    this.browser = await chromium.launch(launchOptions);
+    // Prevent concurrent browser launches
+    if (this.browserLock) {
+      console.log('⏳ Waiting for existing browser initialization...');
+      await this.browserLock;
+      return;
+    }
 
-    this.context = await this.browser.newContext({
-      userAgent: profile.userAgent,
-      viewport: profile.viewport,
-      locale: 'nl-NL',
-      timezoneId: 'Europe/Amsterdam',
-      extraHTTPHeaders: profile.headers
-    });
+    // Create lock promise
+    let releaseLock;
+    this.browserLock = new Promise(resolve => { releaseLock = resolve; });
 
-    // Resource blocking: block images, stylesheets, fonts, media
-    // Target: 50%+ page load speed improvement
-    await this.context.route('**/*', (route) => {
-      const resourceType = route.request().resourceType();
-      const blockedTypes = ['image', 'stylesheet', 'font', 'media'];
+    try {
+      // Get random browser profile for unique fingerprint
+      const profile = this.browserProfiles.getRandomProfile();
       
-      if (blockedTypes.includes(resourceType)) {
-        // Abort blocked resources
-        route.abort();
+      const launchOptions = {
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--disable-dev-shm-usage',
+          '--no-sandbox',
+          '--disable-web-security',
+          '--disable-gpu', // Reduce memory usage on Railway
+          '--single-process' // Critical: prevent process spawning issues
+        ]
+      };
+
+      // Add proxy if provided
+      if (proxyConfig && proxyConfig.proxy) {
+        launchOptions.proxy = proxyConfig.proxy;
+        console.log(`✅ Using ${proxyConfig.tier} proxy (cost: €${proxyConfig.cost}/req) + ${profile.type} profile`);
       } else {
-        // Allow HTML, scripts, XHR, fetch (needed for scraping)
-        route.continue();
+        console.log(`🚀 Direct scraping (no proxy) + ${profile.type} profile`);
       }
-    });
+
+      this.browser = await chromium.launch(launchOptions);
+      this.browserInitialized = true;
+
+      this.context = await this.browser.newContext({
+        userAgent: profile.userAgent,
+        viewport: profile.viewport,
+        locale: 'nl-NL',
+        timezoneId: 'Europe/Amsterdam',
+        extraHTTPHeaders: profile.headers
+      });
+
+      // Resource blocking: block images, stylesheets, fonts, media
+      // Target: 50%+ page load speed improvement
+      await this.context.route('**/*', (route) => {
+        const resourceType = route.request().resourceType();
+        const blockedTypes = ['image', 'stylesheet', 'font', 'media'];
+        
+        if (blockedTypes.includes(resourceType)) {
+          // Abort blocked resources
+          route.abort();
+        } else {
+          // Allow HTML, scripts, XHR, fetch (needed for scraping)
+          route.continue();
+        }
+      });
+    } finally {
+      // Release lock
+      releaseLock();
+      this.browserLock = null;
+    }
   }
 
   /**
@@ -1452,6 +1480,8 @@ class HybridScraper {
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
+      this.browserInitialized = false;
+      console.log('🔒 Browser closed and cleaned up');
     }
   }
 }

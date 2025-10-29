@@ -206,6 +206,9 @@ class SitemapImportService {
 
       let productsFound = 0;
       
+      // Rate limiting: wait between requests to avoid overwhelming Railway resources
+      const delayBetweenRequests = 2000; // 2 seconds between scrapes
+      
       // Use pre-filtered URLs instead of all candidate URLs
       for (let i = 0; i < productUrlCandidates.length && productsFound < maxProducts; i++) {
         if (isCancelled()) {
@@ -240,6 +243,11 @@ class SitemapImportService {
         try {
           // Skip pre-scan in scrapeProduct (already done via URL patterns)
           const scrapedData = await this.scraper.scrapeProduct(url, null, null, null, true);
+          
+          // Rate limiting: wait before next request
+          if (i < productUrlCandidates.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, delayBetweenRequests));
+          }
 
           if (isCancelled()) {
             console.log('[SitemapImport] Cancellation detected after scraping URL', url);
