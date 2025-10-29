@@ -8,7 +8,7 @@
         "npm install --production",
         "npm install knex",
         "npx playwright install chromium --with-deps",
-        "npx knex migrate:latest"
+        "cd /app && NODE_ENV=production DATABASE_URL=$DATABASE_URL npx knex migrate:latest --knexfile backend/knexfile.js"
       ]
     }
   },
