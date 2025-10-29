@@ -1,7 +1,22 @@
 {
+  "phases": {
+    "setup": {
+      "nixPkgs": ["nodejs-18_x"],
+      "aptPkgs": ["chromium", "chromium-driver"]
+    },
+    "install": {
+      "cmds": [
+        "npm ci --omit=dev",
+        "npx playwright install-deps chromium"
+      ]
+    }
+  },
+  "start": {
+    "cmd": "node server.js"
+  },
   "variables": {
     "NIXPACKS_BUILD_DIR": "backend",
-    "NPM_CONFIG_PRODUCTION": "false",
-    "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"
+    "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "0",
+    "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": "/usr/bin/chromium"
   }
 }

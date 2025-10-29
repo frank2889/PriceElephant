@@ -12,8 +12,7 @@
     "db:seed": "knex seed:run --knexfile knexfile.js",
     "db:reset": "npm run db:rollback && npm run db:migrate && npm run db:seed",
     "test": "NODE_ENV=test jest --coverage --runInBand",
-    "lint": "eslint .",
-    "postinstall": "echo 'Skipping Playwright install (handled in Dockerfile)'"
+    "lint": "eslint ."
   },
   "keywords": [
     "price-intelligence",
