@@ -71,6 +71,8 @@
   const selectedProductSku = document.getElementById('pe-selected-product-sku');
   const selectedProductEan = document.getElementById('pe-selected-product-ean');
   const selectedProductOwnPrice = document.getElementById('pe-selected-product-own-price');
+  const debugErrorList = document.getElementById('pe-debug-error-list');
+  const debugErrorCountEl = document.getElementById('pe-debug-error-count');
 
   // Variant management elements
   const variantsCard = document.getElementById('pe-variants-card');
@@ -90,6 +92,79 @@
     productLimit: null,
     isEnterprise: false,
   };
+
+  const DEBUG_ERROR_LIMIT = 12;
+  const debugErrors = [];
+
+  function renderDebugErrors() {
+    if (debugErrorCountEl) {
+      debugErrorCountEl.textContent = String(debugErrors.length);
+    }
+
+    if (!debugErrorList) {
+      return;
+    }
+
+    debugErrorList.innerHTML = '';
+
+    if (!debugErrors.length) {
+      const emptyRow = document.createElement('div');
+      emptyRow.style.color = '#475569';
+      emptyRow.textContent = 'Geen fouten geregistreerd.';
+      debugErrorList.appendChild(emptyRow);
+      return;
+    }
+
+    debugErrors.forEach((entry) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pe-debug-error-item';
+      wrapper.style.marginBottom = '4px';
+
+      const summary = document.createElement('div');
+      summary.textContent = `[${entry.time}] ${entry.stage ? `${entry.stage} · ` : ''}${entry.message}`;
+      wrapper.appendChild(summary);
+
+      if (entry.url) {
+        const link = document.createElement('a');
+        link.href = entry.url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.style.color = '#1d4ed8';
+        link.style.textDecoration = 'underline';
+        link.textContent = entry.url.length > 100 ? `${entry.url.slice(0, 97)}…` : entry.url;
+        wrapper.appendChild(link);
+      }
+
+      debugErrorList.appendChild(wrapper);
+    });
+  }
+
+  function addDebugError(entry) {
+    if (!entry || !entry.message) {
+      return;
+    }
+
+    const now = new Date();
+    debugErrors.unshift({
+      time: now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      stage: entry.stage || entry.type || '',
+      message: entry.message,
+      url: entry.url || entry.currentUrl || null
+    });
+
+    if (debugErrors.length > DEBUG_ERROR_LIMIT) {
+      debugErrors.splice(DEBUG_ERROR_LIMIT);
+    }
+
+    renderDebugErrors();
+  }
+
+  function resetDebugErrors() {
+    debugErrors.length = 0;
+    renderDebugErrors();
+  }
+
+  renderDebugErrors();
 
   const telemetry = {
     sitemapEvents: [],
@@ -661,6 +736,7 @@
 
     try {
       console.log('[handleSitemapImport] Setting up SSE stream...');
+      resetDebugErrors();
       
       // Show progress bar
       progressContainer.hidden = false;
@@ -689,12 +765,17 @@
         
         progressFill.style.width = `${data.percentage || 0}%`;
         progressText.textContent = data.message || 'Bezig...';
-  updateDebug('sitemap', `Progress ${data.percentage || 0}% · scanned ${data.scanned || 0}`);
+        updateDebug('sitemap', `Progress ${data.percentage || 0}% · scanned ${data.scanned || 0}`);
         
         // Show last error if available
         if (data.lastError) {
           console.error('[Scraper Error]', data.lastError);
           updateDebug('error', `⚠️ ${data.lastError}`);
+          addDebugError({
+            stage: data.stage || 'progress',
+            message: data.lastError,
+            url: data.currentUrl || null
+          });
         }
         
         // Update debug info
@@ -752,6 +833,24 @@
           updateDebug('action', `✅ Sitemap: ${results.detectedProducts} detected, ${results.created} imported`);
           updateDebug('sitemap', `Done · detected ${results.detectedProducts} · errors ${results.errors?.length || 0}`);
         }
+
+        if (results?.errors?.length) {
+          const sample = results.errors.slice(0, 5);
+          sample.forEach((item, index) => {
+            addDebugError({
+              stage: `final ${index + 1}/${results.errors.length}`,
+              message: item.error || item.message || 'Onbekende fout',
+              url: item.url || null
+            });
+          });
+
+          if (results.errors.length > sample.length) {
+            addDebugError({
+              stage: 'summary',
+              message: `+${results.errors.length - sample.length} extra errors verborgen (zie console/response)`
+            });
+          }
+        }
         
         await loadProducts(productSearchInput.value.trim());
         
@@ -772,30 +871,30 @@
           at: new Date().toISOString(),
           payload: event.data || null
         });
-        
+
         let errorData;
         try {
           errorData = JSON.parse(event.data);
         } catch (e) {
           errorData = { message: 'Verbinding verbroken' };
         }
-        
+
         eventSource.close();
-        
+
         progressFill.style.width = '100%';
         progressFill.style.background = 'var(--pe-danger)';
         progressText.textContent = '❌ Fout opgetreden';
-        
+
         showStatus(sitemapStatus, `Import mislukt: ${errorData.message || 'Onbekende fout'}`, 'error');
         updateDebug('error', `❌ Import: ${errorData.message}`);
-  updateDebug('sitemap', `Error · ${errorData.message || 'Onbekend'}`);
-        
+        updateDebug('sitemap', `Error · ${errorData.message || 'Onbekend'}`);
+
         setTimeout(() => {
           progressContainer.hidden = true;
           progressFill.style.width = '0%';
           progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
         }, 3000);
-        
+
         setLoading(sitemapImportBtn, false);
       });
 
@@ -807,20 +906,20 @@
           at: new Date().toISOString()
         });
         eventSource.close();
-        
+
         progressFill.style.width = '100%';
         progressFill.style.background = 'var(--pe-danger)';
         progressText.textContent = '❌ Verbinding verloren';
-        
+
         showStatus(sitemapStatus, 'Verbinding met server verloren', 'error');
-  updateDebug('sitemap', 'Error · verbinding verloren');
-        
+        updateDebug('sitemap', 'Error · verbinding verloren');
+
         setTimeout(() => {
           progressContainer.hidden = true;
           progressFill.style.width = '0%';
           progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
         }, 3000);
-        
+
         setLoading(sitemapImportBtn, false);
       };
       
@@ -833,7 +932,7 @@
       
       showStatus(sitemapStatus, `Import mislukt: ${error.message}`, 'error');
       updateDebug('error', `❌ Import: ${error.message}`);
-  updateDebug('sitemap', `Error · ${error.message}`);
+      updateDebug('sitemap', `Error · ${error.message}`);
       
       setTimeout(() => {
         progressContainer.hidden = true;
