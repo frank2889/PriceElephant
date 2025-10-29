@@ -8,6 +8,9 @@ const router = express.Router();
 const SitemapImportService = require('../services/sitemap-import');
 const db = require('../config/database');
 
+// Track active sitemap imports for cancellation support
+const activeSitemapImports = new Map();
+
 /**
  * POST /api/v1/sitemap/import
  * Import products from sitemap
@@ -147,6 +150,34 @@ router.get('/import-stream', async (req, res) => {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
+    const cancelKey = String(customerId);
+    if (activeSitemapImports.has(cancelKey)) {
+      console.warn('[Sitemap SSE] Import already running for customer', cancelKey);
+      sendEvent('error', {
+        error: 'Import already running',
+        message: 'Er draait al een sitemap import voor deze klant. Wacht tot deze is afgerond of stop de huidige import.'
+      });
+      res.end();
+      return;
+    }
+
+    const cancelToken = { cancelled: false, startedAt: Date.now() };
+    activeSitemapImports.set(cancelKey, cancelToken);
+
+    const cleanup = () => {
+      const current = activeSitemapImports.get(cancelKey);
+      if (current === cancelToken) {
+        activeSitemapImports.delete(cancelKey);
+      }
+    };
+
+    req.on('close', () => {
+      if (!cancelToken.cancelled) {
+        console.log('[Sitemap SSE] Client disconnected, cancelling import for', cancelKey);
+        cancelToken.cancelled = true;
+      }
+    });
+
     console.log('[Sitemap SSE] Starting import service...');
     const service = new SitemapImportService(customerId);
     
@@ -159,30 +190,48 @@ router.get('/import-stream', async (req, res) => {
       const results = await service.importFromSitemap(sitemapUrl, {
         maxProducts: parseInt(maxProducts) || 500,
         productUrlPattern: productUrlPattern || null,
-        onProgress
+        onProgress,
+        isCancelled: () => cancelToken.cancelled
       });
 
       console.log('[Sitemap SSE] ✅ Import completed:', {
         scanned: results.scanned,
         created: results.created,
         updated: results.updated,
-        errors: results.errors?.length || 0
+        errors: results.errors?.length || 0,
+        cancelled: results.cancelled || false
       });
 
-      // Send final results
-      sendEvent('complete', {
-        success: true,
-        results: {
-          created: results.created,
-          updated: results.updated,
-          skipped: results.skipped,
-          scanned: results.scanned,
-          detectedProducts: results.detectedProducts,
-          products: results.products,
-          scrapingStats: results.scrapingStats,
-          errors: results.errors
-        }
-      });
+      if (results.cancelled) {
+        sendEvent('cancelled', {
+          success: false,
+          cancelled: true,
+          results: {
+            scanned: results.scanned,
+            detectedProducts: results.detectedProducts,
+            created: results.created,
+            updated: results.updated,
+            skipped: results.skipped,
+            errors: results.errors,
+            scrapingStats: results.scrapingStats
+          }
+        });
+      } else {
+        // Send final results
+        sendEvent('complete', {
+          success: true,
+          results: {
+            created: results.created,
+            updated: results.updated,
+            skipped: results.skipped,
+            scanned: results.scanned,
+            detectedProducts: results.detectedProducts,
+            products: results.products,
+            scrapingStats: results.scrapingStats,
+            errors: results.errors
+          }
+        });
+      }
 
       res.end();
     } catch (error) {
@@ -198,6 +247,8 @@ router.get('/import-stream', async (req, res) => {
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
       res.end();
+    } finally {
+      cleanup();
     }
 
   } catch (error) {
@@ -209,6 +260,36 @@ router.get('/import-stream', async (req, res) => {
       error: 'Stream setup failed', 
       message: error.message 
     });
+  }
+});
+
+/**
+ * POST /api/v1/sitemap/import/cancel
+ * Request cancellation for an active sitemap import
+ */
+router.post('/import/cancel', async (req, res) => {
+  try {
+    const { customerId } = req.body || {};
+    const cancelKey = customerId ? String(customerId) : null;
+
+    if (!cancelKey) {
+      return res.status(400).json({ success: false, error: 'customerId is required' });
+    }
+
+    const token = activeSitemapImports.get(cancelKey);
+    if (!token) {
+      return res.status(404).json({ success: false, error: 'No active sitemap import for this customer' });
+    }
+
+    token.cancelled = true;
+    token.cancelledAt = Date.now();
+
+    console.log('[Sitemap SSE] Cancellation requested for', cancelKey);
+
+    return res.json({ success: true, message: 'Sitemap import cancellation requested' });
+  } catch (error) {
+    console.error('[Sitemap SSE] Cancel request failed:', error.message);
+    return res.status(500).json({ success: false, error: 'Failed to cancel sitemap import', message: error.message });
   }
 });
 

@@ -57,6 +57,7 @@
   const sitemapForm = document.getElementById('pe-sitemap-form');
   const sitemapStatus = document.getElementById('pe-sitemap-status');
   const sitemapImportBtn = document.getElementById('pe-sitemap-import');
+  const sitemapStopBtn = document.getElementById('pe-sitemap-stop');
   const manualForm = document.getElementById('pe-manual-form');
   const manualStatus = document.getElementById('pe-manual-status');
   const productSearchInput = document.getElementById('pe-product-search');
@@ -95,6 +96,8 @@
 
   const DEBUG_ERROR_LIMIT = 12;
   const debugErrors = [];
+  let activeSitemapSource = null;
+  let sitemapCancelRequested = false;
 
   function renderDebugErrors() {
     if (debugErrorCountEl) {
@@ -354,6 +357,28 @@
         button.textContent = button.dataset.originalText;
       }
       button.disabled = false;
+    }
+  }
+
+  function setSitemapRunning(running) {
+    if (!sitemapImportBtn) return;
+
+    if (running) {
+      setLoading(sitemapImportBtn, true);
+      sitemapImportBtn.hidden = true;
+      if (sitemapStopBtn) {
+        sitemapStopBtn.hidden = false;
+        sitemapStopBtn.disabled = false;
+        sitemapStopBtn.textContent = 'Stop import';
+      }
+    } else {
+      setLoading(sitemapImportBtn, false);
+      sitemapImportBtn.hidden = false;
+      if (sitemapStopBtn) {
+        sitemapStopBtn.hidden = true;
+        sitemapStopBtn.disabled = false;
+        sitemapStopBtn.textContent = 'Stop import';
+      }
     }
   }
 
@@ -716,12 +741,25 @@
     updateDebug('action', '🗺️ Importing from sitemap');
     
     showStatus(sitemapStatus, '', null);
-    setLoading(sitemapImportBtn, true);
+
+    if (activeSitemapSource) {
+      console.warn('[handleSitemapImport] Import already running');
+      showStatus(sitemapStatus, 'Er draait al een sitemap import. Stop deze eerst.', 'error');
+      updateDebug('error', '❌ Sitemap import already running');
+      return;
+    }
 
     // Get progress elements
     const progressContainer = document.getElementById('pe-sitemap-progress');
     const progressFill = document.getElementById('pe-sitemap-progress-fill');
     const progressText = document.getElementById('pe-sitemap-progress-text');
+
+    if (!progressContainer || !progressFill || !progressText) {
+      console.error('[handleSitemapImport] Progress UI elementen niet gevonden');
+      showStatus(sitemapStatus, 'Kan voortgang niet tonen: ontbrekende UI-elementen.', 'error');
+      updateDebug('error', '❌ Progress UI ontbreekt');
+      return;
+    }
 
     const formData = new FormData(sitemapForm);
     const sitemapUrl = formData.get('sitemapUrl')?.trim();
@@ -730,17 +768,19 @@
 
     if (!sitemapUrl) {
       showStatus(sitemapStatus, 'Vul eerst een sitemap URL in.', 'error');
-      setLoading(sitemapImportBtn, false);
       return;
     }
 
     try {
       console.log('[handleSitemapImport] Setting up SSE stream...');
       resetDebugErrors();
+      sitemapCancelRequested = false;
+      setSitemapRunning(true);
       
       // Show progress bar
       progressContainer.hidden = false;
       progressFill.style.width = '0%';
+      progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
       progressText.textContent = 'Verbinding maken...';
       
       // Use EventSource for real-time progress
@@ -753,6 +793,8 @@
         })
       );
 
+      activeSitemapSource = eventSource;
+
       // Handle progress events
       eventSource.addEventListener('progress', (event) => {
         const data = JSON.parse(event.data);
@@ -762,11 +804,23 @@
           at: new Date().toISOString(),
           payload: data
         });
-        
-        progressFill.style.width = `${data.percentage || 0}%`;
+
+        if (Number.isFinite(data.percentage)) {
+          const clamped = Math.max(5, Math.min(95, data.percentage));
+          progressFill.style.width = `${clamped}%`;
+        }
+
+        if (data.cancelled || data.stage === 'cancelled') {
+          progressFill.style.background = '#f97316';
+          progressText.textContent = data.message || '⏹️ Stopverzoek verwerkt...';
+          updateDebug('sitemap', `Stop aangevraagd · scanned ${data.scanned || 0}`);
+          return;
+        }
+
+        progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
         progressText.textContent = data.message || 'Bezig...';
         updateDebug('sitemap', `Progress ${data.percentage || 0}% · scanned ${data.scanned || 0}`);
-        
+
         // Show last error if available
         if (data.lastError) {
           console.error('[Scraper Error]', data.lastError);
@@ -777,11 +831,44 @@
             url: data.currentUrl || null
           });
         }
-        
+
         // Update debug info
         if (data.scanned) {
           updateDebug('action', `📊 Scan: ${data.scanned} | Detected: ${data.detectedProducts || 0} | Errors: ${data.errors || 0}`);
         }
+      });
+
+      eventSource.addEventListener('cancelled', (event) => {
+        const data = JSON.parse(event.data);
+        console.log('[SSE Cancelled]', data);
+        telemetry.push({
+          type: 'cancelled',
+          at: new Date().toISOString(),
+          payload: data
+        });
+
+        eventSource.close();
+        if (activeSitemapSource === eventSource) {
+          activeSitemapSource = null;
+        }
+
+        sitemapCancelRequested = false;
+
+        progressFill.style.width = `${data.results?.scanned ? Math.min(100, Math.floor(20 + (data.results.scanned / Math.max(1, maxProducts)) * 60)) : 100}%`;
+    progressFill.style.background = 'var(--pe-danger)';
+    progressText.textContent = '⏹️ Import gestopt';
+
+    showStatus(sitemapStatus, 'Import gestopt op verzoek van gebruiker.', 'success');
+        updateDebug('action', '🛑 Sitemap import gestopt');
+        updateDebug('sitemap', 'Gestopt · gebruiker annuleerde import');
+
+        setTimeout(() => {
+          progressContainer.hidden = true;
+          progressFill.style.width = '0%';
+          progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
+        }, 2000);
+
+        setSitemapRunning(false);
       });
 
       // Handle completion
@@ -795,6 +882,10 @@
         });
         
         eventSource.close();
+        if (activeSitemapSource === eventSource) {
+          activeSitemapSource = null;
+        }
+        sitemapCancelRequested = false;
         
         progressFill.style.width = '100%';
         progressText.textContent = '✅ Scan voltooid!';
@@ -858,9 +949,10 @@
         setTimeout(() => {
           progressContainer.hidden = true;
           progressFill.style.width = '0%';
+          progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
         }, 2000);
         
-        setLoading(sitemapImportBtn, false);
+        setSitemapRunning(false);
       });
 
       // Handle errors
@@ -880,6 +972,10 @@
         }
 
         eventSource.close();
+        if (activeSitemapSource === eventSource) {
+          activeSitemapSource = null;
+        }
+        sitemapCancelRequested = false;
 
         progressFill.style.width = '100%';
         progressFill.style.background = 'var(--pe-danger)';
@@ -895,7 +991,7 @@
           progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
         }, 3000);
 
-        setLoading(sitemapImportBtn, false);
+        setSitemapRunning(false);
       });
 
       // Handle connection errors
@@ -906,6 +1002,10 @@
           at: new Date().toISOString()
         });
         eventSource.close();
+        if (activeSitemapSource === eventSource) {
+          activeSitemapSource = null;
+        }
+        sitemapCancelRequested = false;
 
         progressFill.style.width = '100%';
         progressFill.style.background = 'var(--pe-danger)';
@@ -920,7 +1020,7 @@
           progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
         }, 3000);
 
-        setLoading(sitemapImportBtn, false);
+        setSitemapRunning(false);
       };
       
     } catch (error) {
@@ -940,7 +1040,65 @@
         progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
       }, 3000);
       
-      setLoading(sitemapImportBtn, false);
+      setSitemapRunning(false);
+      activeSitemapSource = null;
+      sitemapCancelRequested = false;
+    }
+  }
+
+  async function handleSitemapStop(event) {
+    if (event) {
+      event.preventDefault();
+    }
+
+    console.log('[handleSitemapStop] Triggered');
+
+    if (!sitemapStopBtn) {
+      return;
+    }
+
+    if (!activeSitemapSource) {
+      showStatus(sitemapStatus, 'Geen actieve import om te stoppen.', 'error');
+      return;
+    }
+
+    if (sitemapCancelRequested) {
+      showStatus(sitemapStatus, 'Stopverzoek is al verstuurd. Een moment geduld...', null);
+      return;
+    }
+
+    sitemapCancelRequested = true;
+    sitemapStopBtn.disabled = true;
+    sitemapStopBtn.textContent = 'Stoppen...';
+
+    updateDebug('action', '🛑 Stopverzoek versturen');
+    updateDebug('sitemap', 'Stop aangevraagd...');
+    telemetry.push({
+      type: 'cancel-request',
+      at: new Date().toISOString(),
+      payload: { customerId }
+    });
+
+    showStatus(sitemapStatus, 'Stopverzoek verstuurd. Wachten tot import stopt...', null);
+
+    try {
+      await apiFetch('/api/v1/sitemap/import/cancel', {
+        method: 'POST',
+        body: JSON.stringify({ customerId })
+      });
+
+      console.log('[handleSitemapStop] Cancel request acknowledged');
+      sitemapStopBtn.textContent = 'Stop aangevraagd...';
+      sitemapStopBtn.disabled = true;
+      updateDebug('action', '🛑 Stopverzoek verstuurd');
+    } catch (error) {
+      console.error('[handleSitemapStop] ERROR:', error);
+      sitemapCancelRequested = false;
+      sitemapStopBtn.disabled = false;
+      sitemapStopBtn.textContent = 'Stop import';
+      showStatus(sitemapStatus, `Stoppen mislukt: ${error.message}`, 'error');
+      addDebugError({ stage: 'cancel', message: `Stoppen mislukt: ${error.message}` });
+      updateDebug('error', `❌ Stoppen mislukt: ${error.message}`);
     }
   }
 
@@ -1195,6 +1353,12 @@
     if (sitemapImportBtn) {
       sitemapImportBtn.addEventListener('click', handleSitemapImport);
       console.log('[PriceElephant] Sitemap import button listener attached');
+      listenersCount++;
+    }
+
+    if (sitemapStopBtn) {
+      sitemapStopBtn.addEventListener('click', handleSitemapStop);
+      console.log('[PriceElephant] Sitemap stop button listener attached');
       listenersCount++;
     }
     

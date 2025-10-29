@@ -37,7 +37,8 @@ class SitemapImportService {
     const {
       maxProducts = 500,
       productUrlPattern = null,
-      onProgress = null
+      onProgress = null,
+      isCancelled = () => false
     } = options;
 
     console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
@@ -73,6 +74,18 @@ class SitemapImportService {
         percentage: 10,
         totalUrls: sites.length
       });
+
+      let cancellationNotified = false;
+      const notifyCancelled = (payload = {}) => {
+        if (cancellationNotified) return;
+        cancellationNotified = true;
+        sendProgress({
+          stage: 'cancelled',
+          message: 'Import gestopt op verzoek van gebruiker',
+          cancelled: true,
+          ...payload
+        });
+      };
 
       let candidateUrls = sites;
       
@@ -117,6 +130,17 @@ class SitemapImportService {
       let productsFound = 0;
       
       for (let i = 0; i < candidateUrls.length && productsFound < maxProducts; i++) {
+        if (isCancelled()) {
+          console.log('[SitemapImport] Cancellation detected before scanning URL index', i);
+          results.cancelled = true;
+          notifyCancelled({
+            percentage: Math.floor(20 + (i / candidateUrls.length) * 60),
+            scanned: results.scanned,
+            detectedProducts: results.detectedProducts
+          });
+          break;
+        }
+
         const url = candidateUrls[i];
         results.scanned++;
         
@@ -137,8 +161,27 @@ class SitemapImportService {
 
         try {
           const scrapedData = await this.scraper.scrapeProduct(url, null, null, null);
+
+          if (isCancelled()) {
+            console.log('[SitemapImport] Cancellation detected after scraping URL', url);
+            results.cancelled = true;
+            notifyCancelled({
+              percentage: Math.floor(20 + (i / candidateUrls.length) * 60),
+              scanned: results.scanned,
+              detectedProducts: results.detectedProducts
+            });
+            break;
+          }
           
           if (!scrapedData || !scrapedData.price || !scrapedData.title) {
+          if (results.cancelled && !cancellationNotified) {
+            notifyCancelled({
+              percentage: 100,
+              scanned: results.scanned,
+              detectedProducts: results.detectedProducts
+            });
+          }
+
             console.log(`[SitemapImport] ❌ Not a product page (no price/title found)`);
             results.skipped++;
             
