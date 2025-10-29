@@ -256,6 +256,8 @@ class HybridScraper {
       httpCacheHits: 0,
       failures: 0,
       totalCost: 0,
+      preScanFiltered: 0, // URLs filtered out by pre-scan (category pages)
+      preScanPassed: 0,   // URLs that passed pre-scan (product pages)
       platformDetections: {
         shopify: 0,
         magento: 0,
@@ -531,10 +533,179 @@ class HybridScraper {
   }
 
   /**
-   * Scrape product with multi-tier fallback strategy
-   * Now with adaptive throttling per retailer + HTTP caching
+   * Fast pre-scan to check if URL is a product page
+   * Checks URL patterns and does lightweight page analysis
+   * Returns: { isProduct: boolean, reason: string, confidence: number }
    */
-  async scrapeProduct(url, ean = null, retailerKey = null, productId = null) {
+  async isProductPage(url) {
+    try {
+      // 1. URL Pattern Analysis (instant, no page load)
+      const urlLower = url.toLowerCase();
+      
+      // Category/listing page indicators in URL
+      const categoryPatterns = [
+        '/categor', '/collection', '/shop/', '/products/', '/zoeken',
+        '/search', '/filter', '/browse', '/overzicht', '/alle-',
+        '?page=', '&page=', '/page/', '/p/', '?q=', '&q=',
+        '/tag/', '/tags/', '/brand/', '/brands/', '/merk/'
+      ];
+      
+      const hasCategory = categoryPatterns.some(pattern => urlLower.includes(pattern));
+      
+      if (hasCategory) {
+        return { 
+          isProduct: false, 
+          reason: 'URL pattern indicates category/listing page',
+          confidence: 85,
+          method: 'url-pattern'
+        };
+      }
+      
+      // Product page indicators in URL
+      const productPatterns = [
+        '/product/', '/p/', '/pd/', '/item/', '/dp/',
+        '.html', '-p-', '/detail/', '/artikel/'
+      ];
+      
+      const hasProduct = productPatterns.some(pattern => urlLower.includes(pattern));
+      
+      if (hasProduct) {
+        return { 
+          isProduct: true, 
+          reason: 'URL pattern indicates product page',
+          confidence: 70,
+          method: 'url-pattern'
+        };
+      }
+      
+      // 2. Lightweight HEAD request check (fast, no full page load)
+      const proxyConfig = await this.proxyPool.getNextProxy();
+      await this.init(proxyConfig);
+      const page = await this.context.newPage();
+      
+      try {
+        // Navigate but don't wait for full load
+        await page.goto(url, { 
+          waitUntil: 'domcontentloaded', 
+          timeout: 5000 
+        });
+        
+        // Quick DOM analysis (< 100ms)
+        const pageType = await page.evaluate(() => {
+          // Check for product schema
+          const productSchema = document.querySelector('script[type="application/ld+json"]');
+          if (productSchema) {
+            try {
+              const data = JSON.parse(productSchema.textContent);
+              const hasProduct = JSON.stringify(data).includes('"@type":"Product"');
+              if (hasProduct) return { type: 'product', confidence: 95 };
+            } catch (e) {}
+          }
+          
+          // Check for multiple product cards (= listing page)
+          const productCards = document.querySelectorAll('[data-product-id], .product-card, .product-item, article.product, [itemtype*="Product"]');
+          if (productCards.length > 3) {
+            return { type: 'listing', confidence: 90 };
+          }
+          
+          // Check for single product price
+          const priceElements = document.querySelectorAll('[itemprop="price"], .price, [data-price], .product-price');
+          if (priceElements.length === 1 || priceElements.length === 2) {
+            return { type: 'product', confidence: 75 };
+          }
+          
+          // Check for pagination (= listing page)
+          const pagination = document.querySelector('.pagination, [class*="paging"], nav[aria-label*="pagination"]');
+          if (pagination) {
+            return { type: 'listing', confidence: 85 };
+          }
+          
+          // Check for add-to-cart button (= product page)
+          const addToCart = document.querySelector('[data-add-to-cart], .add-to-cart, button[type="submit"][name*="add"], input[name="add-to-cart"]');
+          if (addToCart) {
+            return { type: 'product', confidence: 80 };
+          }
+          
+          // Check title/h1
+          const h1 = document.querySelector('h1');
+          const title = h1?.textContent?.toLowerCase() || '';
+          if (title.includes('categor') || title.includes('collectie') || title.includes('overzicht')) {
+            return { type: 'listing', confidence: 70 };
+          }
+          
+          // Default: uncertain
+          return { type: 'unknown', confidence: 0 };
+        });
+        
+        await page.close();
+        await this.close();
+        
+        if (pageType.type === 'product') {
+          return {
+            isProduct: true,
+            reason: 'DOM analysis confirms product page',
+            confidence: pageType.confidence,
+            method: 'dom-analysis'
+          };
+        } else if (pageType.type === 'listing') {
+          return {
+            isProduct: false,
+            reason: 'DOM analysis indicates listing/category page',
+            confidence: pageType.confidence,
+            method: 'dom-analysis'
+          };
+        }
+        
+        // Uncertain - allow scraping but flag it
+        return {
+          isProduct: true, // Default to true to avoid false negatives
+          reason: 'Could not determine page type, proceeding with caution',
+          confidence: 50,
+          method: 'fallback'
+        };
+        
+      } catch (error) {
+        await page.close();
+        await this.close();
+        
+        // On error, default to true (don't skip potential products)
+        return {
+          isProduct: true,
+          reason: `Pre-scan failed: ${error.message}`,
+          confidence: 0,
+          method: 'error-fallback'
+        };
+      }
+      
+    } catch (error) {
+      console.warn(`⚠️ Pre-scan error: ${error.message}`);
+      return {
+        isProduct: true,
+        reason: 'Pre-scan unavailable, assuming product page',
+        confidence: 0,
+        method: 'error'
+      };
+    }
+  }
+
+  /**
+   * Scrape product with multi-tier fallback strategy
+   * Now with adaptive throttling per retailer + HTTP caching + product page pre-scan
+   */
+  async scrapeProduct(url, ean = null, retailerKey = null, productId = null, skipPreScan = false) {
+    // FAST PRE-SCAN: Check if this is actually a product page
+    if (!skipPreScan) {
+      const preScan = await this.isProductPage(url);
+      console.log(`🔍 Pre-scan: ${preScan.isProduct ? '✅ Product' : '❌ Not product'} (${preScan.confidence}% confidence, ${preScan.reason})`);
+      
+      if (!preScan.isProduct && preScan.confidence >= 70) {
+        this.stats.preScanFiltered++; // Track filtered URLs
+        throw new Error(`Not a product page: ${preScan.reason} (confidence: ${preScan.confidence}%)`);
+      }
+      
+      this.stats.preScanPassed++; // Track passed URLs
+    }
+    
     // Auto-detect retailer from URL if not provided
     if (!retailerKey) {
       retailerKey = this.detectRetailerFromUrl(url);
@@ -1236,6 +1407,11 @@ class HybridScraper {
       ? ((this.stats.httpCacheHits / this.stats.total) * 100).toFixed(1)
       : 0;
 
+    const preScanTotal = this.stats.preScanFiltered + this.stats.preScanPassed;
+    const preScanFilterRate = preScanTotal > 0
+      ? ((this.stats.preScanFiltered / preScanTotal) * 100).toFixed(1)
+      : 0;
+
     return {
       total: this.stats.total,
       success: this.stats.total - this.stats.failures,
@@ -1253,6 +1429,9 @@ class HybridScraper {
       sprint29Features: {
         httpCacheHits: this.stats.httpCacheHits,
         cacheHitRate: `${cacheHitRate}%`,
+        preScanFiltered: this.stats.preScanFiltered,
+        preScanPassed: this.stats.preScanPassed,
+        preScanFilterRate: `${preScanFilterRate}%`,
         platformDetections: this.stats.platformDetections,
         browserProfiles: this.browserProfiles.getStats(),
         adaptiveThrottling: this.throttler.getAllStats()
