@@ -58,6 +58,25 @@
 - **Definition of Done:** ✅ Successfully scraping hifi.eu without AI Vision (deployed October 30, 2025)
 - **Learning Sources:** CSS (universal), AI Vision (auto-discovered), Manual (inspected)
 
+✅ **Sprint 2.11 (Sitemap Import Intelligence)** - COMPLETE ✅
+- **Orphaned Products Cleanup:**
+  - Auto-cleanup script compares database vs Shopify
+  - Removes products deleted in Shopify but still in database
+  - Runs automatically before each sitemap import
+  - Manual execution: `node cleanup-orphaned-products.js <customerId>`
+- **Progress Tracking & Resume:**
+  - Database columns: `last_scraped_page`, `last_import_at`, `total_pages_scraped`
+  - Auto-saves progress after each import completes
+  - Auto-resumes from last position on next import
+  - Manual reset option: `resetProgress: true` to start fresh
+  - Manual jump: `resumeFromPage: N` to skip to specific index
+- **Benefits:**
+  - No duplicate processing of URLs
+  - Handles interrupted imports gracefully
+  - Prevents orphaned product accumulation
+  - Reduces import time on resume
+- **Definition of Done:** ✅ Sitemap imports track progress and resume automatically (deployed October 30, 2025)
+
 ### **What's Next (Immediate Priorities):**
 
 � **Sprint 3: Email Automation** - READY TO START (HIGH PRIORITY)
