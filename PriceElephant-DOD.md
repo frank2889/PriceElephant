@@ -41,13 +41,21 @@
 - Browser profile rotation
 - Adaptive throttling system
 
-✅ **Sprint 2.10 (Self-Learning Scraper)** - COMPLETE
-- Database table for learned CSS selectors (`learned_selectors`)
-- SelectorLearning service (280 lines) for saving/retrieving successful selectors
-- HybridScraper integration: tries learned selectors first (95%+ free success rate)
-- AI Vision selector extraction: discovers CSS selectors after AI scrape for future reuse
-- Manual selector addition tools for known domains
+✅ **Sprint 2.10 (Self-Learning Scraper + HTTP Bypass)** - COMPLETE ✅
+- **Self-Learning System:**
+  - Database table for learned CSS selectors (`learned_selectors`)
+  - SelectorLearning service (280 lines) for saving/retrieving successful selectors
+  - HybridScraper integration: tries learned selectors first (95%+ free success rate)
+  - AI Vision selector extraction: discovers CSS selectors after AI scrape for future reuse
+  - Manual selector addition tools for known domains
+- **HTTP-Only Scraper (Tier 0):**
+  - Bypasses Cloudflare Bot Management (no browser fingerprint)
+  - Extracts prices from meta tags, JSON-LD, and Magento inline data
+  - 77ms response time (vs 30s timeout in browsers)
+  - Successfully scrapes hifi.eu and other anti-bot sites
+  - Zero cost - no proxy, no AI Vision needed
 - **Cost Impact:** hifi.eu now scrapes at €0.00 instead of €0.02 per product (100% reduction)
+- **Definition of Done:** ✅ Successfully scraping hifi.eu without AI Vision
 - **Learning Sources:** CSS (universal), AI Vision (auto-discovered), Manual (inspected)
 
 ### **What's Next (Immediate Priorities):**
