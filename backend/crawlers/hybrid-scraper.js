@@ -619,7 +619,7 @@ class HybridScraper {
       const categoryPatterns = [
         '/categor', '/collection', '/shop/', '/products/', '/zoeken',
         '/search', '/filter', '/browse', '/overzicht', '/alle-',
-        '?page=', '&page=', '/page/', '/p/', '?q=', '&q=',
+        '?page=', '&page=', '/page/', '?q=', '&q=',
         '/tag/', '/tags/', '/brand/', '/brands/', '/merk/'
       ];
       
@@ -637,10 +637,17 @@ class HybridScraper {
       // Product page indicators in URL
       const productPatterns = [
         '/product/', '/p/', '/pd/', '/item/', '/dp/',
-        '.html', '-p-', '/detail/', '/artikel/'
+        '.html', '-p-', '/detail/', '/artikel/',
+        /\/\d{10,}\/$/, // Bol.com pattern: /9300000191149238/
+        /\/p\/[^\/]+\/\d+/, // Generic /p/name/id pattern
       ];
       
-      const hasProduct = productPatterns.some(pattern => urlLower.includes(pattern));
+      const hasProduct = productPatterns.some(pattern => {
+        if (pattern instanceof RegExp) {
+          return pattern.test(url);
+        }
+        return urlLower.includes(pattern);
+      });
       
       if (hasProduct) {
         return { 
