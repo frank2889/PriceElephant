@@ -9,6 +9,7 @@
 const HybridScraper = require('../crawlers/hybrid-scraper');
 const db = require('../config/database');
 const ShopifyIntegration = require('../integrations/shopify');
+const cleanupOrphanedProducts = require('../scripts/cleanup-orphaned-products');
 
 // Dynamic import for ES Module compatibility
 let Sitemapper;
@@ -38,11 +39,33 @@ class SitemapImportService {
       maxProducts = 500,
       productUrlPattern = null,
       onProgress = null,
-      isCancelled = () => false
+      isCancelled = () => false,
+      resumeFromPage = null // NEW: Resume from specific page
     } = options;
 
     console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
     console.log(`[SitemapImport] Max products target: ${maxProducts}`);
+
+    // Step 1: Cleanup orphaned products BEFORE import
+    console.log(`[SitemapImport] 🧹 Step 1: Cleaning up orphaned products...`);
+    sendProgress({
+      stage: 'cleanup',
+      message: 'Verwijderen van verouderde producten...',
+      percentage: 2
+    });
+    
+    try {
+      const cleanupResults = await cleanupOrphanedProducts(this.customerId);
+      console.log(`[SitemapImport] ✅ Cleanup complete: deleted ${cleanupResults.deleted} orphaned products`);
+      sendProgress({
+        stage: 'cleanup',
+        message: `${cleanupResults.deleted} verouderde producten verwijderd`,
+        percentage: 5
+      });
+    } catch (cleanupError) {
+      console.error(`[SitemapImport] ⚠️ Cleanup warning: ${cleanupError.message}`);
+      // Continue with import even if cleanup fails
+    }
 
     // Helper to send progress updates
     const sendProgress = (data) => {
