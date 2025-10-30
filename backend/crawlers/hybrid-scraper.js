@@ -295,6 +295,44 @@ class HybridScraper {
   }
 
   /**
+   * Clean URL by removing tracking and anti-bot triggering parameters
+   * Many sites (especially Magento) flag URLs with tracking params as bots
+   * @param {string} url - Original URL
+   * @returns {string} Cleaned URL
+   */
+  cleanUrlForScraping(url) {
+    try {
+      const urlObj = new URL(url);
+      
+      // List of tracking parameters that trigger anti-bot detection
+      const trackingParams = [
+        'srsltid',      // Google Search result tracking
+        'gclid',        // Google Ads
+        'fbclid',       // Facebook
+        'msclkid',      // Microsoft Ads
+        'utm_source',   // UTM tracking
+        'utm_medium',
+        'utm_campaign',
+        'utm_term',
+        'utm_content',
+        '_ga',          // Google Analytics
+        'mc_cid',       // Mailchimp
+        'mc_eid'
+      ];
+      
+      // Remove tracking parameters
+      trackingParams.forEach(param => {
+        urlObj.searchParams.delete(param);
+      });
+      
+      return urlObj.toString();
+    } catch (error) {
+      // If URL parsing fails, return original
+      return url;
+    }
+  }
+
+  /**
    * Detect e-commerce platform from HTML
    * Analyzes meta tags, scripts, and URL patterns to identify platform
    * @param {Object} page - Playwright page instance
@@ -737,6 +775,13 @@ class HybridScraper {
       }
       
       this.stats.preScanPassed++; // Track passed URLs
+    }
+    
+    // Clean URL: Remove tracking parameters that trigger anti-bot detection
+    const cleanUrl = this.cleanUrlForScraping(url);
+    if (cleanUrl !== url) {
+      console.log(`🧹 Cleaned URL (removed tracking): ${url} -> ${cleanUrl}`);
+      url = cleanUrl;
     }
     
     // Auto-detect retailer from URL if not provided
