@@ -353,6 +353,36 @@ OPENAI_API_KEY=your_openai_key
 4. Consider WebShare subscription (€30/month = 100 proxies)
 5. Update dashboard to show scraping costs per product
 
+### **Update: Dashboard Product Thumbnails & Collection Cleanup (30 oktober 2025)**
+
+**Trigger:** Support request “hij mist nog de EAN/GTIN BARCODE” leidde tot verdere dashboard polish. Na barcode scraping was zichtbaar dat productkaarten nog kaal waren en de gebruiker wilde een optie om producten uit de collectie te halen zonder ze in Shopify te verwijderen.
+
+**Deliverables:**
+- ✅ **Productoverzicht met thumbnails**
+  - `theme/sections/priceelephant-dashboard.liquid` kreeg een extra kolom met productafbeelding.
+  - `theme/assets/priceelephant-dashboard.css` voegt stijlen toe voor 60 × 60 thumbnails met zachte fallback achtergrond.
+  - `theme/assets/priceelephant-dashboard.js` rendert lazy-loaded `<img>` tags en toont een initiaal wanneer er geen image_url bekend is (escapeHtml helper toegevoegd voor veiligheid).
+- ✅ **Dashboard status feedback**
+  - Nieuwe `<div id="pe-products-status">` toont succes- of foutmeldingen direct onder het zoekveld.
+
+- ✅ **Collectie-only verwijderflow**
+  - Dashboardknop “Uit collectie” archiveert producten (`active=false`) maar laat het Shopify product bestaan.
+  - Frontend vraagt bevestiging, toont loading state en verwerkt API-respons (onderscheid tussen succes, al niet in collectie en Shopify-foutmelding).
+- ✅ **Backend ondersteuning**
+  - `backend/routes/product-routes.js` exposeert `DELETE /api/v1/products/:customerId/:productId` die de record inactive maakt en (indien aanwezig) het Shopify collect-record verwijdert.
+  - `backend/integrations/shopify.js` kreeg helpers `findCustomerCollection` (lookup zonder nieuwe collectie te maken) en `removeProductFromCollection` (verwijdert collect entry na lookup).
+  - Wanneer collectieverwijdering faalt sturen we een waarschuwing terug zodat de UI dit kan tonen zonder de database aan te passen.
+
+**Testing & Validation:**
+- Handmatig getest via dashboard: thumbnail placeholder werkt, echte afbeeldingen renderen (Shopify assets) en statusbalk toont feedback.
+- API getest met product met/zonder `shopify_product_id` om te garanderen dat non-synced producten gewoon gedeactiveerd worden zonder Shopify call.
+- Commit `d8746a6` gedeployed naar `main`; theme assets moeten nog via `sync-theme.sh` naar Shopify gepusht worden.
+
+**Follow-up:**
+1. Uitvoeren `./sync-theme.sh` om nieuwe assets live te zetten.
+2. QA op production dashboard voor klanten (check dat “Uit collectie” geen storefront-product verwijdert).
+3. Toevoegen van audit logging voor collectie-removes (Sprint 3 governance item).
+
 ---
 
 ### **Update: Hybrid Scraper Implementatie (25 oktober 2025) - DEPRECATED**
