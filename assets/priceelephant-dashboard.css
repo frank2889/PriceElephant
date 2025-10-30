@@ -179,6 +179,41 @@
   background: #f9f5ff;
 }
 
+.pe-product-image-cell {
+  width: 80px;
+  padding-left: 20px;
+  padding-right: 12px;
+}
+
+.pe-product-thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  border: 1px solid var(--pe-border);
+  background: #f5f3ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--pe-primary-dark);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.4px;
+}
+
+.pe-product-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pe-button--small {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
 .pe-empty-state {
   padding: 24px;
   color: var(--pe-text-muted);

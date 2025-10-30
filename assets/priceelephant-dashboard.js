@@ -63,6 +63,7 @@
   const productSearchInput = document.getElementById('pe-product-search');
   const productsBody = document.getElementById('pe-products-body');
   const productsEmptyState = document.getElementById('pe-products-empty');
+  const productsStatus = document.getElementById('pe-products-status');
   const competitorsCard = document.getElementById('pe-competitors-card');
   const competitorsList = document.getElementById('pe-competitors-list');
   const competitorsEmpty = document.getElementById('pe-competitors-empty');
@@ -346,6 +347,18 @@
     return dateFormatter.format(date);
   }
 
+  function escapeHtml(value) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function setLoading(button, loading) {
     if (!button) return;
     if (loading) {
@@ -392,11 +405,19 @@
     productsEmptyState.hidden = true;
     state.products.forEach((product) => {
       const row = document.createElement('tr');
+      const productName = product.product_name || 'Naam onbekend';
+      const safeProductName = escapeHtml(productName);
+      const placeholderInitial = escapeHtml((productName.trim().charAt(0) || '?').toUpperCase());
+      const imageContent = product.image_url
+        ? `<img src="${escapeHtml(product.image_url)}" alt="${safeProductName}" loading="lazy">`
+        : `<span>${placeholderInitial}</span>`;
       
       // Build metadata badges
       const badges = [];
-      if (product.image_url) badges.push('🖼️');
-      if (product.rating) badges.push(`⭐${product.rating.toFixed(1)}`);
+      const ratingValue = Number(product.rating);
+      if (Number.isFinite(ratingValue) && ratingValue > 0) {
+        badges.push(`⭐${ratingValue.toFixed(1)}`);
+      }
       if (product.review_count) badges.push(`(${product.review_count})`);
       if (product.discount_percentage) badges.push(`<span style="color: #dc2626;">-${product.discount_percentage}%</span>`);
       if (product.has_free_shipping) badges.push('🚚');
@@ -419,10 +440,17 @@
           </div>
         `;
       }
+
+      const variantCount = Number(product.variant_count) || 0;
+      const competitorCount = Number(product.metrics?.competitorCount) || 0;
+      const syncStatus = product.syncStatus === 'synced' ? 'synced' : 'pending';
       
       row.innerHTML = `
+        <td class="pe-product-image-cell">
+          <div class="pe-product-thumb">${imageContent}</div>
+        </td>
         <td>
-          <strong>${product.product_name || 'Naam onbekend'}</strong>
+          <strong>${productName}</strong>
           <div class="pe-text-muted">${product.brand || '—'}${product.category ? ` · ${product.category}` : ''}</div>
           ${badgeHtml}
         </td>
@@ -430,21 +458,21 @@
         <td>${priceHtml}</td>
         <td>
           <button class="pe-button pe-button--small" data-action="manage-variants" data-product-id="${product.id}">
-            ${product.variant_count || 0} varianten
+            ${variantCount} varianten
           </button>
         </td>
         <td>
-          <span class="pe-status-chip pe-status-chip--${product.metrics?.competitorCount ? 'success' : 'pending'}">
-            ${product.metrics?.competitorCount || 0} concurrenten
+          <span class="pe-status-chip pe-status-chip--${competitorCount ? 'success' : 'pending'}">
+            ${competitorCount} concurrenten
           </span>
         </td>
         <td>
-          <span class="pe-status-chip pe-status-chip--${product.syncStatus === 'synced' ? 'success' : 'pending'}">
-            ${product.syncStatus === 'synced' ? '✅ Synced' : '⏳ Pending'}
+          <span class="pe-status-chip pe-status-chip--${syncStatus === 'synced' ? 'success' : 'pending'}">
+            ${syncStatus === 'synced' ? '✅ Synced' : '⏳ Pending'}
           </span>
         </td>
         <td style="text-align: right;">
-          ${product.syncStatus !== 'synced' ? `
+          ${syncStatus !== 'synced' ? `
             <button
               class="pe-button pe-button--primary pe-button--small"
               data-action="sync-to-shopify"
@@ -456,7 +484,13 @@
             class="pe-button pe-button--secondary pe-button--small"
             data-action="manage-competitors"
             data-product-id="${product.id}"
+            style="margin-right: 4px;"
           >Beheer</button>
+          <button
+            class="pe-button pe-button--danger pe-button--small"
+            data-action="remove-product"
+            data-product-id="${product.id}"
+          >Uit collectie</button>
         </td>
       `;
       productsBody.appendChild(row);
@@ -1334,6 +1368,54 @@
     }
   }
 
+  async function handleRemoveProduct(productId, triggerButton) {
+    const product = state.products.find((item) => String(item.id) === String(productId));
+    if (!product) {
+      showStatus(productsStatus, 'Product niet gevonden in huidige lijst.', 'error');
+      return;
+    }
+
+    const confirmMessage = `Weet je zeker dat je "${product.product_name || 'dit product'}" uit de PriceElephant collectie wilt verwijderen? Het product blijft bestaan in Shopify, maar wordt niet langer gevolgd.`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    if (triggerButton) {
+      setLoading(triggerButton, true);
+    }
+
+    try {
+      const response = await apiFetch(`/api/v1/products/${customerId}/${product.id}`, {
+        method: 'DELETE',
+      });
+      if (response?.collectionError) {
+        showStatus(
+          productsStatus,
+          `Product gedeactiveerd maar verwijderen uit Shopify collectie is niet gelukt: ${response.collectionError}`,
+          'error'
+        );
+      } else if (response?.removedFromCollection) {
+        showStatus(productsStatus, `"${product.product_name || 'Product'}" verwijderd uit collectie.`, 'success');
+      } else {
+        showStatus(productsStatus, `"${product.product_name || 'Product'}" gedeactiveerd. Product stond niet in de Shopify collectie.`, 'success');
+      }
+
+      if (state.selectedProductId && String(state.selectedProductId) === String(product.id)) {
+        state.selectedProductId = null;
+        competitorsCard.hidden = true;
+        variantsCard.hidden = true;
+      }
+
+      await loadProducts(productSearchInput.value.trim());
+    } catch (error) {
+      showStatus(productsStatus, `Uit collectie verwijderen mislukt: ${error.message}`, 'error');
+    } finally {
+      if (triggerButton) {
+        setLoading(triggerButton, false);
+      }
+    }
+  }
+
   function setupEventListeners() {
     console.log('[PriceElephant] Setup event listeners');
     console.log('[PriceElephant] Elements check:', {
@@ -1404,13 +1486,20 @@
       if (!(target instanceof HTMLElement)) {
         return;
       }
-      const action = target.dataset.action;
+
+      const button = target.closest('button[data-action]');
+      if (!button) {
+        return;
+      }
+
+      const action = button.dataset.action;
+      const productId = button.dataset.productId;
       if (action === 'manage-competitors') {
-        const productId = target.dataset.productId;
         openCompetitorManager(productId);
       } else if (action === 'manage-variants') {
-        const productId = target.dataset.productId;
         openVariantManager(productId);
+      } else if (action === 'remove-product') {
+        handleRemoveProduct(productId, button);
       }
     });
 
