@@ -788,6 +788,10 @@ class HybridScraper {
         
         this.stats.totalCost += cost;
         
+        if (scrapedData && !scrapedData.ean && ean) {
+          scrapedData.ean = ean;
+        }
+
         if (productId) {
           await this.savePriceSnapshot(productId, retailerLabel, scrapedData, tier, cost);
         }
@@ -939,6 +943,10 @@ class HybridScraper {
     }
 
     // Save to database if productId provided
+    if (scrapedData && !scrapedData.ean && ean) {
+      scrapedData.ean = ean;
+    }
+
     if (productId && scrapedData) {
       await this.savePriceSnapshot(productId, retailerLabel, scrapedData, tier, cost);
     }
@@ -1078,6 +1086,72 @@ class HybridScraper {
           return [];
         };
 
+        const normalizeGtin = (value) => {
+          if (value === null || value === undefined) {
+            return null;
+          }
+          if (typeof value === 'object') {
+            if (Array.isArray(value)) {
+              for (const item of value) {
+                const normalized = normalizeGtin(item);
+                if (normalized) return normalized;
+              }
+              return null;
+            }
+            const candidateKeys = ['value', '@value', 'text', 'barcode', 'sku', 'id'];
+            for (const key of candidateKeys) {
+              if (value[key]) {
+                const normalized = normalizeGtin(value[key]);
+                if (normalized) return normalized;
+              }
+            }
+            if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
+              return normalizeGtin(value.toString());
+            }
+            return null;
+          }
+
+          const digits = String(value).replace(/[^0-9]/g, '');
+          if (!digits) return null;
+          if ([8, 12, 13, 14].includes(digits.length)) {
+            return digits;
+          }
+          return null;
+        };
+
+        const collectGtinCandidates = (value, pool) => {
+          if (value === null || value === undefined) {
+            return;
+          }
+          if (Array.isArray(value)) {
+            value.forEach((item) => collectGtinCandidates(item, pool));
+            return;
+          }
+          if (typeof value === 'object') {
+            const keys = ['gtin', 'gtin13', 'gtin12', 'gtin8', 'gtin14', 'barcode', 'ean', 'value', '@value', 'text'];
+            let found = false;
+            for (const key of keys) {
+              if (value[key]) {
+                collectGtinCandidates(value[key], pool);
+                found = true;
+              }
+            }
+            if (!found) {
+              if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
+                collectGtinCandidates(value.toString(), pool);
+              }
+            }
+            return;
+          }
+
+          const normalized = normalizeGtin(value);
+          if (normalized) {
+            pool.push(normalized);
+          }
+        };
+
+        const dedupe = (values) => Array.from(new Set(values.filter(Boolean)));
+
           const extractImage = (source) => {
             if (!source) return null;
             if (typeof source === 'string') return source;
@@ -1156,6 +1230,18 @@ class HybridScraper {
               );
           const hasFreeShipping = typeof shippingText === 'string' && shippingText.toLowerCase().includes('gratis');
 
+          const eanCandidates = [];
+          collectGtinCandidates(
+            [
+              productNode.gtin, productNode.gtin13, productNode.gtin12, productNode.gtin8, productNode.gtin14,
+              productNode.isbn, productNode.ean, productNode.productID, productNode.sku,
+              offer?.gtin13, offer?.gtin, offer?.sku, offer?.productID,
+              productNode.identifier, productNode.barcode,
+              productNode?.offers?.itemOffered?.gtin13, productNode?.offers?.itemOffered?.gtin
+            ],
+            eanCandidates
+          );
+
           const payload = {
             title: productNode.name || document.querySelector('h1')?.textContent?.trim() || 'Unknown Product',
             price,
@@ -1173,6 +1259,7 @@ class HybridScraper {
             deliveryTime: productNode.offers?.deliveryLeadTime?.transitTimeLabel || productNode.offers?.availabilityStarts || null,
             bundleInfo: null,
             currency: offer?.priceCurrency || offer?.priceSpecification?.priceCurrency || productNode.priceCurrency || 'EUR',
+            ean: dedupe(eanCandidates)[0] || null,
             extractedBy: 'json-ld',
             scrapedAt: new Date().toISOString()
           };
@@ -1190,11 +1277,31 @@ class HybridScraper {
           return schemaPayload;
         }
 
+        const eanCandidates = [];
+
         const priceElement = trySelectors(selectors.price);
         const originalPriceElement = trySelectors(selectors.originalPrice);
         const titleElement = trySelectors(selectors.title);
         const stockElement = trySelectors(selectors.availability);
-  const imageElement = trySelectors(selectors.image);
+        const imageElement = trySelectors(selectors.image);
+        const eanSelectors = [
+          selectors.ean,
+          '[itemprop="gtin13"]',
+          '[itemprop="gtin"]',
+          '[itemprop="gtin8"]',
+          '[itemprop="gtin12"]',
+          '[data-product-ean]',
+          '[data-product-barcode]',
+          '.product-ean',
+          '.product__ean',
+          '.product-barcode',
+          '.ean',
+          '#ProductEan',
+          '#ProductEAN',
+          '#ProductBarcode',
+          '[data-ean]'
+        ].filter(Boolean);
+        const eanElement = trySelectors(eanSelectors);
         const discountElement = trySelectors(selectors.discount);
         const shippingElement = trySelectors(selectors.shipping);
         const brandElement = trySelectors(selectors.brand);
@@ -1275,6 +1382,62 @@ class HybridScraper {
 
         imageUrl = imageUrl ? toAbsoluteUrl(imageUrl) : null;
 
+        const eanFromElement = normalizeGtin(readElementValue(eanElement));
+        if (eanFromElement) {
+          eanCandidates.push(eanFromElement);
+        }
+
+        const metaEanSelectors = [
+          'meta[property="product:ean"]',
+          'meta[property="og:ean"]',
+          'meta[name="ean"]',
+          'meta[name="gtin"]',
+          'meta[itemprop="gtin13"]',
+          'meta[itemprop="gtin"]'
+        ];
+        for (const selector of metaEanSelectors) {
+          const meta = document.querySelector(selector);
+          if (meta?.content) {
+            const normalized = normalizeGtin(meta.content);
+            if (normalized) {
+              eanCandidates.push(normalized);
+            }
+          }
+        }
+
+        const productJsonScript = document.querySelector('script[type="application/json"][data-product-json], script#ProductJson');
+        if (productJsonScript?.textContent) {
+          try {
+            const productJson = JSON.parse(productJsonScript.textContent);
+            const variants = Array.isArray(productJson?.variants) ? productJson.variants : [];
+            variants.forEach((variant) => {
+              collectGtinCandidates([variant?.barcode, variant?.sku], eanCandidates);
+            });
+          } catch (error) {
+            // Ignore JSON parse errors silently
+          }
+        }
+
+        const shopifyAnalyticsProduct = window?.ShopifyAnalytics?.meta?.product;
+        if (shopifyAnalyticsProduct) {
+          collectGtinCandidates([
+            shopifyAnalyticsProduct.barcode,
+            shopifyAnalyticsProduct.product_id,
+            ...(Array.isArray(shopifyAnalyticsProduct.variants) ? shopifyAnalyticsProduct.variants.map((variant) => variant?.barcode || variant?.sku) : [])
+          ], eanCandidates);
+        }
+
+        if (!eanCandidates.length) {
+          const bodyText = document.body?.innerText || '';
+          const textMatch = bodyText.match(/(?:EAN|GTIN|Barcode)\D*([0-9]{8,14})/i);
+          if (textMatch && textMatch[1]) {
+            const normalized = normalizeGtin(textMatch[1]);
+            if (normalized) {
+              eanCandidates.push(normalized);
+            }
+          }
+        }
+
         // Parse rating (1-5 scale)
         let rating = null;
         if (ratingElement) {
@@ -1333,6 +1496,7 @@ class HybridScraper {
           deliveryTime: deliveryTime,
           bundleInfo: bundleInfo,
           currency: 'EUR',
+          ean: dedupe(eanCandidates)[0] || null,
           extractedBy: 'selectors',
           scrapedAt: new Date().toISOString()
         };

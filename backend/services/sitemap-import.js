@@ -316,6 +316,7 @@ class SitemapImportService {
               .where({ id: existing.id })
               .update({
                 product_name: scrapedData.title,
+                product_ean: scrapedData.ean || existing.product_ean,
                 own_price: scrapedData.price,
                 original_price: scrapedData.originalPrice || existing.original_price,
                 discount_percentage: scrapedData.discountPercentage || existing.discount_percentage,
@@ -339,7 +340,7 @@ class SitemapImportService {
             const [newProduct] = await db('products').insert({
               shopify_customer_id: this.customerId,
               product_name: scrapedData.title,
-              product_ean: null,
+              product_ean: scrapedData.ean || null,
               product_sku: null,
               own_price: scrapedData.price,
               original_price: scrapedData.originalPrice || null,
