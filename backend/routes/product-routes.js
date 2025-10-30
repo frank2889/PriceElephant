@@ -2,8 +2,44 @@ const express = require('express');
 const ProductInsightsService = require('../services/product-insights');
 const db = require('../config/database');
 const { groupProducts, createShopifyVariants } = require('../utils/variant-grouping');
+const HybridScraper = require('../crawlers/hybrid-scraper');
 
 const router = express.Router();
+
+let productColumnCachePromise = null;
+
+async function getProductColumns() {
+  if (!productColumnCachePromise) {
+    productColumnCachePromise = db('information_schema.columns')
+      .select('column_name')
+      .where({ table_name: 'products', table_schema: 'public' })
+      .then((rows) => new Set(rows.map((row) => row.column_name)))
+      .catch((error) => {
+        console.warn('⚠️  Failed to load product columns:', error.message);
+        return null;
+      });
+  }
+
+  return productColumnCachePromise;
+}
+
+async function filterProductPayload(payload) {
+  const columns = await getProductColumns();
+  const entries = Object.entries(payload).filter(([, value]) => value !== undefined);
+
+  if (!columns || columns.size === 0) {
+    return Object.fromEntries(entries);
+  }
+
+  const filtered = {};
+  for (const [key, value] of entries) {
+    if (columns.has(key)) {
+      filtered[key] = value;
+    }
+  }
+
+  return filtered;
+}
 
 // POST /api/v1/products/import - Bulk import products with variant detection
 router.post('/import', async (req, res) => {
@@ -310,6 +346,146 @@ router.post('/create', async (req, res) => {
     console.error('Product creation error:', error);
     res.status(500).json({
       error: 'Failed to create product',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/v1/products/manual - Add product via dashboard form with optional scraping
+router.post('/manual', async (req, res) => {
+  const { customerId, productUrl, productName } = req.body || {};
+
+  if (!customerId || !productUrl) {
+    return res.status(400).json({
+      error: 'customerId and productUrl are required'
+    });
+  }
+
+  const shopifyCustomerId = Number(customerId);
+  if (!Number.isInteger(shopifyCustomerId) || shopifyCustomerId <= 0) {
+    return res.status(400).json({
+      error: 'customerId must be a positive integer'
+    });
+  }
+
+  let normalizedUrl;
+  try {
+    normalizedUrl = new URL(productUrl).toString();
+  } catch (error) {
+    return res.status(400).json({
+      error: 'productUrl must be a valid URL'
+    });
+  }
+
+  let scraper = null;
+  let scrapeResult = null;
+
+  try {
+    const existing = await db('products')
+      .where({ shopify_customer_id: shopifyCustomerId, product_url: normalizedUrl })
+      .first();
+
+    try {
+      scraper = new HybridScraper();
+  scrapeResult = await scraper.scrapeProduct(normalizedUrl, null, null, existing?.id || null);
+    } catch (scrapeError) {
+      console.warn('⚠️  Manual product scrape failed:', scrapeError.message);
+    } finally {
+      if (scraper) {
+        await scraper.close().catch(() => {});
+      }
+    }
+
+    const now = new Date();
+    const fallbackName = (productName || scrapeResult?.title || new URL(normalizedUrl).hostname || '').trim();
+    const safeName = fallbackName || 'Handmatig product';
+
+    const payload = {
+      shopify_customer_id: shopifyCustomerId,
+      product_name: safeName,
+      product_url: normalizedUrl,
+      product_ean: scrapeResult?.ean || existing?.product_ean || null,
+      brand: scrapeResult?.brand ?? existing?.brand ?? null,
+      own_price: typeof scrapeResult?.price === 'number' ? scrapeResult.price : existing?.own_price ?? null,
+      original_price: typeof scrapeResult?.originalPrice === 'number' ? scrapeResult.originalPrice : existing?.original_price ?? null,
+      discount_percentage: Number.isFinite(scrapeResult?.discountPercentage) ? scrapeResult.discountPercentage : existing?.discount_percentage ?? null,
+      discount_badge: scrapeResult?.discountBadge ?? existing?.discount_badge ?? null,
+      has_free_shipping: typeof scrapeResult?.hasFreeShipping === 'boolean' ? scrapeResult.hasFreeShipping : existing?.has_free_shipping ?? null,
+      shipping_info: scrapeResult?.shippingInfo ?? existing?.shipping_info ?? null,
+      image_url: scrapeResult?.imageUrl ?? existing?.image_url ?? null,
+      rating: Number.isFinite(scrapeResult?.rating) ? scrapeResult.rating : existing?.rating ?? null,
+      review_count: Number.isInteger(scrapeResult?.reviewCount) ? scrapeResult.reviewCount : existing?.review_count ?? null,
+      stock_level: Number.isInteger(scrapeResult?.stockLevel) ? scrapeResult.stockLevel : existing?.stock_level ?? null,
+      delivery_time: scrapeResult?.deliveryTime ?? existing?.delivery_time ?? null,
+      bundle_info: scrapeResult?.bundleInfo ?? existing?.bundle_info ?? null,
+      import_source: 'manual',
+      in_stock: typeof scrapeResult?.inStock === 'boolean' ? scrapeResult.inStock : existing?.in_stock ?? null,
+      active: existing?.active ?? true,
+      updated_at: now
+    };
+
+    if (!existing) {
+      payload.created_at = now;
+    }
+
+    const filteredPayload = await filterProductPayload(payload);
+
+    let productRecord;
+    if (existing) {
+      await db('products')
+        .where({ id: existing.id })
+        .update(filteredPayload);
+
+      productRecord = await db('products')
+        .where({ id: existing.id })
+        .first();
+    } else {
+      const insertResult = await db('products')
+        .insert(filteredPayload)
+        .returning('*');
+
+      productRecord = Array.isArray(insertResult) ? insertResult[0] : insertResult;
+    }
+
+    if (!productRecord) {
+      throw new Error('Failed to persist product record');
+    }
+
+    if (scrapeResult && typeof scrapeResult.price === 'number') {
+      try {
+        // Capture first snapshot so dashboards have immediate competitor data
+        scraper = new HybridScraper();
+        await scraper.savePriceSnapshot(
+          productRecord.id,
+          scrapeResult.retailer || scrapeResult.retailerKey || new URL(normalizedUrl).hostname,
+          scrapeResult,
+          scrapeResult.tier || 'manual-entry',
+          scrapeResult.cost || 0
+        );
+      } catch (snapshotError) {
+        console.warn('⚠️  Failed to save manual price snapshot:', snapshotError.message);
+      } finally {
+        if (scraper) {
+          await scraper.close().catch(() => {});
+        }
+      }
+    }
+
+    res.status(existing ? 200 : 201).json({
+      success: true,
+      message: existing ? 'Product bijgewerkt' : 'Product toegevoegd',
+      product: productRecord,
+      scrape: scrapeResult ? {
+        retailer: scrapeResult.retailer || null,
+        price: scrapeResult.price || null,
+        method: scrapeResult.tier || null
+      } : null
+    });
+  } catch (error) {
+    console.error('Manual product creation error:', error);
+    productColumnCachePromise = null; // Refresh cache next time in case of schema drift
+    res.status(500).json({
+      error: 'Failed to add manual product',
       message: error.message
     });
   }
