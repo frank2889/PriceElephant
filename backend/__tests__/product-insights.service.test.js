@@ -197,4 +197,107 @@ describe('ProductInsightsService integration (manual competitors)', () => {
       })
     ).rejects.toThrow('Product not found for this customer');
   });
+
+  describe('syncManualCompetitor', () => {
+    test('scrapes competitor URL and stores price snapshot', async () => {
+      const productId = await createProduct({
+        customerId: CUSTOMER_ID,
+        shopifyProductId: SHOPIFY_PRODUCT_ID,
+        productName: 'Sony WH-1000XM5',
+        ean: '4548736130772'
+      });
+
+      const competitorId = unwrapId(
+        await db('manual_competitor_urls')
+          .insert({
+            shopify_customer_id: CUSTOMER_ID,
+            shopify_product_id: SHOPIFY_PRODUCT_ID,
+            retailer: 'coolblue',
+            competitor_url: 'https://priceelephant.test/product?price=123.45'
+          })
+          .returning('id')
+      );
+
+      const result = await ProductInsightsService.syncManualCompetitor(
+        CUSTOMER_ID,
+        productId,
+        competitorId
+      );
+
+      expect(result.snapshot).toMatchObject({
+        price: 123.45,
+        inStock: true,
+        method: 'test'
+      });
+
+      const snapshot = await db('price_snapshots')
+        .where({ shopify_customer_id: CUSTOMER_ID, retailer: 'coolblue' })
+        .first();
+
+      expect(snapshot).toBeTruthy();
+      expect(Number(snapshot.price)).toBeCloseTo(123.45, 2);
+      const columnSupport = await ProductInsightsService.getPriceSnapshotColumnSupport();
+      if (columnSupport.scraping_method) {
+        expect(snapshot.scraping_method).toBe('test');
+      } else {
+        expect(snapshot.scraping_method).toBeUndefined();
+      }
+      if (columnSupport.metadata) {
+        expect(snapshot.metadata).toContain('manual-sync');
+      }
+    });
+
+    test('fails when competitor is inactive', async () => {
+      const productId = await createProduct({
+        customerId: CUSTOMER_ID,
+        shopifyProductId: SHOPIFY_PRODUCT_ID,
+        productName: 'Philips Hue'
+      });
+
+      const competitorId = unwrapId(
+        await db('manual_competitor_urls')
+          .insert({
+            shopify_customer_id: CUSTOMER_ID,
+            shopify_product_id: SHOPIFY_PRODUCT_ID,
+            retailer: 'bol.com',
+            competitor_url: 'https://www.bol.com/nl/p/philips-hue',
+            active: false
+          })
+          .returning('id')
+      );
+
+      await expect(
+        ProductInsightsService.syncManualCompetitor(CUSTOMER_ID, productId, competitorId)
+      ).rejects.toThrow('Competitor URL is inactive');
+    });
+
+    test('fails when scraper returns invalid price', async () => {
+      const productId = await createProduct({
+        customerId: CUSTOMER_ID,
+        shopifyProductId: SHOPIFY_PRODUCT_ID,
+        productName: 'Garmin Edge 1040'
+      });
+
+      const competitorId = unwrapId(
+        await db('manual_competitor_urls')
+          .insert({
+            shopify_customer_id: CUSTOMER_ID,
+            shopify_product_id: SHOPIFY_PRODUCT_ID,
+            retailer: 'mediamarkt',
+            competitor_url: 'https://priceelephant.test/no-price'
+          })
+          .returning('id')
+      );
+
+      await expect(
+        ProductInsightsService.syncManualCompetitor(CUSTOMER_ID, productId, competitorId)
+      ).rejects.toThrow('No price found during scraping');
+
+      const snapshot = await db('price_snapshots')
+        .where({ shopify_customer_id: CUSTOMER_ID, retailer: 'mediamarkt' })
+        .first();
+
+      expect(snapshot).toBeUndefined();
+    });
+  });
 });

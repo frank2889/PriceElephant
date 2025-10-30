@@ -652,6 +652,37 @@ router.put('/:customerId/:productId/competitors/:competitorId', async (req, res)
   }
 });
 
+// POST /api/v1/products/:customerId/:productId/competitors/:competitorId/sync
+router.post('/:customerId/:productId/competitors/:competitorId/sync', async (req, res) => {
+  try {
+    const { customerId, productId, competitorId } = req.params;
+    const result = await ProductInsightsService.syncManualCompetitor(
+      customerId,
+      productId,
+      competitorId
+    );
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ Sync manual competitor error:', error.message);
+    const message = error.message || 'Failed to sync competitor';
+    let status = 500;
+    if (message.includes('not found')) {
+      status = 404;
+    } else if (
+      message.includes('inactive') ||
+      message.includes('required') ||
+      message.includes('synced to Shopify') ||
+      message.includes('invalid') ||
+      message.includes('No price')
+    ) {
+      status = 400;
+    }
+
+    res.status(status).json({ success: false, error: message });
+  }
+});
+
 // DELETE /api/v1/products/:customerId/:productId/competitors/:competitorId
 router.delete('/:customerId/:productId/competitors/:competitorId', async (req, res) => {
   try {
@@ -661,6 +692,25 @@ router.delete('/:customerId/:productId/competitors/:competitorId', async (req, r
   } catch (error) {
     console.error('❌ Delete manual competitor error:', error.message);
     const status = error.message.includes('not found') ? 404 : 400;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/v1/products/:customerId/:productId/competitors/:competitorId/sync
+router.post('/:customerId/:productId/competitors/:competitorId/sync', async (req, res) => {
+  try {
+    const { customerId, productId, competitorId } = req.params;
+    const result = await ProductInsightsService.syncManualCompetitor(
+      customerId,
+      productId,
+      competitorId
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ Sync manual competitor error:', error.message);
+    const notFound = error.message.includes('not found');
+    const inactive = error.message.includes('inactive');
+    const status = notFound ? 404 : inactive ? 409 : 400;
     res.status(status).json({ success: false, error: error.message });
   }
 });

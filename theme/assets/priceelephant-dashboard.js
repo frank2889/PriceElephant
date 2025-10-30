@@ -69,6 +69,13 @@
   const competitorsEmpty = document.getElementById('pe-competitors-empty');
   const competitorsStatus = document.getElementById('pe-competitors-status');
   const competitorForm = document.getElementById('pe-competitor-form');
+  const competitorSubmitButton = competitorForm
+    ? competitorForm.querySelector('button[data-role="competitor-submit"]') ||
+      competitorForm.querySelector('button[type="submit"]')
+    : null;
+  const competitorCancelEditButton = document.getElementById('pe-competitor-cancel-edit');
+  const competitorRetailerInput = competitorForm ? competitorForm.querySelector('[name="retailer"]') : null;
+  const competitorUrlInput = competitorForm ? competitorForm.querySelector('[name="competitorUrl"]') : null;
   const selectedProductName = document.getElementById('pe-selected-product-name');
   const selectedProductSku = document.getElementById('pe-selected-product-sku');
   const selectedProductEan = document.getElementById('pe-selected-product-ean');
@@ -93,6 +100,8 @@
     tier: null,
     productLimit: null,
     isEnterprise: false,
+    manualCompetitors: [],
+    editingCompetitorId: null
   };
 
   const DEBUG_ERROR_LIMIT = 12;
@@ -497,7 +506,64 @@
     });
   }
 
+  function resetCompetitorForm(clearFields = true) {
+    if (!competitorForm) {
+      return;
+      resetCompetitorForm();
+    }
+
+    if (clearFields) {
+      try {
+        competitorForm.reset();
+      } catch (error) {
+        console.warn('[PriceElephant] Failed to reset competitor form:', error.message);
+      }
+    }
+
+    state.editingCompetitorId = null;
+    competitorForm.classList.remove('pe-form--editing');
+
+    if (competitorSubmitButton) {
+      competitorSubmitButton.textContent = 'Concurrent toevoegen';
+      delete competitorSubmitButton.dataset.originalText;
+      competitorSubmitButton.disabled = false;
+    }
+
+    if (competitorCancelEditButton) {
+      competitorCancelEditButton.hidden = true;
+    }
+  }
+
+  function enterCompetitorEditMode(competitor) {
+    if (!competitorForm || !competitor) {
+      return;
+    }
+
+    state.editingCompetitorId = String(competitor.id);
+    competitorForm.classList.add('pe-form--editing');
+
+    if (competitorRetailerInput) {
+      competitorRetailerInput.value = competitor.retailer || '';
+    }
+    if (competitorUrlInput) {
+      competitorUrlInput.value = competitor.competitor_url || '';
+    }
+
+    if (competitorSubmitButton) {
+      competitorSubmitButton.textContent = 'Concurrent opslaan';
+    }
+
+    if (competitorCancelEditButton) {
+      competitorCancelEditButton.hidden = false;
+    }
+
+    if (competitorRetailerInput) {
+      competitorRetailerInput.focus();
+    }
+  }
+
   function renderCompetitors(product, manualCompetitors) {
+    state.manualCompetitors = Array.isArray(manualCompetitors) ? manualCompetitors : [];
     if (!product) {
       competitorsCard.hidden = true;
       return;
@@ -516,26 +582,63 @@
     }
 
     competitorsEmpty.hidden = true;
-    manualCompetitors.forEach((item) => {
+    state.manualCompetitors.forEach((item) => {
+      const safeRetailer = escapeHtml(item.retailer || 'Onbekende retailer');
+      const safeUrl = escapeHtml(item.competitor_url || '');
+      const hasUrl = Boolean(item.competitor_url);
+      const priceSnapshot = item.price_snapshot || {};
+      const availabilityText = priceSnapshot.inStock === false ? 'Niet op voorraad' : 'Op voorraad';
+      const lastUpdateText = formatDate(priceSnapshot.scrapedAt);
+
       const wrapper = document.createElement('div');
       wrapper.className = 'pe-competitor-item';
       wrapper.innerHTML = `
         <div class="pe-competitor-item__meta">
-          <strong>${item.retailer}</strong>
-          <a href="${item.competitor_url}" target="_blank" rel="noopener" class="pe-text-muted">${item.competitor_url}</a>
+          <strong>${safeRetailer}</strong>
+          ${hasUrl
+            ? `<a href="${safeUrl}" target="_blank" rel="noopener" class="pe-text-muted">${safeUrl}</a>`
+            : '<span class="pe-text-muted">Geen URL beschikbaar</span>'}
           <div class="pe-text-muted">
-            Laatste prijs: ${formatPrice(item.price_snapshot?.price)} · ${item.price_snapshot?.inStock === false ? 'Niet op voorraad' : 'Op voorraad'}
+            Laatste prijs: ${formatPrice(priceSnapshot.price)} · ${availabilityText}
           </div>
-          <div class="pe-text-muted">Laatste update: ${formatDate(item.price_snapshot?.scrapedAt)}</div>
+          <div class="pe-text-muted">Laatste update: ${lastUpdateText}</div>
         </div>
-        <div>
+        <div class="pe-competitor-item__actions">
           <button
-            class="pe-button pe-button--danger"
+            class="pe-button pe-button--primary pe-button--small"
+            data-action="sync-competitor"
+            data-competitor-id="${item.id}"
+          >Nu syncen</button>
+          <button
+            class="pe-button pe-button--secondary pe-button--small"
+            data-action="edit-competitor"
+            data-competitor-id="${item.id}"
+          >Aanpassen</button>
+          <button
+            class="pe-button pe-button--danger pe-button--small"
             data-action="delete-competitor"
             data-competitor-id="${item.id}"
           >Verwijderen</button>
         </div>
       `;
+
+      const syncButton = wrapper.querySelector('button[data-action="sync-competitor"]');
+      const editButton = wrapper.querySelector('button[data-action="edit-competitor"]');
+      const deleteButton = wrapper.querySelector('button[data-action="delete-competitor"]');
+
+      if (syncButton) {
+        syncButton.dataset.retailer = item.retailer || '';
+      }
+
+      if (editButton) {
+        editButton.dataset.retailer = item.retailer || '';
+        editButton.dataset.competitorUrl = item.competitor_url || '';
+      }
+
+      if (deleteButton) {
+        deleteButton.dataset.retailer = item.retailer || '';
+      }
+
       competitorsList.appendChild(wrapper);
     });
   }
@@ -642,6 +745,7 @@
       return;
     }
 
+    resetCompetitorForm();
     state.selectedProductId = product.id;
     showStatus(competitorsStatus, '', null);
     competitorsEmpty.hidden = true;
@@ -1201,29 +1305,40 @@
       return;
     }
 
-    const formData = new FormData(competitorForm);
-    const retailer = formData.get('retailer')?.trim();
-    const competitorUrl = formData.get('competitorUrl')?.trim();
+    const retailer = competitorRetailerInput?.value?.trim();
+    const competitorUrl = competitorUrlInput?.value?.trim();
 
     if (!retailer || !competitorUrl) {
       showStatus(competitorsStatus, 'Retailer en URL zijn verplicht.', 'error');
       return;
     }
 
-    setLoading(competitorForm.querySelector('button[type="submit"]'), true);
+    const competitorId = state.editingCompetitorId;
+    const isEditing = Boolean(competitorId);
+    const endpoint = isEditing
+      ? `/api/v1/products/${customerId}/${state.selectedProductId}/competitors/${competitorId}`
+      : `/api/v1/products/${customerId}/${state.selectedProductId}/competitors`;
+    const method = isEditing ? 'PUT' : 'POST';
+
+    setLoading(competitorSubmitButton, true);
 
     try {
-      await apiFetch(`/api/v1/products/${customerId}/${state.selectedProductId}/competitors`, {
-        method: 'POST',
+      await apiFetch(endpoint, {
+        method,
         body: JSON.stringify({ retailer, competitorUrl }),
       });
-      competitorForm.reset();
-      showStatus(competitorsStatus, 'Concurrent toegevoegd.', 'success');
+      resetCompetitorForm();
+      showStatus(
+        competitorsStatus,
+        isEditing ? 'Concurrent bijgewerkt.' : 'Concurrent toegevoegd.',
+        'success'
+      );
       await openCompetitorManager(state.selectedProductId);
     } catch (error) {
-      showStatus(competitorsStatus, `Toevoegen mislukt: ${error.message}`, 'error');
+      const actionLabel = isEditing ? 'Bijwerken' : 'Toevoegen';
+      showStatus(competitorsStatus, `${actionLabel} mislukt: ${error.message}`, 'error');
     } finally {
-      setLoading(competitorForm.querySelector('button[type="submit"]'), false);
+      setLoading(competitorSubmitButton, false);
     }
   }
 
@@ -1238,9 +1353,54 @@
         method: 'DELETE',
       });
       showStatus(competitorsStatus, 'Concurrent verwijderd.', 'success');
+      if (state.editingCompetitorId && String(state.editingCompetitorId) === String(competitorId)) {
+        resetCompetitorForm();
+      }
       await openCompetitorManager(state.selectedProductId);
     } catch (error) {
       showStatus(competitorsStatus, `Verwijderen mislukt: ${error.message}`, 'error');
+    }
+  }
+
+  async function handleSyncCompetitor(competitorId, triggerButton) {
+    if (!state.selectedProductId) {
+      showStatus(competitorsStatus, 'Selecteer eerst een product.', 'error');
+      return;
+    }
+
+    if (triggerButton) {
+      setLoading(triggerButton, true);
+    }
+
+    try {
+      const response = await apiFetch(
+        `/api/v1/products/${customerId}/${state.selectedProductId}/competitors/${competitorId}/sync`,
+        { method: 'POST' }
+      );
+
+      const snapshot = response?.snapshot;
+      if (snapshot) {
+        const priceText = formatPrice(snapshot.price);
+        const stockText = snapshot.inStock === false ? 'niet op voorraad' : 'op voorraad';
+        const timestampText = snapshot.scrapedAt ? formatDate(snapshot.scrapedAt) : 'onbekend moment';
+        const methodText = snapshot.method ? ` · methode: ${snapshot.method}` : '';
+        const cacheText = snapshot.cacheHit ? ' · (cache)' : '';
+        showStatus(
+          competitorsStatus,
+          `Laatste scrape: ${priceText} (${stockText}, ${timestampText})${methodText}${cacheText}`,
+          'success'
+        );
+      } else {
+        showStatus(competitorsStatus, 'Scrape uitgevoerd.', 'success');
+      }
+
+      await openCompetitorManager(state.selectedProductId);
+    } catch (error) {
+      showStatus(competitorsStatus, `Sync mislukt: ${error.message}`, 'error');
+    } finally {
+      if (triggerButton) {
+        setLoading(triggerButton, false);
+      }
     }
   }
 
@@ -1508,12 +1668,32 @@
       if (!(target instanceof HTMLElement)) {
         return;
       }
-      const action = target.dataset.action;
+      const button = target.closest('button[data-action]');
+      const action = button?.dataset.action;
+      if (!action) {
+        return;
+      }
+
+      const competitorId = button.dataset.competitorId;
       if (action === 'delete-competitor') {
-        const competitorId = target.dataset.competitorId;
         handleDeleteCompetitor(competitorId);
+      } else if (action === 'edit-competitor') {
+        const competitor = state.manualCompetitors.find((item) => String(item.id) === String(competitorId));
+        if (!competitor) {
+          showStatus(competitorsStatus, 'Concurrent niet gevonden.', 'error');
+          return;
+        }
+        enterCompetitorEditMode(competitor);
+      } else if (action === 'sync-competitor') {
+        handleSyncCompetitor(competitorId, button);
       }
     });
+
+    if (competitorCancelEditButton) {
+      competitorCancelEditButton.addEventListener('click', () => {
+        resetCompetitorForm();
+      });
+    }
 
     variantsList.addEventListener('click', (event) => {
       const target = event.target;

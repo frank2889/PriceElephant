@@ -5,6 +5,7 @@
 
 require('dotenv').config();
 const db = require('../config/database');
+const HybridScraper = require('../crawlers/hybrid-scraper');
 
 class ProductInsightsService {
   /**
@@ -456,6 +457,170 @@ class ProductInsightsService {
 
     return { success: true };
   }
+
+  /**
+   * Trigger an on-demand scrape for a manual competitor URL
+   */
+  static async syncManualCompetitor(customerId, productId, competitorId) {
+    const product = await db('products')
+      .where({ id: productId, shopify_customer_id: customerId })
+      .first();
+
+    if (!product) {
+      throw new Error('Product not found for this customer');
+    }
+
+    if (!product.shopify_product_id) {
+      throw new Error('Product must be synced to Shopify before syncing competitor URLs');
+    }
+
+    const competitor = await db('manual_competitor_urls')
+      .where({
+        id: competitorId,
+        shopify_customer_id: customerId,
+        shopify_product_id: product.shopify_product_id
+      })
+      .first();
+
+    if (!competitor) {
+      throw new Error('Competitor URL not found');
+    }
+
+    if (!competitor.active) {
+      throw new Error('Competitor URL is inactive');
+    }
+
+    if (!competitor.competitor_url) {
+      throw new Error('Competitor URL is required for manual sync');
+    }
+
+    const scraper = new HybridScraper();
+    let scrapeResult;
+
+    try {
+      scrapeResult = await scraper.scrapeProduct(
+        competitor.competitor_url,
+        product.product_ean || null,
+        ProductInsightsService.getRetailerKey(competitor.retailer),
+        null
+      );
+    } finally {
+      try {
+        await scraper.close();
+      } catch (closeError) {
+        console.warn('⚠️  HybridScraper cleanup warning:', closeError.message);
+      }
+    }
+
+    if (!scrapeResult || typeof scrapeResult.price === 'undefined' || scrapeResult.price === null) {
+      throw new Error('No price found during scraping');
+    }
+
+    const price = Number(scrapeResult.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      throw new Error('Scraped price is invalid');
+    }
+
+    const scrapedAt = new Date();
+    const inStock = scrapeResult.inStock !== false;
+
+    const columnSupport = await ProductInsightsService.getPriceSnapshotColumnSupport();
+    const snapshotPayload = {
+      retailer: competitor.retailer,
+      price,
+      in_stock: inStock,
+      scraped_at: scrapedAt
+    };
+
+    if (columnSupport.shopify_customer_id) {
+      snapshotPayload.shopify_customer_id = customerId;
+    }
+    if (columnSupport.shopify_product_id) {
+      snapshotPayload.shopify_product_id = product.shopify_product_id;
+    }
+    if (columnSupport.product_ean) {
+      snapshotPayload.product_ean = product.product_ean || null;
+    }
+    if (columnSupport.product_id) {
+      snapshotPayload.product_id = product.id;
+    }
+    if (columnSupport.currency) {
+      snapshotPayload.currency = scrapeResult.currency || 'EUR';
+    }
+    if (columnSupport.scraping_method) {
+      snapshotPayload.scraping_method = scrapeResult.tier || null;
+    }
+    if (columnSupport.scraping_cost) {
+      snapshotPayload.scraping_cost = Number.isFinite(scrapeResult.cost) ? scrapeResult.cost : null;
+    }
+    if (columnSupport.metadata) {
+      snapshotPayload.metadata = JSON.stringify({ source: 'manual-sync' });
+    }
+
+    await db('price_snapshots').insert(snapshotPayload);
+
+    return {
+      competitor: {
+        id: competitor.id,
+        retailer: competitor.retailer,
+        competitor_url: competitor.competitor_url
+      },
+      snapshot: {
+        retailer: competitor.retailer,
+        detectedRetailer: scrapeResult.retailer || null,
+        price,
+        inStock,
+        scrapedAt: scrapedAt.toISOString(),
+        method: scrapeResult.tier || null,
+        cost: Number.isFinite(scrapeResult.cost) ? scrapeResult.cost : null,
+        cacheHit: Boolean(scrapeResult.cacheHit)
+      }
+    };
+  }
+
+  static getRetailerKey(retailerName) {
+    if (!retailerName) {
+      return null;
+    }
+
+    const value = retailerName.toLowerCase();
+    if (value.includes('coolblue')) return 'coolblue';
+    if (value.includes('bol')) return 'bol';
+    if (value.includes('amazon')) return 'amazon';
+    if (value.includes('media')) return 'mediamarkt';
+    return null;
+  }
 }
+
+ProductInsightsService.priceSnapshotColumnSupport = null;
+
+ProductInsightsService.getPriceSnapshotColumnSupport = async function getPriceSnapshotColumnSupport() {
+  if (this.priceSnapshotColumnSupport) {
+    return this.priceSnapshotColumnSupport;
+  }
+
+  const columnsToCheck = [
+    'shopify_customer_id',
+    'shopify_product_id',
+    'product_ean',
+    'product_id',
+    'currency',
+    'scraping_method',
+    'scraping_cost',
+    'metadata'
+  ];
+
+  const support = {};
+  for (const column of columnsToCheck) {
+    try {
+      support[column] = await db.schema.hasColumn('price_snapshots', column);
+    } catch (error) {
+      support[column] = false;
+    }
+  }
+
+  this.priceSnapshotColumnSupport = support;
+  return support;
+};
 
 module.exports = ProductInsightsService;
