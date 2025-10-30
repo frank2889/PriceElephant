@@ -25,7 +25,31 @@ class SitemapImportService {
   constructor(customerId) {
     this.customerId = customerId;
     this.scraper = new HybridScraper();
-    this.shopify = new ShopifyIntegration();
+    this.shopify = null; // Will be initialized with customer config
+  }
+
+  /**
+   * Initialize Shopify integration with customer-specific credentials
+   */
+  async _initShopify() {
+    if (this.shopify) return; // Already initialized
+
+    const customerConfig = await db('customer_configs')
+      .where({ customer_id: this.customerId })
+      .first();
+
+    if (!customerConfig || !customerConfig.shopify_domain || !customerConfig.shopify_access_token) {
+      console.warn(`[SitemapImport] ⚠️ Customer ${this.customerId} has incomplete Shopify config - using defaults`);
+      this.shopify = new ShopifyIntegration();
+      return;
+    }
+
+    this.shopify = new ShopifyIntegration({
+      shopDomain: customerConfig.shopify_domain,
+      accessToken: customerConfig.shopify_access_token
+    });
+
+    console.log(`[SitemapImport] ✅ Shopify initialized for ${customerConfig.shopify_domain}`);
   }
 
   /**
@@ -46,6 +70,9 @@ class SitemapImportService {
 
     console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
     console.log(`[SitemapImport] Max products target: ${maxProducts}`);
+
+    // Initialize Shopify with customer-specific credentials
+    await this._initShopify();
 
     // Helper to send progress updates
     const sendProgress = (data) => {

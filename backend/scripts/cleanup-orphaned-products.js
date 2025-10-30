@@ -13,11 +13,21 @@ async function cleanupOrphanedProducts(customerId) {
   console.log(`\n🧹 Cleaning up orphaned products for customer ${customerId}...`);
   
   try {
+    // Get customer config for Shopify credentials
+    const customerConfig = await db('customer_configs')
+      .where({ customer_id: customerId })
+      .first();
+
+    if (!customerConfig) {
+      console.error(`❌ Customer ${customerId} not found in customer_configs`);
+      return { deleted: 0, checked: 0 };
+    }
+
     // Get all products for this customer from our database
     const ourProducts = await db('products')
       .where({ shopify_customer_id: customerId })
       .whereNotNull('shopify_product_id')
-      .select('id', 'shopify_product_id', 'title');
+      .select('id', 'shopify_product_id', 'product_name');
     
     console.log(`📊 Found ${ourProducts.length} products in our database`);
     
@@ -26,7 +36,14 @@ async function cleanupOrphanedProducts(customerId) {
       return { deleted: 0, checked: 0 };
     }
     
-    const shopify = new ShopifyIntegration();
+    // Initialize Shopify with customer-specific credentials
+    const shopify = new ShopifyIntegration({
+      shopDomain: customerConfig.shopify_domain,
+      accessToken: customerConfig.shopify_access_token
+    });
+    
+    console.log(`🏪 Checking Shopify: ${customerConfig.shopify_domain}`);
+    
     const shopifyProducts = await shopify.getAllProducts(customerId);
     const shopifyProductIds = new Set(shopifyProducts.map(p => String(p.id)));
     
@@ -46,7 +63,7 @@ async function cleanupOrphanedProducts(customerId) {
     
     // Delete orphaned products
     for (const product of orphanedProducts) {
-      console.log(`   Deleting: ${product.title} (Shopify ID: ${product.shopify_product_id})`);
+      console.log(`   Deleting: ${product.product_name} (Shopify ID: ${product.shopify_product_id})`);
       
       // Delete from products table (CASCADE will handle related records)
       await db('products')
