@@ -47,6 +47,13 @@ class SitemapImportService {
     console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
     console.log(`[SitemapImport] Max products target: ${maxProducts}`);
 
+    // Helper to send progress updates
+    const sendProgress = (data) => {
+      if (onProgress) {
+        onProgress(data);
+      }
+    };
+
     // Get saved progress for this sitemap
     let startFromIndex = 0;
     if (resetProgress) {
@@ -104,13 +111,6 @@ class SitemapImportService {
       console.error(`[SitemapImport] ⚠️ Cleanup warning: ${cleanupError.message}`);
       // Continue with import even if cleanup fails
     }
-
-    // Helper to send progress updates
-    const sendProgress = (data) => {
-      if (onProgress) {
-        onProgress(data);
-      }
-    };
 
     try {
       sendProgress({
