@@ -240,7 +240,10 @@
             <input type="url" id="pe-competitor-url" name="competitorUrl" placeholder="https://www.coolblue.nl/product/...">
           </div>
         </div>
-        <button type="submit" class="pe-button pe-button--primary">Concurrent toevoegen</button>
+        <div class="pe-button-group">
+          <button type="submit" class="pe-button pe-button--primary" data-role="competitor-submit">Concurrent toevoegen</button>
+          <button type="button" class="pe-button pe-button--secondary pe-button--small" id="pe-competitor-cancel-edit" hidden>Annuleren</button>
+        </div>
       </form>
     </section>
   </div>

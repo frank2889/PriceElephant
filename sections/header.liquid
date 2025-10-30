@@ -1,7 +1,12 @@
 <header class="site-header">
   <div class="container">
     <a href="/" class="logo">
-      <span style="font-size: 1.75rem;">🐘</span>
+      <img
+        src="{{ 'elepephant.webp' | asset_url }}"
+        alt="PriceElephant"
+        class="logo-image"
+        loading="lazy"
+      >
       {{ shop.name }}
     </a>
     
@@ -73,6 +78,13 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .site-header .logo-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    object-fit: cover;
   }
   
   .site-header .main-nav {
