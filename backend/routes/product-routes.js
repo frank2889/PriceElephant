@@ -3,6 +3,7 @@ const ProductInsightsService = require('../services/product-insights');
 const db = require('../config/database');
 const { groupProducts, createShopifyVariants } = require('../utils/variant-grouping');
 const HybridScraper = require('../crawlers/hybrid-scraper');
+const ShopifyIntegration = require('../integrations/shopify');
 
 const router = express.Router();
 
@@ -509,6 +510,66 @@ router.get('/:customerId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch product overview'
+    });
+  }
+});
+
+// DELETE /api/v1/products/:customerId/:productId - Archive product and remove from Shopify collection
+router.delete('/:customerId/:productId', async (req, res) => {
+  try {
+    const { customerId, productId } = req.params;
+
+    const product = await db('products')
+      .where({ id: productId, shopify_customer_id: customerId })
+      .first();
+
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Product not found for this customer' });
+    }
+
+    const updated = await db('products')
+      .where({ id: productId })
+      .update({ active: false, updated_at: new Date() });
+
+    if (!updated) {
+      return res.status(500).json({ success: false, error: 'Unable to archive product record' });
+    }
+
+    let removedFromCollection = false;
+    let collectionError = null;
+
+    if (product.shopify_product_id) {
+      try {
+        const shopify = new ShopifyIntegration();
+        const collection = await shopify.findCustomerCollection(customerId);
+        const collectionId = collection?.id ?? null;
+
+        if (collectionId) {
+          removedFromCollection = await shopify.removeProductFromCollection(
+            product.shopify_product_id,
+            collectionId
+          );
+        } else {
+          console.log(`ℹ️  No Shopify collection found for customer ${customerId}, skipping removal.`);
+        }
+      } catch (shopifyError) {
+        collectionError = shopifyError.message;
+        console.error('⚠️  Failed to remove product from Shopify collection:', shopifyError.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      productId: product.id,
+      removedFromCollection,
+      collectionError
+    });
+  } catch (error) {
+    console.error('❌ Product delete error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to remove product from collection',
+      message: error.message
     });
   }
 });
