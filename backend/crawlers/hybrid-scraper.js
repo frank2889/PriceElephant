@@ -21,6 +21,7 @@ const AdaptiveThrottler = require('../utils/adaptive-throttling');
 const BrowserProfiles = require('../utils/browser-profiles');
 const HttpCacheManager = require('../utils/http-cache-manager');
 const SelectorLearning = require('../services/selector-learning');
+const HttpScraper = require('../utils/http-scraper');
 const db = require('../config/database');
 
 class HybridScraper {
@@ -28,6 +29,7 @@ class HybridScraper {
     this.proxyPool = new ProxyPool();
     this.aiVision = new AIVisionScraper();
     this.throttler = new AdaptiveThrottler({ verbose: true }); // Enable logging
+    this.httpScraper = new HttpScraper();
     this.browserProfiles = new BrowserProfiles();
     this.httpCache = new HttpCacheManager({ verbose: true });
     this.selectorLearning = SelectorLearning;
@@ -891,6 +893,61 @@ class HybridScraper {
     } catch (cacheError) {
       console.log(`⚠️ Cache check failed, continuing with normal scrape: ${cacheError.message}`);
       await this.close();
+    }
+
+    // Try Tier 0: HTTP-only (no browser) - bypasses bot detection
+    try {
+      console.log(`🌐 Tier 0: HTTP-only scraping ${url}`);
+      
+      const httpStartTime = Date.now();
+      scrapedData = await this.httpScraper.scrape(url, learnedSelectors || {
+        price: '.price',
+        title: 'h1',
+        brand: '[itemprop="brand"]'
+      });
+      
+      if (scrapedData && scrapedData.price) {
+        tier = 'http';
+        cost = 0; // Free!
+        this.stats.directSuccess++;
+        
+        // Update throttler
+        const responseTime = Date.now() - httpStartTime;
+        await this.throttler.afterRequest(retailerLabel, {
+          responseTime,
+          status: 200,
+          success: true
+        });
+        
+        // Record successful selectors for learning
+        if (learnedSelectors) {
+          await SelectorLearning.recordSuccess(retailer, learnedSelectors);
+        }
+        
+        console.log(`✅ Tier 0 HTTP success: €${scrapedData.price} (${responseTime}ms)`);
+        
+        this.stats.totalCost += cost;
+        
+        if (scrapedData && !scrapedData.ean && ean) {
+          scrapedData.ean = ean;
+        }
+
+        if (productId) {
+          await this.savePriceSnapshot(productId, retailerLabel, scrapedData, tier, cost);
+        }
+        
+        return {
+          ...scrapedData,
+          tier,
+          cost,
+          retailer: retailerLabel,
+          retailerKey: retailerKey || retailerLabel,
+          responseTime,
+          cacheHit: false
+        };
+      }
+    } catch (httpError) {
+      console.log(`❌ Tier 0 HTTP failed: ${httpError.message}`);
     }
 
     // Try Tier 1: Direct (no proxy)
