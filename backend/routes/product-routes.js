@@ -421,7 +421,7 @@ router.post('/manual', async (req, res) => {
       bundle_info: scrapeResult?.bundleInfo ?? existing?.bundle_info ?? null,
       import_source: 'manual',
       in_stock: typeof scrapeResult?.inStock === 'boolean' ? scrapeResult.inStock : existing?.in_stock ?? null,
-      active: existing?.active ?? true,
+      active: true,
       updated_at: now
     };
 
@@ -529,7 +529,7 @@ router.delete('/:customerId/:productId', async (req, res) => {
 
     const updated = await db('products')
       .where({ id: productId })
-      .update({ active: false, updated_at: new Date() });
+      .update({ active: false, shopify_product_id: null, updated_at: new Date() });
 
     if (!updated) {
       return res.status(500).json({ success: false, error: 'Unable to archive product record' });

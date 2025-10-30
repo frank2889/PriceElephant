@@ -331,11 +331,36 @@ class SitemapImportService {
                 stock_level: scrapedData.stockLevel || existing.stock_level,
                 delivery_time: scrapedData.deliveryTime || existing.delivery_time,
                 bundle_info: scrapedData.bundleInfo || existing.bundle_info,
+                active: true,
                 updated_at: new Date()
               });
             
             results.updated++;
             console.log(`[SitemapImport] Updated: ${scrapedData.title}${scrapedData.discountPercentage ? ` (-${scrapedData.discountPercentage}%)` : ''}`);
+
+            if (!existing.shopify_product_id) {
+              try {
+                const shopifyProduct = await this.shopify.createProduct({
+                  title: scrapedData.title,
+                  description: `${scrapedData.brand || 'Product'} - imported from sitemap`,
+                  brand: scrapedData.brand,
+                  price: scrapedData.price,
+                  imageUrl: scrapedData.imageUrl,
+                  tags: ['PriceElephant', `customer-${this.customerId}`, scrapedData.brand].filter(Boolean)
+                });
+
+                await db('products')
+                  .where({ id: existing.id })
+                  .update({
+                    shopify_product_id: shopifyProduct.id,
+                    updated_at: new Date()
+                  });
+
+                console.log(`[SitemapImport] ♻️ Recreated Shopify product ${shopifyProduct.id} for ${scrapedData.title}`);
+              } catch (shopifyError) {
+                console.error(`[SitemapImport] ⚠️ Shopify resync failed: ${shopifyError.message}`);
+              }
+            }
           } else {
             const [newProduct] = await db('products').insert({
               shopify_customer_id: this.customerId,
@@ -359,6 +384,7 @@ class SitemapImportService {
               delivery_time: scrapedData.deliveryTime || null,
               bundle_info: scrapedData.bundleInfo || null,
               import_source: 'sitemap',
+              active: true,
               created_at: new Date()
             }).returning('*');
             

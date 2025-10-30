@@ -14,6 +14,25 @@ class ProductImportService {
     this.shopify = new ShopifyIntegration();
   }
 
+  buildShopifyPayload(product) {
+    const descriptionParts = [];
+    if (product.brand) descriptionParts.push(product.brand);
+    if (product.category) descriptionParts.push(product.category);
+
+    return {
+      title: product.title,
+      description: descriptionParts.length ? descriptionParts.join(' - ') : '',
+      brand: product.brand,
+      category: product.category,
+      price: product.price,
+      sku: product.sku,
+      ean: product.ean,
+      imageUrl: product.imageUrl,
+      channableId: product.externalId,
+      tags: ['PriceElephant', `customer-${this.customerId}`, product.brand, product.category].filter(Boolean)
+    };
+  }
+
   /**
    * Import products from Channable for a customer
    */
@@ -71,7 +90,7 @@ class ProductImportService {
 
         if (existing) {
           // Update existing product
-          await this.updateProduct(existing.id, product);
+          await this.updateProduct(existing, product);
           results.updated++;
           console.log(`♻️  Updated: ${product.title}`);
         } else {
@@ -129,6 +148,8 @@ class ProductImportService {
    * Create new product
    */
   async createProduct(product) {
+    const shopifyPayload = this.buildShopifyPayload(product);
+
     const [newProduct] = await db('products').insert({
       shopify_customer_id: this.customerId,
       shopify_product_id: null, // Will be set when synced to Shopify
@@ -148,18 +169,7 @@ class ProductImportService {
     
     // Auto-sync to Shopify
     try {
-      const shopifyProduct = await this.shopify.createProduct({
-        title: product.title,
-        description: `${product.brand || 'Product'} - ${product.category || ''}`,
-        brand: product.brand,
-        category: product.category,
-        price: product.price,
-        sku: product.sku,
-        ean: product.ean,
-        imageUrl: product.imageUrl,
-        channableId: product.externalId,
-        tags: ['PriceElephant', `customer-${this.customerId}`, product.brand, product.category].filter(Boolean)
-      });
+      const shopifyProduct = await this.shopify.createProduct(shopifyPayload);
       
       // Update with Shopify product ID
       await db('products')
@@ -181,21 +191,51 @@ class ProductImportService {
   /**
    * Update existing product
    */
-  async updateProduct(productId, product) {
+  async updateProduct(existingRecord, product) {
     await db('products')
-      .where({ id: productId })
+      .where({ id: existingRecord.id })
       .update({
         product_name: product.title,
+        product_ean: product.ean || existingRecord.product_ean,
         product_sku: product.sku,
         brand: product.brand,
         category: product.category,
         own_price: product.price,
         product_url: product.url,
         image_url: product.imageUrl,
+        active: true,
         updated_at: db.fn.now()
       });
 
-    return productId;
+    const shopifyPayload = this.buildShopifyPayload(product);
+
+    try {
+      if (existingRecord.shopify_product_id) {
+        try {
+          await this.shopify.updateProduct(existingRecord.shopify_product_id, shopifyPayload);
+        } catch (error) {
+          const notFound = /not\s+found/i.test(error.message) || /404/.test(error.message);
+          if (!notFound) {
+            throw error;
+          }
+          existingRecord.shopify_product_id = null;
+        }
+      }
+
+      if (!existingRecord.shopify_product_id) {
+        const shopifyProduct = await this.shopify.createProduct(shopifyPayload);
+        await db('products')
+          .where({ id: existingRecord.id })
+          .update({
+            shopify_product_id: shopifyProduct.id,
+            updated_at: db.fn.now()
+          });
+      }
+    } catch (error) {
+      console.error(`   ⚠️ Shopify sync failed: ${error.message}`);
+    }
+
+    return existingRecord.id;
   }
 
   /**
