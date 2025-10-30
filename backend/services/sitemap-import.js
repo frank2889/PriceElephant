@@ -40,11 +40,49 @@ class SitemapImportService {
       productUrlPattern = null,
       onProgress = null,
       isCancelled = () => false,
-      resumeFromPage = null // NEW: Resume from specific page
+      resumeFromPage = null, // Resume from specific page index
+      resetProgress = false  // NEW: Start fresh (ignore saved progress)
     } = options;
 
     console.log(`[SitemapImport] Starting intelligent product detection from: ${sitemapUrl}`);
     console.log(`[SitemapImport] Max products target: ${maxProducts}`);
+
+    // Get saved progress for this sitemap
+    let startFromIndex = 0;
+    if (resetProgress) {
+      // User wants to start fresh - reset saved progress
+      console.log(`[SitemapImport] 🔄 Resetting progress - starting from beginning`);
+      await db('sitemap_configs')
+        .where({
+          customer_id: this.customerId,
+          sitemap_url: sitemapUrl
+        })
+        .update({
+          last_scraped_page: 0,
+          total_pages_scraped: 0
+        });
+    } else if (resumeFromPage === null) {
+      // Check if we should auto-resume
+      const savedConfig = await db('sitemap_configs')
+        .where({
+          customer_id: this.customerId,
+          sitemap_url: sitemapUrl
+        })
+        .first();
+      
+      if (savedConfig && savedConfig.last_scraped_page > 0) {
+        startFromIndex = savedConfig.last_scraped_page;
+        console.log(`[SitemapImport] 🔄 Resuming from URL index ${startFromIndex} (last import: ${savedConfig.last_import_at})`);
+        sendProgress({
+          stage: 'resuming',
+          message: `Hervatten vanaf positie ${startFromIndex}...`,
+          percentage: 3
+        });
+      }
+    } else if (resumeFromPage > 0) {
+      startFromIndex = resumeFromPage;
+      console.log(`[SitemapImport] 🔄 Manual resume from index ${startFromIndex}`);
+    }
 
     // Step 1: Cleanup orphaned products BEFORE import
     console.log(`[SitemapImport] 🧹 Step 1: Cleaning up orphaned products...`);
@@ -233,7 +271,7 @@ class SitemapImportService {
       const delayBetweenRequests = 2000; // 2 seconds between scrapes
       
       // Use pre-filtered URLs instead of all candidate URLs
-      for (let i = 0; i < productUrlCandidates.length && productsFound < maxProducts; i++) {
+      for (let i = startFromIndex; i < productUrlCandidates.length && productsFound < maxProducts; i++) {
         if (isCancelled()) {
           console.log('[SitemapImport] Cancellation detected before scanning URL index', i);
           results.cancelled = true;
@@ -499,6 +537,25 @@ class SitemapImportService {
         message: 'Import afronden...',
         percentage: 90
       });
+
+      // Save progress to database for resume capability
+      try {
+        await db('sitemap_configs')
+          .where({ 
+            customer_id: this.customerId,
+            sitemap_url: sitemapUrl 
+          })
+          .update({
+            last_scraped_page: results.scanned, // Track how many URLs we processed
+            last_import_at: new Date(),
+            total_pages_scraped: db.raw('total_pages_scraped + ?', [results.scanned]),
+            updated_at: new Date()
+          });
+        
+        console.log(`[SitemapImport] 💾 Progress saved: ${results.scanned} URLs processed`);
+      } catch (progressError) {
+        console.error(`[SitemapImport] ⚠️ Failed to save progress: ${progressError.message}`);
+      }
 
       const scraperStats = this.scraper.getStats();
       results.scrapingStats = {
