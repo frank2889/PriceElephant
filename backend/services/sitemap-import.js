@@ -540,19 +540,20 @@ class SitemapImportService {
 
       // Save progress to database for resume capability
       try {
+        const finalPosition = startFromIndex + results.scanned; // Absolute position in sitemap
         await db('sitemap_configs')
           .where({ 
             customer_id: this.customerId,
             sitemap_url: sitemapUrl 
           })
           .update({
-            last_scraped_page: results.scanned, // Track how many URLs we processed
+            last_scraped_page: finalPosition, // Track absolute position for next resume
             last_import_at: new Date(),
             total_pages_scraped: db.raw('total_pages_scraped + ?', [results.scanned]),
             updated_at: new Date()
           });
         
-        console.log(`[SitemapImport] 💾 Progress saved: ${results.scanned} URLs processed`);
+        console.log(`[SitemapImport] 💾 Progress saved: position ${finalPosition} (started at ${startFromIndex}, processed ${results.scanned})`);
       } catch (progressError) {
         console.error(`[SitemapImport] ⚠️ Failed to save progress: ${progressError.message}`);
       }
