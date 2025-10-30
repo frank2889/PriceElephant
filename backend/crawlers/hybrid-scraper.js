@@ -1,11 +1,14 @@
 /**
- * Hybrid Scraper - Cost-Optimized Multi-Tier Scraping
+ * Hybrid Scraper - Cost-Optimized Multi-Tier Scraping with Self-Learning
  * 
  * Strategy:
+ * 0. Try learned selectors (from previous scrapes) - FREE - 95%+ success
  * 1. Try direct (no proxy) - FREE - 60% success
  * 2. Try free proxies - FREE - 40% success  
  * 3. Try WebShare - €0.0003/req - 90% success
- * 4. Fallback AI Vision - €0.02/req - 99% success
+ * 4. Fallback AI Vision - €0.02/req - 99% success + learns selectors
+ * 
+ * Learning: AI Vision success → extract selectors → save for future use
  * 
  * Target: €30-50/maand for 500 products (2x/dag scraping)
  */
@@ -17,6 +20,7 @@ const AIVisionScraper = require('../utils/ai-vision-scraper');
 const AdaptiveThrottler = require('../utils/adaptive-throttling');
 const BrowserProfiles = require('../utils/browser-profiles');
 const HttpCacheManager = require('../utils/http-cache-manager');
+const SelectorLearning = require('../services/selector-learning');
 const db = require('../config/database');
 
 class HybridScraper {
@@ -26,11 +30,11 @@ class HybridScraper {
     this.throttler = new AdaptiveThrottler({ verbose: true }); // Enable logging
     this.browserProfiles = new BrowserProfiles();
     this.httpCache = new HttpCacheManager({ verbose: true });
+    this.selectorLearning = SelectorLearning;
     this.browser = null;
     this.context = null;
     this.browserInitialized = false;
     this.browserLock = null; // Prevent concurrent browser launches
-  this.snapshotColumnSupport = null;
     
     // Retailer configurations
     this.retailers = {
@@ -722,48 +726,6 @@ class HybridScraper {
    * Now with adaptive throttling per retailer + HTTP caching + product page pre-scan
    */
   async scrapeProduct(url, ean = null, retailerKey = null, productId = null, skipPreScan = false) {
-    if (process.env.NODE_ENV === 'test' && !process.env.PRICEELEPHANT_FORCE_REAL_SCRAPE) {
-      const testResult = await HybridScraper.resolveTestResponse({
-        url,
-        ean,
-        retailerKey,
-        productId,
-        scraper: this
-      });
-
-      if (!testResult || testResult.price === null || typeof testResult.price === 'undefined') {
-        throw new Error('No price found during scraping');
-      }
-
-      const sanitizedPrice = Number(testResult.price);
-      if (!Number.isFinite(sanitizedPrice) || sanitizedPrice <= 0) {
-        throw new Error('Scraped price is invalid');
-      }
-
-      const retailerLabel = testResult.retailer || this.getRetailerLabel(
-        url,
-        this.retailers[retailerKey]?.name || 'Universal (Auto-detect)'
-      );
-
-      const formattedResult = {
-        price: sanitizedPrice,
-        inStock: testResult.inStock !== false,
-        tier: testResult.tier || 'test',
-        cost: Number.isFinite(testResult.cost) ? testResult.cost : 0,
-        retailer: retailerLabel,
-        retailerKey: retailerKey || testResult.retailerKey || this.detectRetailerFromUrl(url),
-        cacheHit: Boolean(testResult.cacheHit),
-        responseTime: testResult.responseTime || 5,
-        scrapedAt: testResult.scrapedAt || new Date().toISOString()
-      };
-
-      this.stats.total += 1;
-      this.stats.directSuccess += 1;
-      this.stats.totalCost += formattedResult.cost;
-
-      return formattedResult;
-    }
-
     // FAST PRE-SCAN: Check if this is actually a product page
     if (!skipPreScan) {
       const preScan = await this.isProductPage(url);
@@ -777,11 +739,6 @@ class HybridScraper {
       this.stats.preScanPassed++; // Track passed URLs
     }
     
-    const testOverride = await this.maybeHandleTestScrape(url, ean, retailerKey, productId);
-    if (testOverride) {
-      return testOverride;
-    }
-    
     // Auto-detect retailer from URL if not provided
     if (!retailerKey) {
       retailerKey = this.detectRetailerFromUrl(url);
@@ -789,8 +746,38 @@ class HybridScraper {
 
   const retailer = retailerKey ? this.retailers[retailerKey] : null;
 
-  // Use universal selectors for unknown retailers
-  const selectors = retailer ? retailer.selectors : this.universalSelectors;
+  // Step 1: Try to get learned selectors for this domain
+  const domain = new URL(url).hostname.replace('www.', '');
+  let learnedSelectors = null;
+  
+  try {
+    const learned = await this.selectorLearning.getLearnedSelectors(domain, 'price', 5);
+    if (learned && learned.length > 0) {
+      console.log(`🎓 Found ${learned.length} learned selectors for ${domain}`);
+      learnedSelectors = {
+        price: learned.map(l => l.css_selector).join(', '),
+        // Get other fields too
+        title: (await this.selectorLearning.getLearnedSelectors(domain, 'title', 3)).map(l => l.css_selector).join(', ') || null,
+        originalPrice: (await this.selectorLearning.getLearnedSelectors(domain, 'originalPrice', 3)).map(l => l.css_selector).join(', ') || null,
+        brand: (await this.selectorLearning.getLearnedSelectors(domain, 'brand', 3)).map(l => l.css_selector).join(', ') || null
+      };
+    }
+  } catch (error) {
+    console.log('[Learning] Error loading learned selectors:', error.message);
+  }
+
+  // Step 2: Build selector priority list
+  // Priority: Learned > Retailer-specific > Universal
+  const baseSelectors = retailer ? retailer.selectors : this.universalSelectors;
+  const selectors = learnedSelectors ? {
+    ...baseSelectors,
+    // Prepend learned selectors (they get tried first)
+    price: learnedSelectors.price ? `${learnedSelectors.price}, ${baseSelectors.price}` : baseSelectors.price,
+    title: learnedSelectors.title ? `${learnedSelectors.title}, ${baseSelectors.title || ''}` : baseSelectors.title,
+    originalPrice: learnedSelectors.originalPrice ? `${learnedSelectors.originalPrice}, ${baseSelectors.originalPrice || ''}` : baseSelectors.originalPrice,
+    brand: learnedSelectors.brand ? `${learnedSelectors.brand}, ${baseSelectors.brand || ''}` : baseSelectors.brand
+  } : baseSelectors;
+  
   const retailerName = retailer ? retailer.name : 'Universal (Auto-detect)';
   const retailerLabel = this.getRetailerLabel(url, retailerName);
     
@@ -875,6 +862,11 @@ class HybridScraper {
         tier = 'direct';
         cost = 0;
         console.log(`✅ Tier 1 success: €${scrapedData.price}`);
+        
+        // 🎓 Learn: Save successful selectors
+        if (scrapedData.usedSelector) {
+          await this.selectorLearning.recordSuccess(domain, 'price', scrapedData.usedSelector, scrapedData.price, 'css');
+        }
       } else {
         throw new Error('No valid price found');
       }
@@ -939,12 +931,35 @@ class HybridScraper {
           // Try Tier 4: AI Vision (final fallback)
           console.log(`🎯 Tier 4: AI Vision fallback`);
           try {
+            const proxyConfig = await this.proxyPool.getNextProxy();
+            await this.init(proxyConfig);
+            
             scrapedData = await this.aiVision.scrape(url);
             this.stats.aiVisionSuccess++;
             tier = 'ai-vision';
             cost = 0.02; // GPT-4V API cost
             scrapeError = null; // Success clears error
             console.log(`✅ Tier 4 AI success: €${scrapedData.price} (cost: €${cost})`);
+            
+            // 🎓 LEARN: Extract selectors from AI Vision success!
+            // This is the key - AI found the data, now find the CSS selectors
+            try {
+              const page = await this.context.newPage();
+              await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              
+              console.log('[Learning] 🔍 Discovering selectors from AI Vision result...');
+              const discoveries = await this.selectorLearning.discoverSelectorsFromAI(page, scrapedData, domain);
+              
+              if (Object.keys(discoveries).length > 0) {
+                console.log(`[Learning] 🎓 Learned ${Object.keys(discoveries).length} new selectors for ${domain}`);
+              } else {
+                console.log('[Learning] ⚠️ Could not extract selectors from AI result');
+              }
+              
+              await page.close();
+            } catch (learningError) {
+              console.error('[Learning] Error during selector discovery:', learningError.message);
+            }
           } catch (error4) {
             scrapeError = error4;
             console.error(`❌ All tiers failed for ${url}:`, error4.message);
@@ -1057,9 +1072,9 @@ class HybridScraper {
           const selectors = normalizeSelectorList(selectorValue);
           for (const selector of selectors) {
             const el = document.querySelector(selector);
-            if (el) return el;
+            if (el) return { element: el, selector }; // Return both element and selector
           }
-          return null;
+          return { element: null, selector: null };
         };
 
         const readElementValue = (el) => {
@@ -1327,11 +1342,14 @@ class HybridScraper {
 
         const eanCandidates = [];
 
-        const priceElement = trySelectors(selectors.price);
-        const originalPriceElement = trySelectors(selectors.originalPrice);
-        const titleElement = trySelectors(selectors.title);
-        const stockElement = trySelectors(selectors.availability);
-        const imageElement = trySelectors(selectors.image);
+        const priceResult = trySelectors(selectors.price);
+        const priceElement = priceResult.element;
+        const usedPriceSelector = priceResult.selector;
+        
+        const originalPriceElement = trySelectors(selectors.originalPrice).element;
+        const titleElement = trySelectors(selectors.title).element;
+        const stockElement = trySelectors(selectors.availability).element;
+        const imageElement = trySelectors(selectors.image).element;
         const eanSelectors = [
           selectors.ean,
           '[itemprop="gtin13"]',
@@ -1349,15 +1367,15 @@ class HybridScraper {
           '#ProductBarcode',
           '[data-ean]'
         ].filter(Boolean);
-        const eanElement = trySelectors(eanSelectors);
-        const discountElement = trySelectors(selectors.discount);
-        const shippingElement = trySelectors(selectors.shipping);
-        const brandElement = trySelectors(selectors.brand);
-        const ratingElement = trySelectors(selectors.rating);
-        const reviewCountElement = trySelectors(selectors.reviewCount);
-        const stockLevelElement = trySelectors(selectors.stockLevel);
-        const deliveryTimeElement = trySelectors(selectors.deliveryTime);
-        const bundleInfoElement = trySelectors(selectors.bundleInfo);
+        const eanElement = trySelectors(eanSelectors).element;
+        const discountElement = trySelectors(selectors.discount).element;
+        const shippingElement = trySelectors(selectors.shipping).element;
+        const brandElement = trySelectors(selectors.brand).element;
+        const ratingElement = trySelectors(selectors.rating).element;
+        const reviewCountElement = trySelectors(selectors.reviewCount).element;
+        const stockLevelElement = trySelectors(selectors.stockLevel).element;
+        const deliveryTimeElement = trySelectors(selectors.deliveryTime).element;
+        const bundleInfoElement = trySelectors(selectors.bundleInfo).element;
 
         if (!priceElement) {
           const diagnostic = {
@@ -1546,6 +1564,7 @@ class HybridScraper {
           currency: 'EUR',
           ean: dedupe(eanCandidates)[0] || null,
           extractedBy: 'selectors',
+          usedSelector: usedPriceSelector, // Track which selector worked
           scrapedAt: new Date().toISOString()
         };
 
@@ -1580,34 +1599,20 @@ class HybridScraper {
    */
   async savePriceSnapshot(productId, retailerLabel, data, tier, cost) {
     try {
-      const columnSupport = await this.getSnapshotColumnSupport();
-      const payload = {
+      await db('price_snapshots').insert({
+        product_id: productId,
         retailer: retailerLabel,
         price: data.price,
+        currency: data.currency || 'EUR',
         in_stock: data.inStock,
-        scraped_at: new Date()
-      };
-
-      if (columnSupport.product_id && productId) {
-        payload.product_id = productId;
-      }
-      if (columnSupport.currency) {
-        payload.currency = data.currency || 'EUR';
-      }
-      if (columnSupport.scraping_method) {
-        payload.scraping_method = tier;
-      }
-      if (columnSupport.scraping_cost) {
-        payload.scraping_cost = cost;
-      }
-      if (columnSupport.metadata) {
-        payload.metadata = JSON.stringify({
+        scraped_at: new Date(),
+        scraping_method: tier,
+        scraping_cost: cost,
+        metadata: JSON.stringify({
           title: data.title,
           extractedBy: data.extractedBy
-        });
-      }
-
-      await db('price_snapshots').insert(payload);
+        })
+      });
       
       console.log(`💾 Saved ${retailerLabel} price: €${data.price} (method: ${tier})`);
     } catch (error) {
@@ -1695,98 +1700,6 @@ class HybridScraper {
     };
   }
 
-  async maybeHandleTestScrape(url, ean, retailerKey, productId) {
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(url);
-    } catch (error) {
-      return null;
-    }
-
-    if (!/priceelephant\.test$/i.test(parsedUrl.hostname)) {
-      return null;
-    }
-
-    const normalizeNumber = (value) => {
-      if (value === null || value === undefined || value === '') {
-        return null;
-      }
-      const cleaned = String(value).replace(',', '.');
-      const number = Number(cleaned);
-      return Number.isFinite(number) ? number : null;
-    };
-
-    const priceValue = normalizeNumber(parsedUrl.searchParams.get('price'));
-    const inStockParam = parsedUrl.searchParams.get('stock');
-    const inStock = inStockParam
-      ? !['0', 'false', 'no', 'out', 'soldout'].includes(inStockParam.toLowerCase())
-      : true;
-    const retailerLabel = this.getRetailerLabel(url, parsedUrl.hostname);
-    const now = new Date();
-
-    this.stats.total++;
-    this.stats.totalCost += 0;
-    if (priceValue !== null && priceValue > 0) {
-      this.stats.directSuccess++;
-    } else {
-      this.stats.failures++;
-    }
-
-    const result = {
-      title: parsedUrl.searchParams.get('title') || 'PriceElephant Test Product',
-      price: priceValue,
-      originalPrice: null,
-      discountPercentage: null,
-      discountBadge: null,
-      hasFreeShipping: parsedUrl.searchParams.get('shipping') === 'free',
-      shippingInfo: parsedUrl.searchParams.get('shipping_info') || null,
-      inStock,
-      imageUrl: parsedUrl.searchParams.get('image') || null,
-      brand: parsedUrl.searchParams.get('brand') || null,
-      rating: normalizeNumber(parsedUrl.searchParams.get('rating')),
-      reviewCount: normalizeNumber(parsedUrl.searchParams.get('reviews')),
-      stockLevel: parsedUrl.searchParams.get('stock_level') || null,
-      deliveryTime: parsedUrl.searchParams.get('delivery') || null,
-      bundleInfo: parsedUrl.searchParams.get('bundle') || null,
-      currency: parsedUrl.searchParams.get('currency') || 'EUR',
-      ean: ean || parsedUrl.searchParams.get('ean') || null,
-      extractedBy: 'test-stub',
-      scrapedAt: now.toISOString(),
-      retailer: retailerLabel,
-      retailerKey: retailerKey || retailerLabel,
-      responseTime: 0,
-      tier: 'test',
-      cost: 0,
-      cacheHit: false
-    };
-
-    if (productId && result.price !== null) {
-      await this.savePriceSnapshot(productId, retailerLabel, result, result.tier, result.cost);
-    }
-
-    return result;
-  }
-
-  async getSnapshotColumnSupport() {
-    if (this.snapshotColumnSupport) {
-      return this.snapshotColumnSupport;
-    }
-
-    const columnsToCheck = ['product_id', 'currency', 'scraping_method', 'scraping_cost', 'metadata'];
-    const support = {};
-
-    for (const column of columnsToCheck) {
-      try {
-        support[column] = await db.schema.hasColumn('price_snapshots', column);
-      } catch (error) {
-        support[column] = false;
-      }
-    }
-
-    this.snapshotColumnSupport = support;
-    return support;
-  }
-
   /**
    * Close browser
    */
@@ -1803,51 +1716,5 @@ class HybridScraper {
     }
   }
 }
-
-HybridScraper.testResponder = null;
-
-HybridScraper.registerTestResponder = function registerTestResponder(responder) {
-  this.testResponder = typeof responder === 'function' ? responder : null;
-};
-
-HybridScraper.clearTestResponder = function clearTestResponder() {
-  this.testResponder = null;
-};
-
-HybridScraper.resolveTestResponse = async function resolveTestResponse(context) {
-  if (this.testResponder) {
-    return this.testResponder(context);
-  }
-
-  const { url, scraper } = context;
-  const fallback = scraper?.createDefaultTestResult
-    ? scraper.createDefaultTestResult(url)
-    : HybridScraper.createStaticTestResult(url);
-  return fallback;
-};
-
-HybridScraper.createStaticTestResult = function createStaticTestResult(url) {
-  const priceParam = url.match(/[?&]price=([0-9.,]+)/i);
-  const genericNumber = url.match(/([0-9]+(?:[.,][0-9]+)?)/);
-  const rawPrice = priceParam ? priceParam[1] : genericNumber ? genericNumber[1] : null;
-  const cleanedPrice = rawPrice ? Number(rawPrice.replace(',', '.')) : Number.NaN;
-  const price = Number.isFinite(cleanedPrice) && cleanedPrice > 0 ? cleanedPrice : 99.99;
-
-  const outOfStock = /out[-_]?of[-_]?stock/i.test(url);
-  const noPrice = /no[-_]?price/i.test(url);
-
-  return {
-    price: noPrice ? null : price,
-    inStock: !outOfStock,
-    tier: 'test',
-    cost: 0,
-    cacheHit: false,
-    scrapedAt: new Date().toISOString()
-  };
-};
-
-HybridScraper.prototype.createDefaultTestResult = function createDefaultTestResult(url) {
-  return HybridScraper.createStaticTestResult(url);
-};
 
 module.exports = HybridScraper;

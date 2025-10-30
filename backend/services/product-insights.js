@@ -524,40 +524,18 @@ class ProductInsightsService {
     const scrapedAt = new Date();
     const inStock = scrapeResult.inStock !== false;
 
-    const columnSupport = await ProductInsightsService.getPriceSnapshotColumnSupport();
-    const snapshotPayload = {
+    await db('price_snapshots').insert({
+      shopify_customer_id: customerId,
+      shopify_product_id: product.shopify_product_id,
+      product_ean: product.product_ean || null,
       retailer: competitor.retailer,
       price,
       in_stock: inStock,
-      scraped_at: scrapedAt
-    };
-
-    if (columnSupport.shopify_customer_id) {
-      snapshotPayload.shopify_customer_id = customerId;
-    }
-    if (columnSupport.shopify_product_id) {
-      snapshotPayload.shopify_product_id = product.shopify_product_id;
-    }
-    if (columnSupport.product_ean) {
-      snapshotPayload.product_ean = product.product_ean || null;
-    }
-    if (columnSupport.product_id) {
-      snapshotPayload.product_id = product.id;
-    }
-    if (columnSupport.currency) {
-      snapshotPayload.currency = scrapeResult.currency || 'EUR';
-    }
-    if (columnSupport.scraping_method) {
-      snapshotPayload.scraping_method = scrapeResult.tier || null;
-    }
-    if (columnSupport.scraping_cost) {
-      snapshotPayload.scraping_cost = Number.isFinite(scrapeResult.cost) ? scrapeResult.cost : null;
-    }
-    if (columnSupport.metadata) {
-      snapshotPayload.metadata = JSON.stringify({ source: 'manual-sync' });
-    }
-
-    await db('price_snapshots').insert(snapshotPayload);
+      scraped_at: scrapedAt,
+      scraping_method: scrapeResult.tier || null,
+      scraping_cost: Number.isFinite(scrapeResult.cost) ? scrapeResult.cost : null,
+      metadata: JSON.stringify({ source: 'manual-sync' })
+    });
 
     return {
       competitor: {
@@ -591,36 +569,5 @@ class ProductInsightsService {
     return null;
   }
 }
-
-ProductInsightsService.priceSnapshotColumnSupport = null;
-
-ProductInsightsService.getPriceSnapshotColumnSupport = async function getPriceSnapshotColumnSupport() {
-  if (this.priceSnapshotColumnSupport) {
-    return this.priceSnapshotColumnSupport;
-  }
-
-  const columnsToCheck = [
-    'shopify_customer_id',
-    'shopify_product_id',
-    'product_ean',
-    'product_id',
-    'currency',
-    'scraping_method',
-    'scraping_cost',
-    'metadata'
-  ];
-
-  const support = {};
-  for (const column of columnsToCheck) {
-    try {
-      support[column] = await db.schema.hasColumn('price_snapshots', column);
-    } catch (error) {
-      support[column] = false;
-    }
-  }
-
-  this.priceSnapshotColumnSupport = support;
-  return support;
-};
 
 module.exports = ProductInsightsService;

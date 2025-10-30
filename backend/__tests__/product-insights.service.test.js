@@ -7,6 +7,7 @@ const {
   insertPriceSnapshot,
   unwrapId
 } = require('../tests/db-utils');
+const HybridScraper = require('../crawlers/hybrid-scraper');
 
 const CUSTOMER_ID = 101;
 const SHOPIFY_PRODUCT_ID = 900001;
@@ -199,6 +200,25 @@ describe('ProductInsightsService integration (manual competitors)', () => {
   });
 
   describe('syncManualCompetitor', () => {
+    let scrapeSpy;
+
+    beforeEach(() => {
+      scrapeSpy = jest
+        .spyOn(HybridScraper.prototype, 'scrapeProduct')
+        .mockResolvedValue({
+          price: 123.45,
+          inStock: true,
+          tier: 'direct',
+          cost: 0,
+          cacheHit: false
+        });
+      jest.spyOn(HybridScraper.prototype, 'close').mockResolvedValue();
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     test('scrapes competitor URL and stores price snapshot', async () => {
       const productId = await createProduct({
         customerId: CUSTOMER_ID,
@@ -213,7 +233,7 @@ describe('ProductInsightsService integration (manual competitors)', () => {
             shopify_customer_id: CUSTOMER_ID,
             shopify_product_id: SHOPIFY_PRODUCT_ID,
             retailer: 'coolblue',
-            competitor_url: 'https://priceelephant.test/product?price=123.45'
+            competitor_url: 'https://www.coolblue.nl/product/sony'
           })
           .returning('id')
       );
@@ -224,10 +244,17 @@ describe('ProductInsightsService integration (manual competitors)', () => {
         competitorId
       );
 
+      expect(scrapeSpy).toHaveBeenCalledWith(
+        'https://www.coolblue.nl/product/sony',
+        '4548736130772',
+        'coolblue',
+        null
+      );
+
       expect(result.snapshot).toMatchObject({
         price: 123.45,
         inStock: true,
-        method: 'test'
+        method: 'direct'
       });
 
       const snapshot = await db('price_snapshots')
@@ -236,15 +263,8 @@ describe('ProductInsightsService integration (manual competitors)', () => {
 
       expect(snapshot).toBeTruthy();
       expect(Number(snapshot.price)).toBeCloseTo(123.45, 2);
-      const columnSupport = await ProductInsightsService.getPriceSnapshotColumnSupport();
-      if (columnSupport.scraping_method) {
-        expect(snapshot.scraping_method).toBe('test');
-      } else {
-        expect(snapshot.scraping_method).toBeUndefined();
-      }
-      if (columnSupport.metadata) {
-        expect(snapshot.metadata).toContain('manual-sync');
-      }
+      expect(snapshot.scraping_method).toBe('direct');
+      expect(snapshot.metadata).toContain('manual-sync');
     });
 
     test('fails when competitor is inactive', async () => {
@@ -269,9 +289,15 @@ describe('ProductInsightsService integration (manual competitors)', () => {
       await expect(
         ProductInsightsService.syncManualCompetitor(CUSTOMER_ID, productId, competitorId)
       ).rejects.toThrow('Competitor URL is inactive');
+
+      expect(scrapeSpy).not.toHaveBeenCalled();
     });
 
     test('fails when scraper returns invalid price', async () => {
+      jest
+        .spyOn(HybridScraper.prototype, 'scrapeProduct')
+        .mockResolvedValueOnce({ price: null, inStock: true });
+
       const productId = await createProduct({
         customerId: CUSTOMER_ID,
         shopifyProductId: SHOPIFY_PRODUCT_ID,
@@ -284,7 +310,7 @@ describe('ProductInsightsService integration (manual competitors)', () => {
             shopify_customer_id: CUSTOMER_ID,
             shopify_product_id: SHOPIFY_PRODUCT_ID,
             retailer: 'mediamarkt',
-            competitor_url: 'https://priceelephant.test/no-price'
+            competitor_url: 'https://www.mediamarkt.nl/product/garmin'
           })
           .returning('id')
       );
