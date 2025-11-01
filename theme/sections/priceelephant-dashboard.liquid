@@ -175,8 +175,15 @@
     </div>
 
     <section class="pe-card" id="pe-products-card">
-      <h2>Producten</h2>
-      <p>Overzicht van geïmporteerde producten inclusief concurrentinformatie.</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+          <h2 style="margin: 0;">Producten</h2>
+          <p style="margin: 4px 0 0; color: #64748b;">Overzicht van geïmporteerde producten inclusief concurrentinformatie.</p>
+        </div>
+        <button type="button" class="pe-button pe-button--secondary" id="pe-sync-products">
+          🔄 Synchroniseren
+        </button>
+      </div>
       <div class="pe-field" style="max-width: 320px;">
         <label for="pe-product-search">Zoek op naam, EAN of merk</label>
         <input type="search" id="pe-product-search" placeholder="Bijv. ThinkPad of 8719...">
