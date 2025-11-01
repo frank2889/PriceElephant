@@ -93,4 +93,55 @@ router.post('/shopify/products/update', verifyShopifyWebhook, async (req, res) =
   }
 });
 
+/**
+ * POST /api/v1/webhooks/shopify/products/create
+ * Called when a product is created or added to a collection in Shopify
+ */
+router.post('/shopify/products/create', verifyShopifyWebhook, async (req, res) => {
+  try {
+    const { id: shopifyProductId, title, handle, variants, tags, image } = req.body;
+    
+    console.log('[Webhook] Product created in Shopify:', shopifyProductId, title);
+
+    // Extract customer ID from tags (format: customer-8557353828568)
+    const customerTag = tags?.split(',').find(t => t.trim().startsWith('customer-'));
+    const customerId = customerTag ? customerTag.trim().replace('customer-', '') : null;
+
+    if (!customerId) {
+      console.log('[Webhook] ⚠️ No customer tag found, skipping');
+      return res.status(200).send('OK');
+    }
+
+    // Check if product already exists
+    const existing = await db('products')
+      .where({ shopify_product_id: String(shopifyProductId) })
+      .first();
+
+    if (existing) {
+      console.log('[Webhook] Product already exists in database');
+      return res.status(200).send('OK');
+    }
+
+    // Create product in database
+    await db('products').insert({
+      customer_id: customerId,
+      product_name: title,
+      product_url: `https://www.hobo.nl/products/${handle}`,
+      own_price: variants?.[0]?.price || null,
+      shopify_product_id: String(shopifyProductId),
+      image_url: image?.src || null,
+      sync_status: 'synced',
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+
+    console.log(`[Webhook] ✅ Created product in database for customer ${customerId}`);
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('[Webhook] Error handling product creation:', error.message);
+    res.status(500).send('Error');
+  }
+});
+
 module.exports = router;
