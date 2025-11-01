@@ -120,6 +120,14 @@
     - Removed non-existent `sync_status` column from insert queries
   - Cleaned up 25 obsolete test/diagnostic scripts (3,317 lines removed)
   - Dashboard sync button now fully functional
+- **Competitor Data Metafield Sync (November 1, 2025):**
+  - Auto-sync competitor URLs, prices, and original prices to Shopify product metafields
+  - Metafield: `priceelephant.competitor_data` (JSON)
+  - Structure: `{own_url: string, competitors: [{url, retailer, price, original_price, in_stock}]}`
+  - Multi-client support: Each client's own URL stored separately, competitors shared across clients
+  - Database migration: Added `original_price` column to `competitor_prices` table
+  - Triggers on competitor add/remove automatically update metafield
+  - Enables Shopify theme to display competitor data without API calls
 - **Definition of Done:** ✅ Database and Shopify maintain perfect bidirectional sync via webhooks (deployed November 1, 2025)
 
 ### **What's Next (Immediate Priorities):**
