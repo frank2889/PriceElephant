@@ -1434,11 +1434,10 @@
       return;
     }
 
-    const retailer = competitorRetailerInput?.value?.trim();
     const competitorUrl = competitorUrlInput?.value?.trim();
 
-    if (!retailer || !competitorUrl) {
-      showStatus(competitorsStatus, 'Retailer en URL zijn verplicht.', 'error');
+    if (!competitorUrl) {
+      showStatus(competitorsStatus, 'URL is verplicht.', 'error');
       return;
     }
 
@@ -1454,7 +1453,7 @@
     try {
       await apiFetch(endpoint, {
         method,
-        body: JSON.stringify({ retailer, competitorUrl }),
+        body: JSON.stringify({ competitorUrl }),
       });
       resetCompetitorForm();
       showStatus(
