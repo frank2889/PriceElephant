@@ -10,7 +10,7 @@ router.post('/clear-orphaned-shopify-ids/:customerId', async (req, res) => {
     console.log(`🧹 Clearing orphaned Shopify IDs for customer ${customerId}...`);
     
     const result = await db('products')
-      .where('customer_id', customerId)
+      .where('client_id', customerId)
       .whereNotNull('shopify_product_id')
       .update({
         shopify_product_id: null,
@@ -42,7 +42,7 @@ router.post('/sync-collection/:customerId', async (req, res) => {
     
     // Get customer config with Shopify credentials
     const config = await db('customer_configs')
-      .where('customer_id', customerId)
+      .where('client_id', customerId)
       .first();
 
     if (!config || !config.shopify_domain || !config.shopify_access_token) {
