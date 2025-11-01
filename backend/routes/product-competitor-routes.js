@@ -12,6 +12,7 @@ const HybridScraper = require('../crawlers/hybrid-scraper');
 const ShopifyIntegration = require('../integrations/shopify');
 const competitorPriceHistory = require('../services/competitor-price-history');
 const { extractDomain, normalizeRetailerName, extractCompanyName } = require('../utils/domain-extractor');
+const { setupCompetitorInShopify } = require('../services/competitor-customer-service');
 
 function normaliseRetailer(url) {
   try {
@@ -144,8 +145,28 @@ router.post('/:productId/competitors', async (req, res) => {
         
         console.log(`  ✅ Created competitor registry entry: ${registry.retailer_name}`);
         
-        // TODO: Auto-create Shopify customer + collection for this competitor
+        // Auto-create Shopify customer + collection for this competitor
         // This enables tracking their data and contacting them later
+        try {
+          const customerConfig = await db('customer_configs')
+            .where({ customer_id: req.customer.id })
+            .first();
+          
+          if (customerConfig?.shopify_domain && customerConfig?.shopify_access_token) {
+            const { customerId, collectionId } = await setupCompetitorInShopify(
+              registry.id,
+              domain,
+              normalizeRetailerName(domain),
+              customerConfig.shopify_domain,
+              customerConfig.shopify_access_token
+            );
+            
+            console.log(`  🎯 Auto-created Shopify customer (${customerId}) and collection (${collectionId})`);
+          }
+        } catch (shopifyError) {
+          console.error('  ⚠️ Failed to auto-create Shopify customer:', shopifyError.message);
+          // Continue - registry is created, Shopify setup can be retried later
+        }
       }
     }
 

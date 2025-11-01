@@ -718,6 +718,56 @@ class ShopifyIntegration {
       return [];
     }
   }
+
+  /**
+   * Create a new customer in Shopify
+   * Used for auto-registering competitors as prospects
+   */
+  async createCustomer(customerData) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.post({
+        path: 'customers',
+        data: {
+          customer: customerData
+        }
+      });
+
+      await this.applyRateLimitDelay(response.headers);
+      console.log(`✅ Created Shopify customer: ${customerData.email}`);
+      return response.body.customer;
+
+    } catch (error) {
+      console.error('❌ Failed to create customer:', error.message);
+      throw this.wrapShopifyError('customer aanmaken', error);
+    }
+  }
+
+  /**
+   * Create a new collection in Shopify
+   * Used for organizing competitor products
+   */
+  async createCollection(collectionData) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.post({
+        path: 'custom_collections',
+        data: {
+          custom_collection: collectionData
+        }
+      });
+
+      await this.applyRateLimitDelay(response.headers);
+      console.log(`✅ Created Shopify collection: ${collectionData.title}`);
+      return response.body.custom_collection;
+
+    } catch (error) {
+      console.error('❌ Failed to create collection:', error.message);
+      throw this.wrapShopifyError('collection aanmaken', error);
+    }
+  }
 }
 
 module.exports = ShopifyIntegration;
