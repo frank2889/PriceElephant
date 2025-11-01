@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const HybridScraper = require('../crawlers/hybrid-scraper');
+const ShopifyIntegration = require('../integrations/shopify');
 const competitorPriceHistory = require('../services/competitor-price-history');
 
 function normaliseRetailer(url) {
