@@ -144,4 +144,59 @@ router.post('/shopify/products/create', verifyShopifyWebhook, async (req, res) =
   }
 });
 
+/**
+ * POST /api/v1/webhooks/shopify/collections/update
+ * Called when products are added/removed from a collection
+ */
+router.post('/shopify/collections/update', verifyShopifyWebhook, async (req, res) => {
+  try {
+    const { title, id: collectionId } = req.body;
+    
+    console.log('[Webhook] Collection updated:', title);
+
+    // Extract customer ID from collection title (format: PriceElephant - Customer 8557353828568)
+    const match = title?.match(/Customer\s+(\d+)/i);
+    const customerId = match ? match[1] : null;
+
+    if (!customerId) {
+      console.log('[Webhook] ⚠️ Not a customer collection, skipping');
+      return res.status(200).send('OK');
+    }
+
+    // Fetch products in this collection from Shopify
+    const shopify = require('../integrations/shopify');
+    const products = await shopify.getCollectionProducts(customerId, collectionId);
+
+    console.log(`[Webhook] Found ${products.length} products in collection`);
+
+    // Sync each product to database
+    for (const product of products) {
+      const existing = await db('products')
+        .where({ shopify_product_id: String(product.id) })
+        .first();
+
+      if (!existing) {
+        // Create new product
+        await db('products').insert({
+          customer_id: customerId,
+          product_name: product.title,
+          product_url: `https://www.hobo.nl/products/${product.handle}`,
+          own_price: product.variants?.[0]?.price || null,
+          shopify_product_id: String(product.id),
+          image_url: product.image?.src || null,
+          sync_status: 'synced',
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+        console.log(`[Webhook] ✅ Created product: ${product.title}`);
+      }
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('[Webhook] Error handling collection update:', error.message);
+    res.status(500).send('Error');
+  }
+});
+
 module.exports = router;
