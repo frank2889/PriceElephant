@@ -42,7 +42,7 @@ router.post('/sync-collection/:customerId', async (req, res) => {
     
     // Get customer config with Shopify credentials
     const config = await db('customer_configs')
-      .where('client_id', customerId)
+      .where('customer_id', customerId)
       .first();
 
     if (!config || !config.shopify_domain || !config.shopify_access_token) {
