@@ -115,7 +115,8 @@ router.get('/import-stream', async (req, res) => {
       customerId, 
       sitemapUrl, 
       maxProducts,
-      productUrlPattern
+      productUrlPattern,
+      resetProgress
     } = req.query;
 
     if (!customerId) {
