@@ -18,6 +18,7 @@ const variantRoutes = require('./routes/variant-routes');
 const sitemapRoutes = require('./routes/sitemap-routes');
 const customerRoutes = require('./routes/customer-routes');
 const diagnosticRoutes = require('./routes/diagnostic-routes');
+const webhookRoutes = require('./routes/webhook-routes');
 
 const app = express();
 
@@ -46,6 +47,10 @@ if (process.env.SENTRY_DSN) {
 
 app.use(helmet());
 app.use(cors());
+
+// Capture raw body for webhook verification (before JSON parsing)
+app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
@@ -65,6 +70,7 @@ app.use('/api/v1/scraper', scraperRoutes);
 app.use('/api/v1/sitemap', sitemapRoutes);
 app.use('/api/v1/customers', customerRoutes);
 app.use('/api/v1/diagnostic', diagnosticRoutes);
+app.use('/api/v1/webhooks', webhookRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
