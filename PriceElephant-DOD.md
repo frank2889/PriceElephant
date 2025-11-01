@@ -130,6 +130,48 @@
   - Enables Shopify theme to display competitor data without API calls
 - **Definition of Done:** ✅ Database and Shopify maintain perfect bidirectional sync via webhooks (deployed November 1, 2025)
 
+✅ **Sprint 2.13 (Historical Price Intelligence)** - COMPLETE ✅
+- **Price History Tracking System:**
+  - Database table: `competitor_price_history` - Records every price change with timestamps
+  - Database table: `price_events` - Pre-seeded shopping events (Black Friday, Cyber Monday, seasonal sales)
+  - Automatic price change detection and recording
+  - Price change calculations (absolute and percentage)
+  - Event tagging: Auto-detects prices during major shopping events
+  - Historical data retention: Unlimited price history storage
+- **Year-over-Year Analysis:**
+  - Compare current prices to previous year's same event (e.g., Black Friday 2024 vs 2025)
+  - Identify price manipulation patterns (raising prices before sales)
+  - Track seasonal pricing trends
+  - Predict optimal pricing windows
+- **Price Trend Intelligence:**
+  - Real-time trend detection (increasing/decreasing/stable)
+  - Statistical analysis: avg, min, max, volatility
+  - 90-day rolling trend analysis
+  - Price range and variation metrics
+- **Shopify Metafield Integration:**
+  - Metafield: `priceelephant.price_history_analysis` (JSON)
+  - Per-competitor structure: `{url, trend, currentPrice, avgPrice, minPrice, maxPrice, history: [{date, price, event}]}`
+  - Last 50 data points per competitor
+  - Event-tagged historical snapshots
+  - Enables frontend to display charts and trends without API calls
+- **Smart Recording:**
+  - Only records when price actually changes (saves storage)
+  - Daily snapshots during stable periods
+  - Immediate recording on price changes
+  - Event detection window: ±3 days from event date
+- **Pre-Seeded Events (2024-2025):**
+  - Black Friday 2024 (Nov 29) & 2025 (Nov 28)
+  - Cyber Monday 2024 (Dec 2) & 2025 (Dec 1)
+  - Summer Sale 2025 (Jul 1)
+  - Holiday Season 2025 (Dec 15)
+- **Benefits:**
+  - Full audit trail of all competitive price movements
+  - Data-driven pricing decisions based on historical patterns
+  - Competitive intelligence: Know when competitors typically discount
+  - Never lose pricing data - unlimited retention
+  - Answer questions like: "What were prices during last Black Friday?"
+- **Definition of Done:** ✅ Complete price history with event tracking and year-over-year analysis (deployed November 1, 2025)
+
 ### **What's Next (Immediate Priorities):**
 
 � **Sprint 3: Email Automation** - READY TO START (HIGH PRIORITY)
