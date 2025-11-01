@@ -100,7 +100,7 @@ router.post('/sync-collection/:customerId', async (req, res) => {
       } else {
         // Create new product
         await db('products').insert({
-          customer_id: customerId,
+          client_id: customerId,
           product_name: product.title,
           product_url: `https://www.hobo.nl/products/${product.handle}`,
           own_price: product.variants?.[0]?.price || null,
