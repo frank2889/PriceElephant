@@ -383,6 +383,461 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/12345
 - Product & variant management system
 - Multi-language support (Dutch/English)
 
+#### Technical Architecture - Sprint 1 (MVP Core)
+
+**Purpose**: Build minimum viable product connecting Channable product feeds to Shopify store with customer dashboard.
+
+**Core File Structure**:
+
+```
+backend/routes/
+  ├── channable-routes.js (247 lines) - Channable import/config API
+  ├── shopify-routes.js (181 lines) - Shopify sync endpoints
+  └── product-routes.js (719 lines) - Product CRUD + variant grouping
+
+backend/integrations/
+  ├── channable.js (233 lines) - Channable feed parser
+  └── shopify.js (391 lines) - Shopify Admin API wrapper
+
+backend/services/
+  └── product-import.js (376 lines) - Import orchestration
+
+theme/assets/
+  └── priceelephant-dashboard.js (1992 lines) - Frontend SPA
+
+locales/
+  └── nl.json - Dutch translations
+
+templates/
+  └── index.liquid - Dashboard theme template
+```
+
+**1. Channable Integration (`backend/integrations/channable.js`)**
+
+**Purpose**: Parse Channable product feeds (XML/CSV) and API into standardized format
+
+**Line-by-Line Breakdown**:
+- **Line 11-17**: `constructor(config)` - Initialize with companyId, apiToken, projectId, feedUrl, baseUrl
+- **Line 23-37**: `importFromAPI()` - Fetch products from Channable REST API (`GET /v1/companies/{companyId}/projects/{projectId}/items`)
+- **Line 44-74**: `importFromFeed()` - Import from XML/CSV feed URL with auto-format detection
+- **Line 79-91**: `parseChannableProducts(items)` - Map API response to standard format (externalId, ean, sku, title, brand, price, url, imageUrl, category, inStock)
+- **Line 96-124**: `parseXMLFeed(xmlData)` - Parse Google Shopping XML using xml2js library
+  - Extracts from RSS > channel > item structure
+  - Maps g:id, g:gtin, g:ean, g:title, g:brand, g:price, g:link, g:image_link, g:product_type, g:description
+- **Line 130-133**: `getXMLValue(obj, key)` - Extract value from XML namespace fields
+- **Line 138-165**: `parseCSVFeed(csvData)` - Parse CSV with header mapping
+- **Line 200-210**: `testConnection()` - Validate API credentials before saving
+
+**Dependencies**: axios (HTTP), xml2js (XML parsing)
+
+**2. Channable Routes (`backend/routes/channable-routes.js`)**
+
+**Line-by-Line Breakdown**:
+
+- **Line 15-69**: `POST /api/v1/channable/import` - Import products for customer
+  - **Request Body**: `{ customerId, feedUrl?, companyId?, projectId?, apiToken? }`
+  - **Line 18-21**: Validate customerId required
+  - **Line 23-42**: Fetch config from `channable_integrations` table OR use provided params
+  - **Line 45-46**: Initialize ProductImportService and import
+  - **Line 49-56**: Update `channable_integrations.last_sync_at` and `products_synced` counter
+  - **Response**: `{ success, customerId, results: { created, updated, skipped, errors, total } }`
+
+- **Line 75-145**: `POST /api/v1/channable/configure` - Save Channable config
+  - **Request Body**: `{ customerId, feedUrl?, companyId?, projectId?, apiToken?, feedFormat? }`
+  - **Line 85-90**: Validate either feedUrl OR (companyId + projectId + apiToken)
+  - **Line 93-102**: Test connection before saving using `testConnection()`
+  - **Line 105-141**: Upsert to `channable_integrations` table
+  - **Security Note Line 127**: TODO: Encrypt api_token
+  - **Response**: `{ success, message, testResult }`
+
+- **Line 151-192**: `GET /api/v1/channable/config/:customerId` - Get saved config
+  - **Response**: `{ success, config: { feedUrl, feedFormat, lastSync, productsSynced, hasApiCredentials } }`
+
+- **Line 198-247**: `GET /api/v1/channable/products/:customerId` - List products
+  - **Query Params**: `limit=50, offset=0, search?`
+  - **Line 205-207**: Filter by shopify_customer_id and active=true
+  - **Line 210-215**: Search in product_name, product_ean, brand (case-insensitive ILIKE)
+  - **Response**: `{ success, products[], pagination: { total, limit, offset, hasMore } }`
+
+**Database Tables Used**:
+- `channable_integrations` (stores API credentials)
+- `products` (stores imported products)
+
+**3. Product Import Service (`backend/services/product-import.js`)**
+
+**Purpose**: Orchestrate import from Channable to database with deduplication
+
+**Line-by-Line Breakdown**:
+
+- **Line 11-15**: `constructor(customerId)` - Initialize with customer ID and Shopify integration
+- **Line 17-33**: `buildShopifyPayload(product)` - Transform product to Shopify format
+  - Combines brand + category in description
+  - Creates tags: ['PriceElephant', 'customer-{id}', brand, category]
+
+- **Line 38-69**: `importFromChannable(channableConfig)` - Main import method
+  - **Line 46-52**: Fetch from feed URL OR API
+  - **Line 56**: Call `importProducts()` to save to DB
+  - **Returns**: `{ created, updated, skipped, errors }`
+
+- **Line 74-115**: `importProducts(products)` - Import to database with deduplication
+  - **Line 85-87**: Check `findExistingProduct()` by EAN or external ID
+  - **Line 89-92**: Update existing OR create new
+  - **Line 94-113**: Error handling per product (partial import support)
+
+- **Line 120-139**: `findExistingProduct(product)` - Query by channable_product_id OR product_ean
+  - Uses `products` table with `shopify_customer_id` filter
+
+- **Line 144-172**: `createProduct(product)` - Insert new product
+  - Maps to: shopify_customer_id, product_name, product_ean, product_sku, brand, category, own_price, product_url, image_url, channable_product_id, active=true
+
+- **Line 177-197**: `updateProduct(existing, newData)` - Update existing product
+  - Updates: product_name, brand, category, own_price, product_url, image_url, updated_at
+
+**4. Shopify Integration (`backend/integrations/shopify.js`)**
+
+**Purpose**: Shopify Admin API wrapper for product sync
+
+**Line-by-Line Breakdown**:
+
+- **Line 18-37**: `constructor(config)` - Initialize with shop domain + access token from env vars
+  - Uses `@shopify/shopify-api` library v12.1.0
+  - Creates GraphQL client
+
+- **Line 91-175**: `createProduct(productData)` - Create product in Shopify
+  - **GraphQL Mutation**: `productCreate`
+  - **Input**: title, descriptionHtml, productType, vendor, tags, variants[{price, sku}], images[{src}]
+  - **Returns**: `{ shopifyProductId, shopifyVariantId }`
+
+- **Line 178-235**: `updateProduct(shopifyProductId, updateData)` - Update existing product
+  - **GraphQL Mutation**: `productUpdate`
+  - **Line 225-234**: Update metafields if provided
+
+- **Line 196-213**: `getCollections()` - Fetch custom collections for organization
+  - **GraphQL Query**: `collections(first: 250)`
+  - **Returns**: Array of `{ id, title, handle }`
+
+- **Line 248-286**: `getProductMetafields(productId)` - Get product metafields
+  - **GraphQL Query**: `product(id) { metafields(first: 50) }`
+  - **Returns**: Array of metafields
+
+- **Line 318-367**: `updateCompetitorData(productId, competitorData)` - Sync competitor_data metafield
+  - **Namespace**: `priceelephant`
+  - **Key**: `competitor_data`
+  - **Type**: `json`
+  - **Value**: Stringified competitor URLs + prices
+
+**Environment Variables Required**:
+```
+SHOPIFY_SHOP_DOMAIN=hobo-nl.myshopify.com
+SHOPIFY_ACCESS_TOKEN=shpat_xxxxx
+SHOPIFY_API_VERSION=2024-10
+```
+
+**5. Shopify Sync Routes (`backend/routes/shopify-routes.js`)**
+
+**Line-by-Line Breakdown**:
+
+- **Line 15-38**: `POST /api/v1/shopify/sync` - Sync limited products to Shopify
+  - **Request**: `{ customerId, limit=10 }`
+  - **Line 24**: Uses `ShopifySyncService.syncProductsToShopify()`
+  - **Response**: `{ success, results }`
+
+- **Line 44-71**: `POST /api/v1/shopify/sync-all` - Bulk sync in background
+  - **Request**: `{ customerId }`
+  - **Line 52**: Runs `syncAllProducts()` asynchronously
+  - **Response**: `{ success, message: 'Bulk sync started in background' }`
+
+- **Line 77-100**: `POST /api/v1/shopify/sync-prices/:productId` - Update competitor prices
+  - **Params**: `productId`
+  - **Line 83**: Calls `syncCompetitorPrices(productId)`
+  - **Response**: `{ success, message }`
+
+**6. Product Routes (`backend/routes/product-routes.js`)**
+
+**Purpose**: Product CRUD + variant grouping + bulk import
+
+**Line-by-Line Breakdown**:
+
+- **Line 10-24**: `getProductColumns()` - Cache product table columns for validation
+  - Queries `information_schema.columns` once
+  - Prevents SQL errors from undefined columns
+
+- **Line 26-41**: `filterProductPayload(payload)` - Remove undefined fields before DB insert
+
+- **Line 44-234**: `POST /api/v1/products/import` - Bulk import with variant detection
+  - **Request**: `{ products[], enable_variant_grouping=true }`
+  - **Line 58-67**: Group products by customer
+  - **Line 71**: Call `groupProducts()` from variant-grouping utility
+  - **Line 76-97**: Check if parent product exists by EAN
+  - **Line 99-109**: Single variant → import as standalone
+  - **Line 111-174**: Multiple variants → create parent + children with `createShopifyVariants()`
+  - **Response**: `{ imported, skipped, failed, variants_created, parent_products, errors[] }`
+
+- **Line 236-298**: `POST /api/v1/products` - Create single product
+  - **Request**: `{ shopify_customer_id, product_name, product_ean, product_sku, brand, category, own_price, ... }`
+  - **Line 250**: Filter payload with `filterProductPayload()`
+  - **Line 254**: Insert to `products` table
+  - **Response**: `{ success, product }`
+
+- **Line 300-370**: `GET /api/v1/products/:customerId` - List customer products
+  - **Query**: `limit=50, offset=0, search?`
+  - **Line 317-325**: Search in product_name, product_ean, brand
+  - **Line 328**: Join competitor_prices to count competitors
+  - **Response**: `{ success, products[], pagination }`
+
+- **Line 372-427**: `GET /api/v1/products/:customerId/:productId` - Get single product
+  - **Line 381**: Fetch product by id + shopify_customer_id
+  - **Line 386-420**: Join competitors from `competitor_prices` table
+  - **Response**: `{ success, product: { ...productData, competitors[] } }`
+
+**Variant Grouping Logic** (`backend/utils/variant-grouping.js`):
+- Groups products by base name (removes size/color/variant identifiers)
+- Detects variant attributes (size, color, material, etc.)
+- Creates Shopify variant options (max 3 per product)
+- Assigns variant position (1, 2, 3...)
+
+**7. Dashboard Frontend (`theme/assets/priceelephant-dashboard.js`)**
+
+**Purpose**: Single Page Application for customer product management
+
+**Line-by-Line Breakdown**:
+
+- **Line 1-27**: Initialization and debug utilities
+  - **Line 32**: Get customerId from `data-customer-id` attribute
+  - **Line 33-43**: Get API base URL from theme settings or fallback to Railway
+
+- **Line 252-293**: `fetchCustomerTier()` - Get customer subscription tier
+  - **Line 256**: `GET /api/v1/customers/{customerId}/tier`
+  - **Line 267-272**: Enterprise tier (product_limit=0) gets unlimited products
+  - **Line 273-280**: Apply enterprise defaults to sitemap form
+
+- **Line 296-330**: `apiFetch(endpoint, options)` - Wrapper for all API calls
+  - **Line 301**: Constructs full URL with `${apiBaseUrl}${endpoint}`
+  - **Line 303-325**: Error handling with JSON parsing fallback
+  - **Returns**: Parsed JSON response
+
+- **Line 656-681**: `loadChannableConfig()` - Load Channable integration status
+  - **Line 658**: `GET /api/v1/channable/config/${customerId}`
+  - **Line 668-678**: Display last sync time and product count
+
+- **Line 683-733**: `loadSitemapConfig()` - Load sitemap configuration
+  - Similar pattern to Channable config
+
+- **Line 738-830**: `loadProducts(searchTerm, page=1)` - Load product list
+  - **Line 743**: `GET /api/v1/products/${customerId}?limit=50&offset=${offset}&search=${searchTerm}`
+  - **Line 757-820**: Render product cards with competitor count, sync status
+  - **Line 776-790**: Render product actions (view, edit, sync, delete)
+
+- **Line 1949-1992**: `init()` - Application initialization
+  - **Line 1950**: Fetch customer tier
+  - **Line 1951**: Load Channable config
+  - **Line 1952**: Load sitemap config
+  - **Line 1953**: Load initial products
+  - **Line 1955-1988**: Attach all event listeners
+  - **Line 1991**: Call `init()` on DOM ready
+
+**Authentication**:
+- Uses Shopify customer session (liquid template variable)
+- Customer ID passed via `data-customer-id` attribute
+- No separate login system (relies on Shopify customer account)
+
+**API Communication**:
+- All requests go to Railway backend (`https://web-production-2568.up.railway.app`)
+- Base URL configurable in theme settings
+- JSON request/response format
+- Error handling displays alerts in UI
+
+**8. Multi-Language Support**
+
+**File**: `locales/nl.json`
+
+**Structure**:
+```json
+{
+  "general": {
+    "search": "Zoeken",
+    "save": "Opslaan",
+    "cancel": "Annuleren"
+  },
+  "products": {
+    "title": "Producten",
+    "add_product": "Product toevoegen",
+    "no_products": "Geen producten gevonden"
+  },
+  "channable": {
+    "title": "Channable Integratie",
+    "configure": "Configureren",
+    "import": "Importeren"
+  }
+}
+```
+
+**Liquid Template**: `templates/index.liquid`
+- Loads translations: `{{ 'products.title' | t }}`
+- Embeds customer ID: `data-customer-id="{{ customer.id }}"`
+- Includes dashboard JS: `{{ 'priceelephant-dashboard.js' | asset_url | script_tag }}`
+
+**9. Database Schema (Sprint 1 Tables)**
+
+**products table**:
+```sql
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    shopify_customer_id VARCHAR(255) NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    product_ean VARCHAR(13),
+    product_sku VARCHAR(100),
+    brand VARCHAR(255),
+    category VARCHAR(255),
+    own_price DECIMAL(10,2),
+    product_url TEXT,
+    image_url TEXT,
+    channable_product_id VARCHAR(255),
+    shopify_product_id VARCHAR(255),
+    shopify_variant_id VARCHAR(255),
+    active BOOLEAN DEFAULT true,
+    is_parent_product BOOLEAN DEFAULT false,
+    variant_position INTEGER,
+    variant_option1_name VARCHAR(100),
+    variant_option1_value VARCHAR(255),
+    variant_option2_name VARCHAR(100),
+    variant_option2_value VARCHAR(255),
+    variant_option3_name VARCHAR(100),
+    variant_option3_value VARCHAR(255),
+    sync_status VARCHAR(50),
+    last_synced_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(shopify_customer_id, product_ean)
+);
+
+CREATE INDEX idx_products_customer ON products(shopify_customer_id);
+CREATE INDEX idx_products_ean ON products(product_ean);
+CREATE INDEX idx_products_channable ON products(channable_product_id);
+CREATE INDEX idx_products_shopify ON products(shopify_product_id);
+```
+
+**channable_integrations table**:
+```sql
+-- Created via migration, not in schema.sql
+-- Stores per-customer Channable API credentials
+CREATE TABLE channable_integrations (
+    id SERIAL PRIMARY KEY,
+    shopify_customer_id VARCHAR(255) NOT NULL UNIQUE,
+    channable_company_id VARCHAR(255),
+    channable_project_id VARCHAR(255),
+    feed_url TEXT,
+    api_token VARCHAR(500), -- TODO: Encrypt
+    feed_format VARCHAR(20) DEFAULT 'xml',
+    last_sync_at TIMESTAMP,
+    products_synced INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**10. API Endpoints Summary (Sprint 1)**
+
+**Channable**:
+- `POST /api/v1/channable/import` - Import products from Channable
+- `POST /api/v1/channable/configure` - Save Channable credentials
+- `GET /api/v1/channable/config/:customerId` - Get config
+- `GET /api/v1/channable/products/:customerId` - List products
+
+**Shopify**:
+- `POST /api/v1/shopify/sync` - Sync limited products
+- `POST /api/v1/shopify/sync-all` - Bulk sync (background)
+- `POST /api/v1/shopify/sync-prices/:productId` - Update prices
+
+**Products**:
+- `POST /api/v1/products/import` - Bulk import with variant grouping
+- `POST /api/v1/products` - Create single product
+- `GET /api/v1/products/:customerId` - List products with pagination
+- `GET /api/v1/products/:customerId/:productId` - Get product details
+
+**11. Configuration & Environment**
+
+**Required Environment Variables**:
+```bash
+# Shopify
+SHOPIFY_SHOP_DOMAIN=hobo-nl.myshopify.com
+SHOPIFY_ACCESS_TOKEN=shpat_xxxxx
+SHOPIFY_API_VERSION=2024-10
+
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
+
+# Redis
+REDIS_URL=redis://host:6379
+
+# API
+PORT=3000
+NODE_ENV=production
+```
+
+**Package Dependencies** (Sprint 1 additions):
+```json
+{
+  "dependencies": {
+    "@shopify/shopify-api": "^12.1.0",
+    "axios": "^1.6.0",
+    "xml2js": "^0.6.0"
+  }
+}
+```
+
+**12. Data Flow Diagram**
+
+```
+Channable Feed (XML/CSV)
+         ↓
+channable.js (parse)
+         ↓
+ProductImportService
+         ↓
+Database (products table)
+         ↓
+ShopifySyncService
+         ↓
+Shopify Admin API
+         ↓
+Customer Shopify Store
+
+Dashboard → API Routes → Services → Database/Shopify
+```
+
+**13. Sprint 1 Achievements**
+
+✅ **Channable Integration**:
+- XML/CSV feed parsing with auto-detection
+- API integration with authentication
+- Connection testing before config save
+- Per-customer credential storage (encrypted TODO)
+
+✅ **Shopify Integration**:
+- GraphQL product create/update
+- Metafield management
+- Collection fetching
+- Variant support
+
+✅ **Product Management**:
+- Bulk import with deduplication (by EAN)
+- Variant grouping and detection
+- Parent-child product relationships
+- Pagination and search
+
+✅ **Customer Dashboard**:
+- Single Page Application (1992 lines)
+- Real-time product list
+- Channable/Sitemap config panels
+- Customer tier detection
+- Multi-language (Dutch)
+
+✅ **Authentication**:
+- Shopify customer session integration
+- Customer ID-based data isolation
+- No separate login required
+
 ✅ **Sprint 2 (Scraping at Scale)** - COMPLETE
 - Multi-retailer scraper (Coolblue, Bol.com, Amazon.nl, MediaMarkt)
 - Bull queue with 5 concurrent workers
