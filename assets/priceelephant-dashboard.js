@@ -1498,42 +1498,6 @@
         { method: 'POST' }
       );
 
-  async function handleSyncProducts() {
-    if (!customerId) {
-      showStatus(productsStatus, 'Customer ID niet gevonden', 'error');
-      return;
-    }
-
-    setLoading(syncProductsBtn, true);
-    showStatus(productsStatus, 'Producten synchroniseren...', null);
-    updateDebug('action', '🔄 Sync producten');
-
-    try {
-      const response = await apiFetch(`/api/v1/admin/sync-collection/${customerId}`, {
-        method: 'POST'
-      });
-
-      if (response.success) {
-        showStatus(
-          productsStatus,
-          `✅ ${response.total} producten gesynchroniseerd (${response.created} nieuw, ${response.updated} bijgewerkt)`,
-          'success'
-        );
-        // Refresh products list
-        await loadProducts();
-        updateDebug('action', `✅ Sync voltooid: ${response.total} producten`);
-      } else {
-        showStatus(productsStatus, `Synchronisatie mislukt: ${response.error || 'Onbekende fout'}`, 'error');
-        updateDebug('error', `❌ Sync mislukt: ${response.error}`);
-      }
-    } catch (error) {
-      showStatus(productsStatus, `Synchronisatie mislukt: ${error.message}`, 'error');
-      updateDebug('error', `❌ Sync mislukt: ${error.message}`);
-    } finally {
-      setLoading(syncProductsBtn, false);
-    }
-  }
-
       const snapshot = response?.snapshot;
       if (snapshot) {
         const priceText = formatPrice(snapshot.price);
@@ -1654,6 +1618,42 @@
         body: JSON.stringify(variantData),
       });
       variantForm.reset();
+
+  async function handleSyncProducts() {
+    if (!customerId) {
+      showStatus(productsStatus, 'Customer ID niet gevonden', 'error');
+      return;
+    }
+
+    setLoading(syncProductsBtn, true);
+    showStatus(productsStatus, 'Producten synchroniseren...', null);
+    updateDebug('action', '🔄 Sync producten');
+
+    try {
+      const response = await apiFetch(`/api/v1/admin/sync-collection/${customerId}`, {
+        method: 'POST'
+      });
+
+      if (response.success) {
+        showStatus(
+          productsStatus,
+          `✅ ${response.total} producten gesynchroniseerd (${response.created} nieuw, ${response.updated} bijgewerkt)`,
+          'success'
+        );
+        // Refresh products list
+        await loadProducts();
+        updateDebug('action', `✅ Sync voltooid: ${response.total} producten`);
+      } else {
+        showStatus(productsStatus, `Synchronisatie mislukt: ${response.error || 'Onbekende fout'}`, 'error');
+        updateDebug('error', `❌ Sync mislukt: ${response.error}`);
+      }
+    } catch (error) {
+      showStatus(productsStatus, `Synchronisatie mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ Sync mislukt: ${error.message}`);
+    } finally {
+      setLoading(syncProductsBtn, false);
+    }
+  }
       showStatus(variantsStatus, 'Variant toegevoegd.', 'success');
       await openVariantManager(state.selectedProductId);
       // Refresh product list to update variant count
