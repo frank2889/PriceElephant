@@ -104,6 +104,18 @@
               <input type="text" id="pe-url-pattern" name="productUrlPattern" placeholder="/product/">
               <small class="pe-text-muted">Optioneel: pre-filter URLs voordat intelligent scannen start (versnelt proces)</small>
             </div>
+            <div id="pe-resume-status" style="display: none; padding: 12px; background: #f0f9ff; border-left: 3px solid #3b82f6; margin-bottom: 12px; border-radius: 4px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span style="font-size: 18px;">▶️</span>
+                <strong style="color: #1e40af;">Voortgang opgeslagen</strong>
+              </div>
+              <div style="font-size: 14px; color: #475569;">
+                Laatst gestopt bij: <strong id="pe-resume-position">URL #0</strong>
+              </div>
+              <small style="color: #64748b; display: block; margin-top: 4px;">
+                💡 Laat de checkbox hieronder <u>uitgevinkt</u> om verder te gaan waar je gestopt bent.
+              </small>
+            </div>
             <div class="pe-field">
               <label>
                 <input type="checkbox" id="pe-reset-progress" name="resetProgress">

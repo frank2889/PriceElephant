@@ -445,11 +445,25 @@ router.get('/config/:customerId', async (req, res) => {
       enterprise: isEnterprise
     });
 
+    // Get last scraped page from sitemap_configs if available
+    let lastScrapedPage = 0;
+    try {
+      const sitemapConfig = await db('sitemap_configs')
+        .where({ customer_id: customerId })
+        .first();
+      if (sitemapConfig && sitemapConfig.last_scraped_page) {
+        lastScrapedPage = sitemapConfig.last_scraped_page;
+      }
+    } catch (err) {
+      console.log('[Sitemap Config] No sitemap_configs entry found:', err.message);
+    }
+
     res.json({
       sitemapUrl: config.sitemap_url,
       productUrlPattern: config.sitemap_product_url_pattern,
       maxProducts,
-      enterprise: isEnterprise
+      enterprise: isEnterprise,
+      lastScrapedPage
     });
   } catch (error) {
     console.error('[Sitemap Config] ❌ Load error:', error.message);

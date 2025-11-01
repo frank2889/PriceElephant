@@ -701,6 +701,18 @@
             }
           }
         }
+        
+        // Show resume status if there's saved progress
+        if (config.lastScrapedPage && config.lastScrapedPage > 0) {
+          const resumeStatus = document.getElementById('pe-resume-status');
+          const resumePosition = document.getElementById('pe-resume-position');
+          if (resumeStatus && resumePosition) {
+            resumePosition.textContent = `URL #${config.lastScrapedPage}`;
+            resumeStatus.style.display = 'block';
+            console.log('[loadSitemapConfig] Resume status shown at position:', config.lastScrapedPage);
+          }
+        }
+        
         showStatus(sitemapStatus, 'Sitemap configuratie geladen.', 'success');
         setApiStatus('sitemap', 'success');
       } else {
@@ -1643,6 +1655,25 @@
     if (variantForm) {
       variantForm.addEventListener('submit', handleVariantSubmit);
       console.log('[PriceElephant] Variant form listener attached');
+      listenersCount++;
+    }
+    
+    // Reset progress checkbox - show/hide resume status
+    const resetProgressCheckbox = document.getElementById('pe-reset-progress');
+    const resumeStatus = document.getElementById('pe-resume-status');
+    if (resetProgressCheckbox && resumeStatus) {
+      resetProgressCheckbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          resumeStatus.style.display = 'none';
+        } else {
+          // Only show if there's actually saved progress
+          const resumePosition = document.getElementById('pe-resume-position');
+          if (resumePosition && resumePosition.textContent !== 'URL #0') {
+            resumeStatus.style.display = 'block';
+          }
+        }
+      });
+      console.log('[PriceElephant] Reset progress checkbox listener attached');
       listenersCount++;
     }
     
