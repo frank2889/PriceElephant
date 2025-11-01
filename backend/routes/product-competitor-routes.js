@@ -304,7 +304,7 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
     // Get competitors from database (source of truth for URLs)
     const competitors = await db('competitor_prices')
       .where({ product_id: productId })
-      .select('id', 'retailer', 'competitor_url', 'price', 'in_stock', 'scraped_at');
+      .select('id', 'retailer', 'url', 'price', 'in_stock', 'scraped_at');
 
     if (competitors.length === 0) {
       return res.status(400).json({ 
@@ -328,8 +328,8 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
 
     for (const comp of competitors) {
       try {
-        console.log(`  Scraping ${comp.retailer} - ${comp.competitor_url}...`);
-        const result = await scraper.scrapeProduct(comp.competitor_url, null, null, productId);
+        console.log(`  Scraping ${comp.retailer} - ${comp.url}...`);
+        const result = await scraper.scrapeProduct(comp.url, null, null, productId);
 
         if (result?.price) {
           // Update existing competitor_prices record
@@ -346,7 +346,7 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
           // Add to scraped competitors for metafield sync
           scrapedCompetitors.push({
             retailer: comp.retailer,
-            url: comp.competitor_url,
+            url: comp.url,
             price: result.price,
             original_price: result.originalPrice || null,
             in_stock: result.inStock !== false
@@ -355,7 +355,7 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
         
         results.push({
           retailer: comp.retailer,
-          url: comp.competitor_url,
+          url: comp.url,
           success: true,
           price: result.price,
           original_price: result.originalPrice,
@@ -368,10 +368,10 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 2000));
 
       } catch (error) {
-        console.error(`  ❌ Failed to scrape ${comp.competitor_url}:`, error.message);
+        console.error(`  ❌ Failed to scrape ${comp.url}:`, error.message);
         results.push({
           retailer: comp.retailer,
-          url: comp.competitor_url,
+          url: comp.url,
           success: false,
           error: error.message
         });
