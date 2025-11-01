@@ -1618,6 +1618,16 @@
         body: JSON.stringify(variantData),
       });
       variantForm.reset();
+      showStatus(variantsStatus, 'Variant toegevoegd.', 'success');
+      await openVariantManager(state.selectedProductId);
+      // Refresh product list to update variant count
+      await loadProducts(productSearchInput.value.trim());
+    } catch (error) {
+      showStatus(variantsStatus, `Toevoegen mislukt: ${error.message}`, 'error');
+    } finally {
+      setLoading(variantForm.querySelector('button[type="submit"]'), false);
+    }
+  }
 
   async function handleSyncProducts() {
     if (!customerId) {
@@ -1652,16 +1662,6 @@
       updateDebug('error', `❌ Sync mislukt: ${error.message}`);
     } finally {
       setLoading(syncProductsBtn, false);
-    }
-  }
-      showStatus(variantsStatus, 'Variant toegevoegd.', 'success');
-      await openVariantManager(state.selectedProductId);
-      // Refresh product list to update variant count
-      await loadProducts(productSearchInput.value.trim());
-    } catch (error) {
-      showStatus(variantsStatus, `Toevoegen mislukt: ${error.message}`, 'error');
-    } finally {
-      setLoading(variantForm.querySelector('button[type="submit"]'), false);
     }
   }
 
