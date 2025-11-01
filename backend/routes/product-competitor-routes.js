@@ -68,7 +68,7 @@ router.post('/:productId/competitors', async (req, res) => {
       return res.status(400).json({ error: 'Valid URL required' });
     }
 
-    // Check product exists and get client_id
+    // Check product exists
     const product = await db('products')
       .where({ id: productId })
       .first();
@@ -77,21 +77,21 @@ router.post('/:productId/competitors', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Check subscription limits
-    const plan = await db('clients')
-      .join('subscription_plans', 'clients.subscription_plan_id', 'subscription_plans.id')
-      .where({ 'clients.id': product.client_id })
-      .select('subscription_plans.max_competitors')
+    // Check subscription limits via customer tier
+    const tier = await db('customer_tiers')
+      .where({ customer_id: product.shopify_customer_id })
       .first();
+
+    const maxCompetitors = tier?.competitor_limit || 5; // Default to 5
 
     const currentCompetitors = await db('competitor_prices')
       .where({ product_id: productId })
       .groupBy('retailer')
       .count('* as count');
 
-    if (currentCompetitors.length >= (plan?.max_competitors || 3)) {
+    if (maxCompetitors > 0 && currentCompetitors.length >= maxCompetitors) {
       return res.status(403).json({ 
-        error: `Competitor limit reached (${plan?.max_competitors || 3} max). Upgrade plan for more.`,
+        error: `Competitor limit reached (${maxCompetitors} max for ${tier?.tier || 'your'} tier). Upgrade for more.`,
         upgrade_url: '/pricing'
       });
     }
