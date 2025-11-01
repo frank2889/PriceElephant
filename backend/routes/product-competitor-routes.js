@@ -301,37 +301,11 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
       });
     }
 
-    // Initialize Shopify integration
-    const shopify = new ShopifyIntegration(
-      customerConfig.shopify_domain,
-      customerConfig.shopify_access_token
-    );
+    // Get competitors from database (source of truth for URLs)
+    const competitors = await db('competitor_prices')
+      .where({ product_id: productId })
+      .select('id', 'retailer', 'competitor_url', 'price', 'in_stock', 'scraped_at');
 
-    // Get competitor URLs from Shopify metafield
-    const metafields = await shopify.getProductMetafields(product.shopify_product_id);
-    const competitorDataMetafield = metafields.find(m => 
-      m.namespace === 'priceelephant' && m.key === 'competitor_data'
-    );
-
-    if (!competitorDataMetafield || !competitorDataMetafield.value) {
-      return res.status(400).json({ 
-        error: 'No competitor URLs configured',
-        hint: 'Add competitors first via Beheer button'
-      });
-    }
-
-    // Parse competitor data from metafield
-    let competitorData;
-    try {
-      competitorData = JSON.parse(competitorDataMetafield.value);
-    } catch (error) {
-      return res.status(500).json({ 
-        error: 'Invalid competitor data format in metafield'
-      });
-    }
-
-    const competitors = competitorData.competitors || [];
-    
     if (competitors.length === 0) {
       return res.status(400).json({ 
         error: 'No competitor URLs configured',
@@ -339,49 +313,49 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
       });
     }
 
+    // Initialize Shopify integration for syncing results
+    const shopify = new ShopifyIntegration(
+      customerConfig.shopify_domain,
+      customerConfig.shopify_access_token
+    );
+
     console.log(`🔍 Re-scraping ${competitors.length} competitors for product ${product.product_name}...`);
 
     // Scrape each competitor
     const scraper = new HybridScraper();
     const results = [];
+    const scrapedCompetitors = [];
 
     for (const comp of competitors) {
       try {
-        console.log(`  Scraping ${comp.retailer || comp.url}...`);
-        const result = await scraper.scrapeProduct(comp.url, null, null, productId);
+        console.log(`  Scraping ${comp.retailer} - ${comp.competitor_url}...`);
+        const result = await scraper.scrapeProduct(comp.competitor_url, null, null, productId);
 
         if (result?.price) {
-          // Save to database
-          await db('competitor_prices').insert({
-            product_id: productId,
-            retailer: comp.retailer || normaliseRetailer(comp.url),
+          // Update existing competitor_prices record
+          await db('competitor_prices')
+            .where({ id: comp.id })
+            .update({
+              price: result.price,
+              original_price: result.originalPrice || null,
+              in_stock: result.inStock !== false,
+              scraped_at: new Date(),
+              updated_at: new Date()
+            });
+
+          // Add to scraped competitors for metafield sync
+          scrapedCompetitors.push({
+            retailer: comp.retailer,
+            url: comp.competitor_url,
             price: result.price,
             original_price: result.originalPrice || null,
-            url: comp.url,
-            in_stock: result.inStock !== false,
-            scraped_at: new Date(),
-            created_at: new Date()
+            in_stock: result.inStock !== false
           });
-
-          // Record price history
-          await competitorPriceHistory.recordPrice(
-            productId,
-            comp.retailer || normaliseRetailer(comp.url),
-            comp.url,
-            result.price,
-            result.originalPrice || null,
-            result.inStock !== false
-          );
-
-          // Update competitor data in array
-          comp.price = result.price;
-          comp.original_price = result.originalPrice || null;
-          comp.in_stock = result.inStock !== false;
         }
         
         results.push({
-          retailer: comp.retailer || normaliseRetailer(comp.url),
-          url: comp.url,
+          retailer: comp.retailer,
+          url: comp.competitor_url,
           success: true,
           price: result.price,
           original_price: result.originalPrice,
@@ -394,22 +368,22 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 2000));
 
       } catch (error) {
-        console.error(`  ❌ Failed to scrape ${comp.url}:`, error.message);
+        console.error(`  ❌ Failed to scrape ${comp.competitor_url}:`, error.message);
         results.push({
-          retailer: comp.retailer || normaliseRetailer(comp.url),
-          url: comp.url,
+          retailer: comp.retailer,
+          url: comp.competitor_url,
           success: false,
           error: error.message
         });
       }
     }
 
-    // Update Shopify metafield with latest prices
+    // Update Shopify metafield with latest prices (bidirectional sync)
     try {
       await shopify.updateCompetitorData(
         product.shopify_product_id,
-        competitorData.own_url,
-        competitors
+        product.product_url || '',
+        scrapedCompetitors
       );
       console.log(`✅ Updated competitor_data metafield for product ${product.shopify_product_id}`);
     } catch (metafieldError) {
