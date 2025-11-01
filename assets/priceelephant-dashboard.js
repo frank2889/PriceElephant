@@ -482,6 +482,15 @@
           </span>
         </td>
         <td style="text-align: right;">
+          ${competitorCount > 0 ? `
+            <button
+              class="pe-button pe-button--success pe-button--small"
+              data-action="rescrape-competitors"
+              data-product-id="${product.id}"
+              style="margin-right: 4px;"
+              title="Concurrent prijzen nu ophalen"
+            >🔄 Re-scrape</button>
+          ` : ''}
           ${syncStatus !== 'synced' ? `
             <button
               class="pe-button pe-button--primary pe-button--small"
@@ -1524,6 +1533,44 @@
     }
   }
 
+  async function handleRescrapeCompetitors(productId, triggerButton) {
+    if (!productId) {
+      showStatus(productsStatus, 'Product ID niet gevonden.', 'error');
+      return;
+    }
+
+    if (triggerButton) {
+      setLoading(triggerButton, true);
+    }
+
+    try {
+      showStatus(productsStatus, 'Concurrent prijzen ophalen...', 'info');
+      
+      const response = await apiFetch(
+        `/api/v1/products/${productId}/competitors/scrape`,
+        { method: 'POST' }
+      );
+
+      const { scraped, failed, results } = response;
+      
+      if (scraped > 0) {
+        const failedText = failed > 0 ? ` (${failed} mislukt)` : '';
+        showStatus(productsStatus, `✅ ${scraped} concurrent${scraped !== 1 ? 'en' : ''} opgehaald${failedText}`, 'success');
+        
+        // Reload products to show updated competitor count/status
+        await loadProducts(productSearchInput.value.trim());
+      } else {
+        showStatus(productsStatus, 'Geen concurrenten om te scrapen', 'warning');
+      }
+    } catch (error) {
+      showStatus(productsStatus, `Re-scrape mislukt: ${error.message}`, 'error');
+    } finally {
+      if (triggerButton) {
+        setLoading(triggerButton, false);
+      }
+    }
+  }
+
   // Variant management functions
   async function openVariantManager(productId) {
     const product = state.products.find((item) => String(item.id) === String(productId));
@@ -1841,6 +1888,8 @@
         openVariantManager(productId);
       } else if (action === 'remove-product') {
         handleRemoveProduct(productId, button);
+      } else if (action === 'rescrape-competitors') {
+        handleRescrapeCompetitors(productId, button);
       }
     });
 
