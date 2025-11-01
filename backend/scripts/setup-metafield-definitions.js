@@ -50,10 +50,26 @@ const metafieldDefinitions = [
   },
   {
     ownerType: 'PRODUCT',
+    name: 'Competitor Data',
+    namespace: 'priceelephant',
+    key: 'competitor_data',
+    description: 'Multi-client competitor data (JSON with own_url and competitors array)',
+    type: 'json',
+  },
+  {
+    ownerType: 'PRODUCT',
     name: 'Price History',
     namespace: 'priceelephant',
     key: 'price_history',
     description: 'Historical price data (JSON array with date, price, retailer)',
+    type: 'json',
+  },
+  {
+    ownerType: 'PRODUCT',
+    name: 'Price History Analysis',
+    namespace: 'priceelephant',
+    key: 'price_history_analysis',
+    description: 'Historical price analysis with trends and year-over-year comparisons (JSON)',
     type: 'json',
   },
   {
