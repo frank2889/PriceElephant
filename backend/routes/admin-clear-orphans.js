@@ -106,7 +106,6 @@ router.post('/sync-collection/:customerId', async (req, res) => {
           own_price: product.variants?.[0]?.price || null,
           shopify_product_id: String(product.id),
           image_url: product.image?.src || null,
-          sync_status: 'synced',
           created_at: new Date(),
           updated_at: new Date()
         });
