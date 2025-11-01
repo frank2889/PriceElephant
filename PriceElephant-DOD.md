@@ -10,7 +10,373 @@
 - 4-tier hybrid scraper (Direct → Free Proxy → WebShare → AI Vision)
 - Cost-optimized scraping: €5/month vs €600+ traditional
 
-✅ **Sprint 1 (MVP Core)** - COMPLETE  
+---
+
+## **TECHNICAL ARCHITECTURE: Sprint 0 (Foundation)**
+
+### **📁 Core Infrastructure Files**
+
+**`backend/knexfile.js`** (59 lines)
+- **Line 3-23:** Development environment configuration
+  - PostgreSQL client setup
+  - Connection: `localhost:5432` or `DATABASE_URL`
+  - Pool: min 2, max 10 connections
+  - Migrations directory: `./database/migrations`
+  - Seeds directory: `./database/seeds`
+- **Line 25-43:** Test environment configuration
+  - Separate test database: `priceelephant_test`
+  - Pool: min 1, max 5 connections (smaller for tests)
+  - Environment variable overrides for CI/CD
+- **Line 45-59:** Production environment configuration
+  - Uses `DATABASE_URL` environment variable (Railway/Heroku)
+  - Pool: configurable via `DATABASE_POOL_MIN` and `DATABASE_POOL_MAX`
+  - SSL mode: `require` for cloud databases
+  - Migration table: `knex_migrations`
+
+**`backend/config/database.js`** (8 lines)
+- **Line 1:** Import Knex query builder
+- **Line 2:** Import knexfile configuration
+- **Line 4:** Detect environment (development/test/production)
+- **Line 5:** Initialize Knex instance with environment config
+- **Line 7:** Export database connection singleton
+
+**`backend/config/redis.js`** (38 lines)
+- **Line 1-17:** Redis client configuration
+  - URL: `REDIS_URL` or `redis://localhost:6379`
+  - Password: `REDIS_PASSWORD` (optional)
+  - Reconnection strategy: exponential backoff (max 10 retries)
+  - Max retry delay: 3 seconds
+- **Line 19-31:** Event handlers
+  - `error`: Log Redis errors
+  - `connect`: Confirm successful connection
+  - `reconnecting`: Log reconnection attempts
+- **Line 34-39:** Auto-connect on module load
+  - Async IIFE for connection
+  - Error handling for connection failures
+  - Module exports connected client
+
+**`backend/app.js`** (93 lines)
+- **Line 1-11:** Core dependencies
+  - Express, CORS, Helmet, Morgan, Rate limiting
+  - Sentry for error tracking
+  - Route imports (12 route modules)
+- **Line 26-30:** Background job initialization
+  - `jobs/sitemap-import-queue` - Sitemap processing
+  - `jobs/scraper-queue` - Price scraping jobs
+- **Line 32-41:** Sentry initialization
+  - DSN: `SENTRY_DSN` environment variable
+  - Environment detection
+  - Performance monitoring
+  - Error tracking
+- **Line 50-62:** Middleware stack
+  - CORS: Allow all origins
+  - Webhook raw body capture (for HMAC verification)
+  - JSON/URL-encoded parsing
+  - Morgan HTTP logging
+  - Static files: `/public`
+  - Rate limiting: 100 requests per 15 minutes
+- **Line 66-75:** Route mounting
+  - `/api/v1/channable` - Channable routes
+  - `/api/v1/shopify` - Shopify routes
+  - `/api/v1/products` - Product routes (3 routers)
+  - `/api/v1/scraper` - Scraper routes
+  - `/api/v1/sitemap` - Sitemap routes
+  - `/api/v1/customers` - Customer routes
+  - `/api/v1/diagnostic` - Diagnostic routes
+  - `/api/v1/webhooks` - Webhook routes
+  - `/api/v1/admin` - Admin routes
+- **Line 77-93:** Health check and error handling
+  - `GET /health` - Health check endpoint
+  - Global error handler with Sentry integration
+  - 404 handler for unknown routes
+
+**`backend/server.js`** (26 lines)
+- **Line 1-4:** Imports (app, db, redis)
+- **Line 6:** Port configuration (default: 3000)
+- **Line 8-12:** Database connection test
+  - `SELECT NOW()` query to verify PostgreSQL
+  - Logs success with timestamp
+  - Catches connection errors
+- **Line 14-17:** Redis connection verification
+  - Pings Redis server
+  - Logs success
+  - Catches Redis errors
+- **Line 19-26:** Express server startup
+  - Listens on configured port
+  - Logs server URL
+  - Catches startup errors
+
+### **🗄️ Database Schema (15 Tables)**
+
+#### **Core Tables**
+
+**`clients` Table**
+```sql
+CREATE TABLE clients (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  shopify_domain VARCHAR(255) UNIQUE NOT NULL,
+  shopify_access_token TEXT,
+  api_key VARCHAR(255) UNIQUE NOT NULL,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+**Purpose:** Multi-tenant client management. Each Shopify store is a client.
+
+**`products` Table** (Initial schema from schema.sql)
+```sql
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  shopify_product_id BIGINT,
+  title VARCHAR(500) NOT NULL,
+  sku VARCHAR(100),
+  ean VARCHAR(20),
+  current_price DECIMAL(10,2),
+  compare_at_price DECIMAL(10,2),
+  product_url TEXT,
+  image_url TEXT,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(client_id, shopify_product_id)
+);
+```
+**Purpose:** Product catalog. Links to Shopify products via `shopify_product_id`.
+
+**`competitor_prices` Table**
+```sql
+CREATE TABLE competitor_prices (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  retailer VARCHAR(100) NOT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  url TEXT,
+  in_stock BOOLEAN DEFAULT true,
+  scraped_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_competitor_prices_product ON competitor_prices(product_id, scraped_at DESC);
+CREATE INDEX idx_competitor_prices_retailer ON competitor_prices(retailer, scraped_at DESC);
+```
+**Purpose:** Real-time competitor pricing data. New row for each scrape.
+
+**`price_history` Table** (Partitioned)
+```sql
+CREATE TABLE price_history (
+  id BIGSERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  price DECIMAL(10,2) NOT NULL,
+  source VARCHAR(50) DEFAULT 'shopify',  -- 'shopify' or 'manual'
+  recorded_at TIMESTAMP DEFAULT NOW()
+) PARTITION BY RANGE (recorded_at);
+
+-- Monthly partitions for performance
+CREATE TABLE price_history_2025_10 PARTITION OF price_history
+  FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
+
+CREATE TABLE price_history_2025_11 PARTITION OF price_history
+  FOR VALUES FROM ('2025-11-01') TO ('2025-12-01');
+
+CREATE INDEX idx_price_history_product ON price_history(product_id, recorded_at DESC);
+```
+**Purpose:** Long-term price history for charts. Partitioned by month for performance at scale.
+
+**`price_alerts` Table**
+```sql
+CREATE TABLE price_alerts (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  email VARCHAR(255) NOT NULL,
+  target_price DECIMAL(10,2),
+  alert_type VARCHAR(50) DEFAULT 'price_drop',  -- 'price_drop', 'back_in_stock', 'competitor_lower'
+  active BOOLEAN DEFAULT true,
+  last_triggered TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_price_alerts_active ON price_alerts(product_id, active);
+```
+**Purpose:** Customer price alert subscriptions. Triggers notifications when conditions met.
+
+**`scraping_jobs` Table**
+```sql
+CREATE TABLE scraping_jobs (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  status VARCHAR(50) DEFAULT 'pending',  -- 'pending', 'running', 'completed', 'failed'
+  last_run TIMESTAMP,
+  next_run TIMESTAMP,
+  error_message TEXT,
+  retry_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_scraping_jobs_next_run ON scraping_jobs(next_run) WHERE status = 'pending';
+```
+**Purpose:** Job queue for scheduled scraping. Tracks job status and retry logic.
+
+**`analytics_events` Table**
+```sql
+CREATE TABLE analytics_events (
+  id BIGSERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  event_type VARCHAR(100) NOT NULL,  -- 'scrape_success', 'scrape_fail', 'price_change', etc.
+  event_data JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_analytics_events_client ON analytics_events(client_id, created_at DESC);
+CREATE INDEX idx_analytics_events_type ON analytics_events(event_type, created_at DESC);
+```
+**Purpose:** Analytics and monitoring. Tracks all system events with JSON metadata.
+
+#### **Additional Tables (Created by Migrations)**
+
+See individual sprint documentation for:
+- `customer_configs` (Sprint 2.12)
+- `customer_tiers` (Sprint 2.8)
+- `product_variants` (Sprint 2.12)
+- `sitemap_configs` (Sprint 2.7)
+- `learned_selectors` (Sprint 2.10)
+- `competitor_price_history` (Sprint 2.13)
+- `price_events` (Sprint 2.13)
+
+**Total Table Count:** 15 tables (7 core + 8 from migrations)
+
+### **🔧 Database Migrations**
+
+**`backend/database/migrations/20251025_initial_schema.js`**
+- Creates core tables: clients, products, price_history partitions
+- Sets up indexes for performance
+- Establishes foreign key relationships
+- Partitions price_history table by month
+
+**Migration Execution:**
+```bash
+# Development
+npx knex migrate:latest
+
+# Production (Railway)
+npx knex migrate:latest --env production
+
+# Rollback last migration
+npx knex migrate:rollback
+```
+
+### **🚀 Environment Variables**
+
+**Required:**
+- `DATABASE_URL` - PostgreSQL connection string
+  - Format: `postgresql://user:pass@host:5432/dbname`
+  - Railway auto-provides this
+- `REDIS_URL` - Redis connection string
+  - Format: `redis://host:6379`
+  - Optional password: `redis://:password@host:6379`
+- `NODE_ENV` - Environment (`development`, `test`, `production`)
+- `PORT` - Server port (default: 3000)
+
+**Optional:**
+- `REDIS_PASSWORD` - Redis authentication
+- `DATABASE_POOL_MIN` - Minimum DB connections (default: 5)
+- `DATABASE_POOL_MAX` - Maximum DB connections (default: 20)
+- `SENTRY_DSN` - Sentry error tracking URL
+- `PGUSER` - PostgreSQL username (development)
+- `TEST_DATABASE_URL` - Test database connection
+
+**Example `.env` file:**
+```env
+NODE_ENV=development
+PORT=3000
+DATABASE_URL=postgresql://postgres@localhost:5432/priceelephant_dev
+REDIS_URL=redis://localhost:6379
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/12345
+```
+
+### **📦 Core Dependencies (package.json)**
+
+**Database & Cache:**
+- `knex@2.5.1` - SQL query builder
+- `pg@8.11.3` - PostgreSQL client
+- `redis@4.6.10` - Redis client
+
+**Web Framework:**
+- `express@4.18.2` - HTTP server
+- `cors@2.8.5` - Cross-origin requests
+- `helmet@7.1.0` - Security headers
+- `morgan@1.10.0` - HTTP logging
+
+**Queue & Jobs:**
+- `bull@4.12.0` - Redis-based job queue
+- `bull-board@2.2.0` - Job queue UI
+- `node-cron@3.0.3` - Scheduled tasks
+
+**Monitoring:**
+- `@sentry/node@7.77.0` - Error tracking
+- `express-rate-limit@7.1.5` - Rate limiting
+
+### **🔄 Application Startup Flow**
+
+```
+1. Load environment variables (.env)
+   ↓
+2. Initialize Sentry (app.js line 32-41)
+   ↓
+3. Connect to PostgreSQL (server.js line 8-12)
+   ├─ Test connection with SELECT NOW()
+   └─ Log success or error
+   ↓
+4. Connect to Redis (config/redis.js line 34-39)
+   ├─ Auto-reconnect on failure
+   └─ Exponential backoff (max 10 retries)
+   ↓
+5. Initialize background jobs (app.js line 26-30)
+   ├─ Load sitemap-import-queue
+   └─ Load scraper-queue
+   ↓
+6. Mount middleware stack (app.js line 50-62)
+   ├─ CORS, Helmet, Morgan
+   ├─ Body parsers (JSON, URL-encoded)
+   └─ Rate limiting
+   ↓
+7. Mount API routes (app.js line 66-75)
+   ├─ /api/v1/* routes
+   └─ Health check endpoint
+   ↓
+8. Start Express server (server.js line 19-26)
+   ├─ Listen on PORT
+   └─ Log: "Server running on http://localhost:3000"
+```
+
+### **🎯 Sprint 0 Achievements**
+
+**Infrastructure:**
+- ✅ PostgreSQL database with 15 tables
+- ✅ Redis for job queues and caching
+- ✅ Knex migrations system
+- ✅ Express API server with middleware
+- ✅ Multi-tenant architecture (clients table)
+- ✅ Sentry error tracking
+- ✅ Rate limiting and security headers
+
+**Database Features:**
+- ✅ Partitioned tables (price_history by month)
+- ✅ Optimized indexes for queries
+- ✅ Foreign key constraints for data integrity
+- ✅ JSONB columns for flexible metadata
+- ✅ Unique constraints preventing duplicates
+
+**Scalability:**
+- ✅ Connection pooling (configurable pool size)
+- ✅ Redis reconnection with exponential backoff
+- ✅ Environment-specific configurations
+- ✅ Health check endpoint for monitoring
+- ✅ Structured error handling with Sentry
+
+---
+
+✅ **Sprint 1 (MVP Core)** - COMPLETE
 - Channable API integration working
 - Shopify Admin API connected
 - Dashboard with customer authentication
