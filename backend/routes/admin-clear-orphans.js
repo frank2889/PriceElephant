@@ -10,7 +10,7 @@ router.post('/clear-orphaned-shopify-ids/:customerId', async (req, res) => {
     console.log(`🧹 Clearing orphaned Shopify IDs for customer ${customerId}...`);
     
     const result = await db('products')
-      .where('client_id', customerId)
+      .where('shopify_customer_id', customerId)
       .whereNotNull('shopify_product_id')
       .update({
         shopify_product_id: null,
@@ -100,7 +100,7 @@ router.post('/sync-collection/:customerId', async (req, res) => {
       } else {
         // Create new product
         await db('products').insert({
-          client_id: customerId,
+          shopify_customer_id: customerId,
           product_name: product.title,
           product_url: `https://www.hobo.nl/products/${product.handle}`,
           own_price: product.variants?.[0]?.price || null,
