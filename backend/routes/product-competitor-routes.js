@@ -290,7 +290,7 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
       });
     }
 
-    // Get customer config
+    // Get customer config for Shopify access
     const customerConfig = await db('customer_configs')
       .where({ customer_id: product.shopify_customer_id })
       .first();
@@ -301,10 +301,85 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
       });
     }
 
-    // Get competitors from database (source of truth for URLs)
-    const competitors = await db('competitor_prices')
+    // Initialize Shopify integration
+    const shopify = new ShopifyIntegration(
+      customerConfig.shopify_domain,
+      customerConfig.shopify_access_token
+    );
+
+    // BIDIRECTIONAL SYNC: Merge competitors from both Shopify metafield AND database
+    let competitors = [];
+    let metafieldCompetitors = [];
+    
+    try {
+      const metafields = await shopify.getProductMetafields(product.shopify_product_id);
+      const competitorDataMetafield = metafields.find(m => 
+        m.namespace === 'priceelephant' && m.key === 'competitor_data'
+      );
+
+      if (competitorDataMetafield && competitorDataMetafield.value) {
+        const competitorData = JSON.parse(competitorDataMetafield.value);
+        metafieldCompetitors = competitorData.competitors || [];
+        console.log(`📥 Found ${metafieldCompetitors.length} competitors in Shopify metafield`);
+      }
+    } catch (metafieldError) {
+      console.log('⚠️  Could not read metafield:', metafieldError.message);
+    }
+
+    // Get existing competitors from database
+    const dbCompetitors = await db('competitor_prices')
       .where({ product_id: productId })
       .select('id', 'retailer', 'url', 'price', 'in_stock', 'scraped_at');
+
+    console.log(`💾 Found ${dbCompetitors.length} competitors in database`);
+
+    // Create URL-based map for deduplication
+    const competitorMap = new Map();
+
+    // 1. Add database competitors to map
+    dbCompetitors.forEach(comp => {
+      competitorMap.set(comp.url, {
+        id: comp.id,
+        retailer: comp.retailer,
+        url: comp.url,
+        price: comp.price,
+        in_stock: comp.in_stock,
+        source: 'database'
+      });
+    });
+
+    // 2. Merge metafield competitors (add missing ones to database)
+    for (const comp of metafieldCompetitors) {
+      if (!competitorMap.has(comp.url)) {
+        // URL exists in metafield but not in database → Add to database
+        console.log(`  ➕ Adding ${comp.retailer} from metafield to database`);
+        const [insertedId] = await db('competitor_prices').insert({
+          product_id: productId,
+          retailer: comp.retailer,
+          url: comp.url,
+          price: comp.price || 0,
+          original_price: comp.original_price || null,
+          in_stock: comp.in_stock !== false,
+          scraped_at: new Date(),
+          created_at: new Date()
+        }).returning('id');
+
+        competitorMap.set(comp.url, {
+          id: insertedId,
+          retailer: comp.retailer,
+          url: comp.url,
+          price: comp.price || 0,
+          in_stock: comp.in_stock !== false,
+          source: 'metafield'
+        });
+      } else {
+        // URL exists in both → Keep database version (will be updated by scrape)
+        console.log(`  ✅ ${comp.retailer} already in database`);
+      }
+    }
+
+    // 3. Convert map back to array
+    competitors = Array.from(competitorMap.values());
 
     if (competitors.length === 0) {
       return res.status(400).json({ 
@@ -312,12 +387,6 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
         hint: 'Add competitors first via Beheer button'
       });
     }
-
-    // Initialize Shopify integration for syncing results
-    const shopify = new ShopifyIntegration(
-      customerConfig.shopify_domain,
-      customerConfig.shopify_access_token
-    );
 
     console.log(`🔍 Re-scraping ${competitors.length} competitors for product ${product.product_name}...`);
 
