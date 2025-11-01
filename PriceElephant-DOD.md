@@ -1862,21 +1862,31 @@ CREATE TABLE sitemap_configs (
 ### **📁 File Structure & Responsibilities**
 
 #### **Backend Routes**
-**`backend/routes/product-competitor-routes.js`** (418 lines)
-- **Line 1-21:** Imports and dependencies (Express, DB, HybridScraper, competitorPriceHistory)
-- **Line 14-22:** `normaliseRetailer(url)` - Extracts domain from URL for retailer identification
-- **Line 30-119:** `POST /:customerId/:productId/competitors` - Add competitor URL endpoint
+**`backend/routes/product-competitor-routes.js`** (545 lines)
+- **Line 1-15:** Imports and dependencies (Express, DB, HybridScraper, competitorPriceHistory, domain-extractor, competitor-customer-service)
+- **Line 17-24:** `normaliseRetailer(url)` - Extracts domain from URL for retailer identification
+- **Line 30-170:** `POST /:customerId/:productId/competitors` - Add competitor URL endpoint
   - Validates customer tier limits via `customer_tiers` table
+  - **Extracts domain** using `extractDomain(url)` utility
+  - **Checks competitor_registry** for existing domain
+  - **If new domain:**
+    - Creates registry entry with `is_paying_customer: false`
+    - Auto-creates Shopify customer via `setupCompetitorInShopify()`
+    - Tags as 'competitor', 'prospect'
+    - Creates Shopify collection for competitor products
+    - Stores `shopify_customer_id` and `shopify_collection_id`
+  - **If existing domain:** Increments `tracked_by_customers` counter
   - Scrapes competitor immediately with HybridScraper
-  - Saves to `competitor_prices` table
+  - Saves to `competitor_prices` table with `competitor_registry_id`, `ean`, `shared_scrape`
   - Records price history via `competitor-price-history.js`
   - Syncs to Shopify `competitor_data` metafield
   - Returns: `{success, competitor: {id, url, retailer, price, original_price, in_stock}}`
-- **Line 145-268:** `DELETE /:customerId/:productId/competitors/:competitorId` - Remove competitor
+- **Line 172-290:** `DELETE /:customerId/:productId/competitors/:competitorId` - Remove competitor
   - Deletes from `competitor_prices` table
+  - Decrements registry counters
   - Updates Shopify metafield to remove competitor
   - Returns: `{success, message}`
-- **Line 272-418:** `POST /:productId/competitors/scrape` - Manual re-scrape all competitors
+- **Line 294-545:** `POST /:productId/competitors/scrape` - Manual re-scrape all competitors
   - Fetches competitor URLs from Shopify `competitor_data` metafield (source of truth)
   - Scrapes each URL with HybridScraper (2-second rate limit between scrapes)
   - Saves prices to `competitor_prices` table
@@ -1892,7 +1902,7 @@ CREATE TABLE sitemap_configs (
   - Creates/updates products in `products` table
   - Returns: `{success, created, updated, total}`
 
-**`backend/integrations/shopify.js`** (391 lines)
+**`backend/integrations/shopify.js`** (773 lines)
 - **Line 196-213:** `getCollections()` - Fetch all Shopify custom collections
 - **Line 215-246:** `getCollectionProducts(customerId, collectionId)` - Fetch products in collection
 - **Line 248-286:** `getProductMetafields(shopifyProductId)` - Fetch product metafields
@@ -1901,6 +1911,14 @@ CREATE TABLE sitemap_configs (
   - Creates JSON: `{own_url, competitors: [{url, retailer, price, original_price, in_stock}]}`
   - Uses GraphQL `metafieldsSet` mutation
   - Returns: `{success, metafield_id}`
+- **Line 705-724:** `createCustomer(customerData)` - Create Shopify customer (for competitor auto-registration)
+  - Creates customer with email, name, tags
+  - Used by competitor-customer-service.js
+  - Returns: customer object with ID
+- **Line 726-745:** `createCollection(collectionData)` - Create Shopify collection
+  - Creates custom collection with title, handle, published status
+  - Used for competitor product organization
+  - Returns: collection object with ID
 
 **`backend/services/competitor-price-history.js`** (280 lines)
 - **Line 15-82:** `recordPrice(productId, retailer, url, price, originalPrice, inStock)` - Record price with change detection
@@ -1914,6 +1932,41 @@ CREATE TABLE sitemap_configs (
 - **Line 137-193:** `getYearOverYearComparison(productId, retailer, eventName)` - Compare prices between years
 - **Line 195-236:** `getPriceTrend(productId, retailer, days)` - Analyze trend (increasing/decreasing/stable)
 - **Line 238-280:** `syncToShopifyMetafield(shopifyProductId, productId, shopify)` - Create price_history_analysis metafield
+
+**`backend/services/competitor-customer-service.js`** (117 lines) - NEW: Multi-Tenant Viral Growth
+- **Line 1-11:** Imports (db, ShopifyIntegration, domain-extractor utilities)
+- **Line 13-39:** `createCompetitorCustomer(shopify, domain, retailerName)` - Create Shopify customer
+  - Email: `contact@${domain}` (e.g., contact@bol.com)
+  - Name: `${companyName} (Competitor)`
+  - Tags: 'competitor', 'prospect'
+  - Note: Auto-created from competitor tracking
+  - Returns: customer object with ID
+- **Line 41-67:** `createCompetitorCollection(shopify, domain, retailerName)` - Create Shopify collection
+  - Title: `${retailerName} - Competitor Products`
+  - Handle: `competitor-${domain-slug}`
+  - Published: false (hidden from storefront)
+  - Returns: collection object with ID
+- **Line 69-117:** `setupCompetitorInShopify(registryId, domain, retailerName, shopifyDomain, accessToken)` - Main orchestration
+  - Initializes Shopify integration
+  - Creates customer for competitor
+  - Creates collection for competitor products
+  - Updates competitor_registry with Shopify IDs
+  - Returns: `{customerId, collectionId}`
+  - Purpose: Auto-converts competitors to sales prospects
+
+**`backend/utils/domain-extractor.js`** (48 lines) - NEW: Domain Utilities
+- **Line 1-14:** `extractDomain(url)` - Extract clean domain from URL
+  - Removes www., m. prefixes
+  - Example: `https://www.bol.com/product` → `bol.com`
+  - Returns: domain string or null
+- **Line 16-28:** `normalizeRetailerName(domain)` - Convert domain to display name
+  - Maps known retailers: `bol.com → 'bol.'`, `coolblue.nl → 'Coolblue'`
+  - Fallback: Returns domain as-is
+  - Returns: retailer display name
+- **Line 30-48:** `extractCompanyName(domain)` - Extract company name for Shopify customer
+  - Example: `bol.com → 'Bol'`, `coolblue.nl → 'Coolblue'`
+  - Capitalizes first letter
+  - Returns: company name string
 
 **`backend/app.js`** (93 lines)
 - **Line 13:** `const productCompetitorRoutes = require('./routes/product-competitor-routes');`
@@ -1966,7 +2019,7 @@ CREATE INDEX idx_products_shopify_id ON products(shopify_product_id);
 CREATE INDEX idx_products_ean ON products(product_ean);
 ```
 
-#### **`competitor_prices` Table** (Created by: `20251101d_create_competitor_prices_table.js`)
+#### **`competitor_prices` Table** (Created by: `20251101d_create_competitor_prices_table.js`, Enhanced by: `20251101f_link_competitor_prices_to_registry.js`)
 ```sql
 CREATE TABLE competitor_prices (
   id SERIAL PRIMARY KEY,
@@ -1975,14 +2028,48 @@ CREATE TABLE competitor_prices (
   price DECIMAL(10,2) NOT NULL,
   original_price DECIMAL(10,2),              -- Compare-at price (added 20251101)
   url TEXT,                                   -- Competitor product URL
+  competitor_registry_id INTEGER REFERENCES competitor_registry(id),  -- Link to multi-tenant registry
+  ean VARCHAR(13),                            -- Product EAN for multi-tenant deduplication
+  shared_scrape BOOLEAN DEFAULT false,        -- TRUE if scraped via multi-tenant queue
   in_stock BOOLEAN DEFAULT true,
   scraped_at TIMESTAMP DEFAULT NOW(),        -- When this price was scraped
   created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX idx_competitor_prices_product ON competitor_prices(product_id, scraped_at DESC);
 CREATE INDEX idx_competitor_prices_retailer ON competitor_prices(retailer, scraped_at DESC);
+CREATE INDEX idx_competitor_prices_registry ON competitor_prices(competitor_registry_id);
+CREATE INDEX idx_competitor_prices_ean_registry ON competitor_prices(ean, competitor_registry_id);
 ```
-**Purpose:** Stores every scrape result (historical snapshots). Multiple rows per product+retailer over time.
+**Purpose:** Stores every scrape result (historical snapshots). Links to competitor_registry for multi-tenant tracking.
+
+#### **`competitor_registry` Table** (Created by: `20251101e_create_competitor_registry.js`) - NEW: Multi-Tenant Registry
+```sql
+CREATE TABLE competitor_registry (
+  id SERIAL PRIMARY KEY,
+  domain VARCHAR(255) UNIQUE NOT NULL,        -- 'bol.com', 'coolblue.nl', etc.
+  retailer_name VARCHAR(255),                 -- Display name: 'bol.', 'Coolblue'
+  is_paying_customer BOOLEAN DEFAULT false,   -- FALSE until they sign up as customer
+  shopify_customer_id BIGINT,                 -- Auto-created Shopify customer ID
+  shopify_collection_id BIGINT,               -- Auto-created Shopify collection ID
+  total_products_tracked INTEGER DEFAULT 0,   -- Total unique products tracked
+  tracked_by_customers INTEGER DEFAULT 0,     -- Number of customers tracking this competitor
+  first_tracked_at TIMESTAMP DEFAULT NOW(),   -- When first competitor URL added
+  became_customer_at TIMESTAMP,               -- When they signed up (if ever)
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_competitor_registry_domain ON competitor_registry(domain);
+CREATE INDEX idx_competitor_registry_customer ON competitor_registry(is_paying_customer, shopify_customer_id);
+```
+**Purpose:** Domain-based competitor tracking for multi-tenant scraping and viral growth. Auto-creates Shopify customer/collection for each competitor domain.
+
+**Viral Growth Mechanics:**
+- Customer A adds `https://www.bol.com/product/123` → Domain `bol.com` registered
+- System auto-creates Shopify customer: `contact@bol.com` with tags: `competitor`, `prospect`
+- System auto-creates Shopify collection: "bol. - Competitor Products" (hidden)
+- Customer B also adds bol.com product → `tracked_by_customers` increments to 2
+- Sales team: "bol.com is tracked by 20+ customers - want competitive intelligence?"
+- When bol.com signs up → `is_paying_customer = true`, existing data already available
 
 #### **`competitor_price_history` Table** (Created by: `20251101c_add_competitor_price_history.js`)
 ```sql
@@ -2330,6 +2417,20 @@ Dashboard reloads product list (updated prices visible)
 - Creates `competitor_prices` table (if not exists)
 - Includes `original_price` column
 - Creates indexes on product_id and retailer
+
+**`backend/database/migrations/20251101e_create_competitor_registry.js`** - NEW: Multi-Tenant Registry
+- Creates `competitor_registry` table
+- Columns: domain (UNIQUE), retailer_name, is_paying_customer, shopify_customer_id, shopify_collection_id
+- Counters: total_products_tracked, tracked_by_customers
+- Indexes: domain, is_paying_customer + shopify_customer_id
+- Purpose: Track all competitor domains for multi-tenant scraping and viral growth
+
+**`backend/database/migrations/20251101f_link_competitor_prices_to_registry.js`** - NEW: Multi-Tenant Link
+- Adds `competitor_registry_id INTEGER REFERENCES competitor_registry(id)` to competitor_prices
+- Adds `ean VARCHAR(13)` for multi-tenant EAN-based deduplication
+- Adds `shared_scrape BOOLEAN DEFAULT false` to track multi-tenant scrapes
+- Indexes: competitor_registry_id, (ean + competitor_registry_id) composite
+- Purpose: Link individual scrapes to registry for shared scraping
 
 ### **🔧 Configuration Requirements**
 
