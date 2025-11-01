@@ -308,10 +308,10 @@ class ShopifyIntegration {
   }
 
   /**
-   * Update competitor URLs metafield
-   * Stores own_url and competitor_urls for multi-client support
+   * Update competitor data metafield (URLs + prices)
+   * Stores own_url and full competitor data for multi-client support
    */
-  async updateCompetitorUrls(shopifyProductId, ownUrl, competitorUrls) {
+  async updateCompetitorData(shopifyProductId, ownUrl, competitorData) {
     try {
       const client = new this.shopify.clients.Rest({ session: this.session });
       
@@ -322,25 +322,25 @@ class ShopifyIntegration {
       });
       await this.applyRateLimitDelay(existingMetafields.headers);
 
-      const urlMetafield = existingMetafields.body.metafields.find(
-        m => m.key === 'competitor_urls'
+      const dataMetafield = existingMetafields.body.metafields.find(
+        m => m.key === 'competitor_data'
       );
 
-      const urlData = {
+      const fullData = {
         own_url: ownUrl,
-        competitor_urls: competitorUrls
+        competitors: competitorData
       };
 
-      const urlDataJson = JSON.stringify(urlData);
+      const dataJson = JSON.stringify(fullData);
 
-      if (urlMetafield) {
+      if (dataMetafield) {
         // Update existing metafield
         const updateResponse = await client.put({
-          path: `products/${shopifyProductId}/metafields/${urlMetafield.id}`,
+          path: `products/${shopifyProductId}/metafields/${dataMetafield.id}`,
           data: {
             metafield: {
-              id: urlMetafield.id,
-              value: urlDataJson,
+              id: dataMetafield.id,
+              value: dataJson,
               type: 'json'
             }
           }
@@ -351,17 +351,17 @@ class ShopifyIntegration {
         await this.addProductMetafield(
           shopifyProductId,
           'priceelephant',
-          'competitor_urls',
-          urlDataJson,
+          'competitor_data',
+          dataJson,
           'json'
         );
       }
 
-      console.log(`🔗 Updated competitor URLs for product ${shopifyProductId}`);
+      console.log(`🔗 Updated competitor data for product ${shopifyProductId} (${competitorData.length} competitors)`);
 
     } catch (error) {
-      console.error('❌ Failed to update competitor URLs:', error.message);
-      throw this.wrapShopifyError('competitor URLs bijwerken', error);
+      console.error('❌ Failed to update competitor data:', error.message);
+      throw this.wrapShopifyError('competitor data bijwerken', error);
     }
   }
 

@@ -111,22 +111,29 @@ router.post('/:productId/competitors', async (req, res) => {
       product_id: productId,
       retailer,
       price: result.price,
+      original_price: result.originalPrice || null,
       url,
       in_stock: result.inStock !== false,
       scraped_at: new Date(),
       created_at: new Date()
     });
 
-    // Sync competitor URLs to Shopify metafield
+    // Sync competitor URLs and prices to Shopify metafield
     if (product.shopify_product_id) {
       try {
-        // Get all competitor URLs for this product
+        // Get all competitors with prices for this product
         const allCompetitors = await db('competitor_prices')
           .where({ product_id: productId })
-          .select('url', 'retailer')
+          .select('url', 'retailer', 'price', 'original_price', 'in_stock')
           .orderBy('retailer');
 
-        const competitorUrls = allCompetitors.map(c => c.url);
+        const competitorData = allCompetitors.map(c => ({
+          url: c.url,
+          retailer: c.retailer,
+          price: parseFloat(c.price),
+          original_price: c.original_price ? parseFloat(c.original_price) : null,
+          in_stock: c.in_stock
+        }));
 
         // Get Shopify credentials for this customer
         const config = await db('customer_configs')
@@ -140,16 +147,16 @@ router.post('/:productId/competitors', async (req, res) => {
             accessToken: config.shopify_access_token
           });
 
-          await shopify.updateCompetitorUrls(
+          await shopify.updateCompetitorData(
             product.shopify_product_id,
             product.product_url, // Own URL
-            competitorUrls
+            competitorData
           );
 
-          console.log(`✅ Synced ${competitorUrls.length} competitor URLs to Shopify metafield`);
+          console.log(`✅ Synced ${competitorData.length} competitors with prices to Shopify metafield`);
         }
       } catch (metafieldError) {
-        console.error('⚠️  Failed to sync URLs to Shopify metafield:', metafieldError.message);
+        console.error('⚠️  Failed to sync to Shopify metafield:', metafieldError.message);
         // Don't fail the request if metafield sync fails
       }
     }
@@ -193,16 +200,22 @@ router.delete('/:productId/competitors/:retailer', async (req, res) => {
       .where({ product_id: productId, retailer })
       .del();
 
-    // Sync updated competitor URLs to Shopify metafield
+    // Sync updated competitor data to Shopify metafield
     if (product && product.shopify_product_id) {
       try {
-        // Get remaining competitor URLs for this product
+        // Get remaining competitors with prices
         const remainingCompetitors = await db('competitor_prices')
           .where({ product_id: productId })
-          .select('url', 'retailer')
+          .select('url', 'retailer', 'price', 'original_price', 'in_stock')
           .orderBy('retailer');
 
-        const competitorUrls = remainingCompetitors.map(c => c.url);
+        const competitorData = remainingCompetitors.map(c => ({
+          url: c.url,
+          retailer: c.retailer,
+          price: parseFloat(c.price),
+          original_price: c.original_price ? parseFloat(c.original_price) : null,
+          in_stock: c.in_stock
+        }));
 
         // Get Shopify credentials for this customer
         const config = await db('customer_configs')
@@ -216,16 +229,16 @@ router.delete('/:productId/competitors/:retailer', async (req, res) => {
             accessToken: config.shopify_access_token
           });
 
-          await shopify.updateCompetitorUrls(
+          await shopify.updateCompetitorData(
             product.shopify_product_id,
             product.product_url, // Own URL
-            competitorUrls
+            competitorData
           );
 
-          console.log(`✅ Synced ${competitorUrls.length} competitor URLs to Shopify metafield after deletion`);
+          console.log(`✅ Synced ${competitorData.length} competitors with prices to Shopify metafield after deletion`);
         }
       } catch (metafieldError) {
-        console.error('⚠️  Failed to sync URLs to Shopify metafield:', metafieldError.message);
+        console.error('⚠️  Failed to sync to Shopify metafield:', metafieldError.message);
         // Don't fail the request if metafield sync fails
       }
     }
