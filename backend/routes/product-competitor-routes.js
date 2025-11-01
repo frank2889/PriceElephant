@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const HybridScraper = require('../crawlers/hybrid-scraper');
+const competitorPriceHistory = require('../services/competitor-price-history');
 
 function normaliseRetailer(url) {
   try {
@@ -117,6 +118,16 @@ router.post('/:productId/competitors', async (req, res) => {
       scraped_at: new Date(),
       created_at: new Date()
     });
+
+    // Record price history
+    await competitorPriceHistory.recordPrice(
+      productId,
+      retailer,
+      url,
+      result.price,
+      result.originalPrice,
+      result.inStock !== false
+    );
 
     // Sync competitor URLs and prices to Shopify metafield
     if (product.shopify_product_id) {
