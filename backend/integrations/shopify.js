@@ -376,20 +376,6 @@ class ShopifyIntegration {
         path: 'customers/search',
         query: { query: `email:${email}` }
       });
-```
-  }
-
-  /**
-   * Get customer by email
-   */
-  async getCustomerByEmail(email) {
-    try {
-      const client = new this.shopify.clients.Rest({ session: this.session });
-
-      const response = await client.get({
-        path: 'customers/search',
-        query: { query: `email:${email}` }
-      });
 
       await this.applyRateLimitDelay(response.headers);
       return response.body.customers[0] || null;
