@@ -108,10 +108,23 @@
 
 ### **🗄️ Database Schema (15 Tables)**
 
-#### **Core Tables**
+> **⚠️ IMPORTANT - Schema Evolution Notes:**
+> - **Original Schema (`schema.sql`):** Legacy schema using `client_id` for multi-tenant architecture
+> - **Current Schema (Migrations):** Migrated to `shopify_customer_id BIGINT` for direct Shopify integration
+> - **Customer ID Standardization:**
+>   - ✅ **`products` table:** Uses `shopify_customer_id BIGINT` (after migration 20251025)
+>   - ✅ **`customer_tiers` table:** Uses `customer_id BIGINT` (Shopify Customer ID)
+>   - ✅ **`customer_configs` table:** Uses `customer_id BIGINT` (Shopify Customer ID)
+>   - ℹ️ **Why BIGINT?** Shopify Customer IDs are large numbers (e.g., 8557353828568) that exceed INTEGER range
+> - **Table Purposes Clarified:**
+>   - `price_snapshots` = Historical audit trail (ALL scrapes, partitioned by month)
+>   - `competitor_prices` = Current competitor state (LATEST prices, used for display)
 
-**`clients` Table**
+#### **Core Tables (Legacy schema.sql - Deprecated)**
+
+**⚠️ DEPRECATED - `clients` Table**
 ```sql
+-- LEGACY: Replaced by customer_configs table
 CREATE TABLE clients (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -123,13 +136,14 @@ CREATE TABLE clients (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 ```
-**Purpose:** Multi-tenant client management. Each Shopify store is a client.
+**Status:** Legacy table from original schema. Modern implementation uses `customer_configs` with `customer_id BIGINT`.
 
-**`products` Table** (Initial schema from schema.sql)
+**⚠️ DEPRECATED - `products` Table (Original)**
 ```sql
+-- LEGACY SCHEMA - See migration 20251025_add_products_table.js for current schema
 CREATE TABLE products (
   id SERIAL PRIMARY KEY,
-  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,  -- ❌ REPLACED by shopify_customer_id
   shopify_product_id BIGINT,
   title VARCHAR(500) NOT NULL,
   sku VARCHAR(100),
@@ -144,114 +158,310 @@ CREATE TABLE products (
   UNIQUE(client_id, shopify_product_id)
 );
 ```
-**Purpose:** Product catalog. Links to Shopify products via `shopify_product_id`.
+**Status:** Legacy schema. Current schema uses `shopify_customer_id BIGINT` instead of `client_id INTEGER`.
 
-**`competitor_prices` Table**
+#### **Current Production Tables (Migration-based Schema)**
+
+**✅ CURRENT - `products` Table** (Migration: `20251025_add_products_table.js`)
+```sql
+CREATE TABLE products (
+  id BIGSERIAL PRIMARY KEY,
+  shopify_customer_id BIGINT NOT NULL,           -- ✅ Direct Shopify Customer ID (e.g., 8557353828568)
+  shopify_product_id BIGINT,                     -- NULL until synced to Shopify
+  product_name VARCHAR(500) NOT NULL,
+  product_ean VARCHAR(20),
+  product_sku VARCHAR(100),
+  brand VARCHAR(200),
+  category VARCHAR(200),
+  own_price DECIMAL(10,2),                       -- Customer's selling price
+  product_url TEXT,
+  image_url TEXT,
+  channable_product_id VARCHAR(100),             -- External ID from Channable
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  -- Additional fields added by later migrations:
+  shopify_variant_id BIGINT,                     -- Added by 20251027_add_shopify_variant_id.js
+  is_parent_product BOOLEAN DEFAULT false,       -- Added by 20251027_add_product_variants.js
+  variant_position INTEGER,
+  variant_option1_name VARCHAR(100),
+  variant_option1_value VARCHAR(255),
+  variant_option2_name VARCHAR(100),
+  variant_option2_value VARCHAR(255),
+  variant_option3_name VARCHAR(100),
+  variant_option3_value VARCHAR(255),
+  
+  -- Pricing metadata (20251028_add_pricing_metadata.js):
+  original_price DECIMAL(10,2),
+  discount_percentage DECIMAL(5,2),
+  
+  -- Enhanced metadata (20251028_add_metadata_fields.js):
+  rating DECIMAL(3,2),
+  review_count INTEGER,
+  stock_level INTEGER,
+  delivery_time VARCHAR(255),
+  free_shipping BOOLEAN,
+  bundle_info TEXT,
+  
+  -- Import tracking (20251030_add_import_source_column.js):
+  import_source VARCHAR(50) DEFAULT 'channable',  -- 'channable', 'sitemap', 'manual'
+  last_import_at TIMESTAMP,
+  
+  -- Sync status (20251030b_add_scraping_tracking_columns.js):
+  sync_status VARCHAR(50),
+  last_synced_at TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX idx_products_shopify_customer ON products(shopify_customer_id);
+CREATE INDEX idx_products_ean ON products(product_ean);
+CREATE INDEX idx_products_shopify_product ON products(shopify_product_id);
+CREATE INDEX idx_products_customer_ean ON products(shopify_customer_id, product_ean);  -- Composite for duplicate detection
+CREATE INDEX idx_products_customer_channable ON products(shopify_customer_id, channable_product_id);
+```
+**Purpose:** Centralized product catalog with Shopify sync tracking and multi-source imports.
+**Customer ID Column:** `shopify_customer_id BIGINT` (direct Shopify Customer ID)
+
+**✅ CURRENT - `customer_tiers` Table** (Migration: `20241028_create_customer_tiers.js`)
+```sql
+CREATE TABLE customer_tiers (
+  id SERIAL PRIMARY KEY,
+  customer_id BIGINT UNIQUE NOT NULL,            -- ✅ Shopify Customer ID
+  tier VARCHAR(20) NOT NULL DEFAULT 'trial',     -- 'trial', 'starter', 'professional', 'enterprise'
+  product_limit INTEGER NOT NULL DEFAULT 50,     -- 0 = unlimited
+  competitor_limit INTEGER NOT NULL DEFAULT 5,   -- 0 = unlimited
+  api_access BOOLEAN NOT NULL DEFAULT false,
+  monthly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_customer_tiers_customer_id ON customer_tiers(customer_id);
+```
+**Purpose:** Subscription tier management. Syncs with Shopify metafield `priceelephant.customer_tier`.
+**Customer ID Column:** `customer_id BIGINT` (Shopify Customer ID)
+
+**✅ CURRENT - `customer_configs` Table** (Migration: `20241028_create_customer_configs.js`)
+```sql
+CREATE TABLE customer_configs (
+  id SERIAL PRIMARY KEY,
+  customer_id BIGINT UNIQUE NOT NULL,            -- ✅ Shopify Customer ID
+  shopify_domain VARCHAR(255),                   -- Customer's Shopify domain
+  shopify_access_token TEXT,                     -- Customer-specific API token
+  sitemap_url TEXT,
+  sitemap_max_products INTEGER DEFAULT 500,
+  sitemap_product_url_pattern VARCHAR(500),
+  channable_feed_url TEXT,
+  channable_company_id VARCHAR(255),
+  channable_project_id VARCHAR(255),
+  channable_api_token TEXT,
+  email_notifications BOOLEAN DEFAULT false,
+  notification_email VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_customer_configs_customer_id ON customer_configs(customer_id);
+```
+**Purpose:** Per-customer configuration. Stores Shopify credentials, Channable settings, sitemap config.
+**Customer ID Column:** `customer_id BIGINT` (Shopify Customer ID)
+
+**✅ CURRENT - `sitemap_configs` Table** (Migration: `20251030c_add_sitemap_progress_tracking.js`)
+```sql
+CREATE TABLE sitemap_configs (
+  id SERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL,                   -- ✅ Shopify Customer ID
+  sitemap_url TEXT NOT NULL,
+  product_url_pattern VARCHAR(500),
+  last_import_at TIMESTAMP,
+  last_scraped_page INTEGER DEFAULT 0,           -- Resume tracking
+  total_pages_scraped INTEGER DEFAULT 0,
+  max_products INTEGER DEFAULT 500,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(customer_id, sitemap_url)
+);
+
+CREATE INDEX idx_sitemap_configs_customer ON sitemap_configs(customer_id);
+```
+**Purpose:** Sitemap import progress tracking with resume capability.
+**Customer ID Column:** `customer_id BIGINT` (Shopify Customer ID)
+
+**✅ CURRENT - `competitor_prices` Table** (Created: Sprint 2.12 - 20251101d_create_competitor_prices_table.js)
 ```sql
 CREATE TABLE competitor_prices (
   id SERIAL PRIMARY KEY,
   product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-  retailer VARCHAR(100) NOT NULL,
+  retailer VARCHAR(255) NOT NULL,
+  competitor_url TEXT NOT NULL,
   price DECIMAL(10,2) NOT NULL,
-  url TEXT,
+  original_price DECIMAL(10,2),                  -- Added by 20251101_add_original_price.js
   in_stock BOOLEAN DEFAULT true,
-  scraped_at TIMESTAMP DEFAULT NOW(),
-  created_at TIMESTAMP DEFAULT NOW()
+  scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 CREATE INDEX idx_competitor_prices_product ON competitor_prices(product_id, scraped_at DESC);
 CREATE INDEX idx_competitor_prices_retailer ON competitor_prices(retailer, scraped_at DESC);
 ```
-**Purpose:** Real-time competitor pricing data. New row for each scrape.
+**Purpose:** **Current competitor state** - Stores LATEST competitor prices for dashboard display.
+**Update Pattern:** `UPDATE` existing row on re-scrape (one row per product+retailer).
+**Sync:** Bidirectional with Shopify `priceelephant.competitor_data` metafield.
 
-**`price_history` Table** (Partitioned)
+**✅ CURRENT - `price_snapshots` Table** (Created: Sprint 2 - 20241029_create_price_snapshots.js) - **PARTITIONED**
 ```sql
-CREATE TABLE price_history (
-  id BIGSERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+CREATE TABLE price_snapshots (
+  id BIGSERIAL,                                  -- No PRIMARY KEY (partition constraint)
+  product_id INTEGER,
+  ean VARCHAR(13),
+  retailer VARCHAR(255) NOT NULL,
   price DECIMAL(10,2) NOT NULL,
-  source VARCHAR(50) DEFAULT 'shopify',  -- 'shopify' or 'manual'
-  recorded_at TIMESTAMP DEFAULT NOW()
-) PARTITION BY RANGE (recorded_at);
+  original_price DECIMAL(10,2),
+  in_stock BOOLEAN DEFAULT true,
+  scraped_at TIMESTAMP NOT NULL,
+  scrape_method VARCHAR(50),                     -- 'http', 'free_proxy', 'paid_proxy', 'ai_vision', 'cached'
+  cost DECIMAL(10,6) DEFAULT 0,
+  response_time_ms INTEGER,
+  platform VARCHAR(50),                          -- 'shopify', 'magento', 'woocommerce'
+  shopify_customer_id BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) PARTITION BY RANGE (scraped_at);
 
--- Monthly partitions for performance
-CREATE TABLE price_history_2025_10 PARTITION OF price_history
+-- Monthly partitions created automatically by scheduled job
+CREATE TABLE price_snapshots_2025_10 PARTITION OF price_snapshots
   FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
-
-CREATE TABLE price_history_2025_11 PARTITION OF price_history
+CREATE TABLE price_snapshots_2025_11 PARTITION OF price_snapshots
   FOR VALUES FROM ('2025-11-01') TO ('2025-12-01');
 
-CREATE INDEX idx_price_history_product ON price_history(product_id, recorded_at DESC);
+CREATE INDEX idx_snapshots_product ON price_snapshots(product_id, scraped_at DESC);
+CREATE INDEX idx_snapshots_ean_retailer ON price_snapshots(ean, retailer, scraped_at DESC);
+CREATE INDEX idx_snapshots_method ON price_snapshots(scrape_method);
 ```
-**Purpose:** Long-term price history for charts. Partitioned by month for performance at scale.
+**Purpose:** **Historical audit trail** - Stores ALL scraping attempts for analytics/charts.
+**Update Pattern:** `INSERT` new row on every scrape (append-only log).
+**Sync:** Write-only (no metafield sync).
+**Retention:** Long-term (partitioned by month for performance).
 
-**`price_alerts` Table**
+**✅ CURRENT - `scrape_jobs` Table** (Created: Sprint 2 - 20241029_create_scrape_jobs.js)
 ```sql
-CREATE TABLE price_alerts (
-  id SERIAL PRIMARY KEY,
+CREATE TABLE scrape_jobs (
+  id BIGSERIAL PRIMARY KEY,
   product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-  email VARCHAR(255) NOT NULL,
-  target_price DECIMAL(10,2),
-  alert_type VARCHAR(50) DEFAULT 'price_drop',  -- 'price_drop', 'back_in_stock', 'competitor_lower'
-  active BOOLEAN DEFAULT true,
-  last_triggered TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  retailer VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL,                   -- 'queued', 'processing', 'completed', 'failed'
+  error_message TEXT,
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_price_alerts_active ON price_alerts(product_id, active);
+
+CREATE INDEX idx_jobs_status ON scrape_jobs(status, created_at);
+CREATE INDEX idx_jobs_product ON scrape_jobs(product_id, created_at DESC);
 ```
-**Purpose:** Customer price alert subscriptions. Triggers notifications when conditions met.
+**Purpose:** Bull queue job tracking for async scraping operations.
+**Status Flow:** `queued` → `processing` → `completed`/`failed`
+
+---
+
+### **📋 Database Architecture Clarifications**
+
+#### **1. Customer ID Naming Convention**
+
+| Table | Column Name | Data Type | Purpose |
+|-------|------------|-----------|---------|
+| `products` | `shopify_customer_id` | `BIGINT` | Direct Shopify Customer ID (e.g., 8557353828568) |
+| `customer_tiers` | `customer_id` | `BIGINT` | Shopify Customer ID (same value, different name) |
+| `customer_configs` | `customer_id` | `BIGINT` | Shopify Customer ID (same value, different name) |
+| `sitemap_configs` | `customer_id` | `BIGINT` | Shopify Customer ID (same value, different name) |
+| `price_snapshots` | `shopify_customer_id` | `BIGINT` | Direct Shopify Customer ID |
+
+**⚠️ Naming Inconsistency Acknowledged:**
+- `products` table uses `shopify_customer_id` (explicitly named)
+- Other tables use `customer_id` (implicitly Shopify Customer ID)
+- **Both refer to the same Shopify Customer ID value**
+- Consistency: All use BIGINT (Shopify IDs exceed INTEGER 2.1 billion limit)
+- Future refactor: Standardize to `shopify_customer_id` everywhere
+
+#### **2. Price Storage: competitor_prices vs price_snapshots**
+
+**Why Two Tables?**
+
+| Feature | `competitor_prices` | `price_snapshots` |
+|---------|---------------------|-------------------|
+| **Purpose** | Current competitor state (dashboard display) | Historical audit trail (analytics) |
+| **Data Volume** | Low (1 row per product per retailer) | High (1 row per scrape) |
+| **Updates** | UPDATE existing row on re-scrape | INSERT new row on every scrape |
+| **Retention** | Recent data only (~1 month) | Long-term (partitioned by month, indefinite) |
+| **Sync** | Bidirectional with Shopify metafield | Write-only (audit log) |
+| **Query Pattern** | "What's the current price?" | "What was the price on Oct 15?" |
+| **Example Use** | Dashboard competitor price display | Price history charts, Black Friday trends |
+| **Indexing** | `product_id + scraped_at DESC` (latest) | `product_id + scraped_at DESC` (time-series) |
+
+**Data Flow:**
+1. Scraper runs → Saves to `price_snapshots` (audit trail)
+2. Same scraper → UPDATEs `competitor_prices` (current state)
+3. Competitor price → Syncs to Shopify `competitor_data` metafield
+4. Result: `price_snapshots` grows forever (partitioned), `competitor_prices` stays small
+
+**Example Scenario:**
+- Product has 3 competitors (Amazon, Bol.com, Coolblue)
+- Scraped 3x/day for 30 days = 270 scrapes
+- `competitor_prices`: 3 rows (latest state)
+- `price_snapshots`: 270 rows (full history)
+
+#### **3. Metafield as "Source of Truth" Pattern**
+
+**Shopify Metafield ↔ Database Sync:**
+
+| Operation | Database Action | Metafield Action | Direction |
+|-----------|-----------------|------------------|-----------|
+| **Add Competitor** | INSERT into `competitor_prices` | UPDATE `competitor_data` metafield | DB → Shopify |
+| **Delete Competitor** | DELETE from `competitor_prices` | UPDATE `competitor_data` metafield | DB → Shopify |
+| **Re-scrape** | Fetch URLs from metafield → UPDATE prices | Sync updated prices back | Shopify → DB → Shopify |
+| **Webhook Update** | Sync metafield changes to DB | N/A (triggered by Shopify) | Shopify → DB |
+
+**Metafield = Source of Truth for:**
+- ✅ Competitor URLs (user-configured in Shopify admin)
+- ✅ Product metadata (managed via Shopify admin)
+- ✅ Customer tier (displayed in Shopify customer record)
+
+**Database = Source of Truth for:**
+- ✅ Price snapshots (historical audit trail)
+- ✅ Scraping job status (operational state)
+- ✅ Analytics aggregations (not synced back)
+
+**Pattern:** Bidirectional sync with eventual consistency. Metafield authoritative for configuration, database authoritative for operational data.
 
 **`scraping_jobs` Table**
 ```sql
 CREATE TABLE scraping_jobs (
-  id SERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-  status VARCHAR(50) DEFAULT 'pending',  -- 'pending', 'running', 'completed', 'failed'
-  last_run TIMESTAMP,
-  next_run TIMESTAMP,
-  error_message TEXT,
-  retry_count INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX idx_scraping_jobs_next_run ON scraping_jobs(next_run) WHERE status = 'pending';
-```
-**Purpose:** Job queue for scheduled scraping. Tracks job status and retry logic.
+**Purpose:** Bull queue job tracking for async scraping operations.
+**Status Flow:** `queued` → `processing` → `completed`/`failed`
 
-**`analytics_events` Table**
-```sql
-CREATE TABLE analytics_events (
-  id BIGSERIAL PRIMARY KEY,
-  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
-  event_type VARCHAR(100) NOT NULL,  -- 'scrape_success', 'scrape_fail', 'price_change', etc.
-  event_data JSONB,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX idx_analytics_events_client ON analytics_events(client_id, created_at DESC);
-CREATE INDEX idx_analytics_events_type ON analytics_events(event_type, created_at DESC);
-```
-**Purpose:** Analytics and monitoring. Tracks all system events with JSON metadata.
+---
 
-#### **Additional Tables (Created by Migrations)**
+### **4. Additional Tables Reference**
 
-See individual sprint documentation for:
-- `customer_configs` (Sprint 2.12)
-- `customer_tiers` (Sprint 2.8)
-- `product_variants` (Sprint 2.12)
-- `sitemap_configs` (Sprint 2.7)
-- `learned_selectors` (Sprint 2.10)
-- `competitor_price_history` (Sprint 2.13)
-- `price_events` (Sprint 2.13)
+For complete table schemas added in later sprints, see:
+- **Sprint 2.7:** `sitemap_configs` (documented above)
+- **Sprint 2.8:** `customer_tiers`, `customer_configs` (documented above)
+- **Sprint 2.10:** `learned_selectors` (self-learning AI)
+- **Sprint 2.11:** `competitor_intelligence` (competitor monitoring)
+- **Sprint 2.12:** `product_variants` (variant grouping)
 
-**Total Table Count:** 15 tables (7 core + 8 from migrations)
+**Total Current Table Count:** 10 core tables + 5 specialized tables = **15 tables**
+
+---
 
 ### **🔧 Database Migrations**
 
 **`backend/database/migrations/20251025_initial_schema.js`**
-- Creates core tables: clients, products, price_history partitions
+- Creates core tables: products, customer_tiers, customer_configs, price_snapshots partitions
 - Sets up indexes for performance
 - Establishes foreign key relationships
-- Partitions price_history table by month
+- Partitions price_snapshots table by month (not price_history - renamed in Sprint 2)
 
 **Migration Execution:**
 ```bash
@@ -352,16 +562,16 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/12345
 ### **🎯 Sprint 0 Achievements**
 
 **Infrastructure:**
-- ✅ PostgreSQL database with 15 tables
+- ✅ PostgreSQL database with 10 core tables (15 total with later sprints)
 - ✅ Redis for job queues and caching
 - ✅ Knex migrations system
 - ✅ Express API server with middleware
-- ✅ Multi-tenant architecture (clients table)
+- ✅ Multi-tenant architecture (shopify_customer_id per tenant)
 - ✅ Sentry error tracking
 - ✅ Rate limiting and security headers
 
 **Database Features:**
-- ✅ Partitioned tables (price_history by month)
+- ✅ Partitioned tables (price_snapshots by month)
 - ✅ Optimized indexes for queries
 - ✅ Foreign key constraints for data integrity
 - ✅ JSONB columns for flexible metadata
@@ -683,7 +893,7 @@ SHOPIFY_API_VERSION=2024-10
 ```sql
 CREATE TABLE products (
     id SERIAL PRIMARY KEY,
-    shopify_customer_id VARCHAR(255) NOT NULL,
+    shopify_customer_id BIGINT NOT NULL,  -- ✅ BIGINT (Shopify Customer IDs are large)
     product_name VARCHAR(255) NOT NULL,
     product_ean VARCHAR(13),
     product_sku VARCHAR(100),
@@ -723,7 +933,7 @@ CREATE INDEX idx_products_shopify ON products(shopify_product_id);
 -- Stores per-customer Channable API credentials
 CREATE TABLE channable_integrations (
     id SERIAL PRIMARY KEY,
-    shopify_customer_id VARCHAR(255) NOT NULL UNIQUE,
+    shopify_customer_id BIGINT NOT NULL UNIQUE,  -- ✅ BIGINT (Shopify Customer IDs are large)
     channable_company_id VARCHAR(255),
     channable_project_id VARCHAR(255),
     feed_url TEXT,
@@ -1718,7 +1928,7 @@ CREATE TABLE sitemap_configs (
 ```sql
 CREATE TABLE products (
   id SERIAL PRIMARY KEY,
-  shopify_customer_id VARCHAR(255) NOT NULL,  -- Customer who owns this product
+  shopify_customer_id BIGINT NOT NULL,  -- ✅ BIGINT - Customer who owns this product
   product_name VARCHAR(500),
   product_url TEXT,
   product_ean VARCHAR(50),
@@ -1805,9 +2015,9 @@ CREATE INDEX idx_price_events_date ON price_events(event_date);
 ```sql
 CREATE TABLE customer_configs (
   id SERIAL PRIMARY KEY,
-  customer_id VARCHAR(255) UNIQUE NOT NULL,  -- Shopify customer ID
-  shopify_domain VARCHAR(255),                -- 'hobo.myshopify.com'
-  shopify_access_token TEXT,                  -- Shopify API access token
+  customer_id BIGINT UNIQUE NOT NULL,  -- ✅ BIGINT - Shopify customer ID
+  shopify_domain VARCHAR(255),          -- 'hobo.myshopify.com'
+  shopify_access_token TEXT,            -- Shopify API access token
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -1817,10 +2027,10 @@ CREATE TABLE customer_configs (
 ```sql
 CREATE TABLE customer_tiers (
   id SERIAL PRIMARY KEY,
-  customer_id VARCHAR(255) UNIQUE NOT NULL,
-  tier VARCHAR(50) NOT NULL,                  -- 'trial', 'starter', 'professional', 'enterprise'
-  product_limit INTEGER DEFAULT 0,            -- 0 = unlimited
-  competitor_limit INTEGER DEFAULT 0,         -- 0 = unlimited
+  customer_id BIGINT UNIQUE NOT NULL,  -- ✅ BIGINT - Shopify customer ID
+  tier VARCHAR(50) NOT NULL,            -- 'trial', 'starter', 'professional', 'enterprise'
+  product_limit INTEGER DEFAULT 0,      -- 0 = unlimited
+  competitor_limit INTEGER DEFAULT 0,   -- 0 = unlimited
   api_access BOOLEAN DEFAULT false,
   monthly_price DECIMAL(10,2),
   created_at TIMESTAMP DEFAULT NOW(),

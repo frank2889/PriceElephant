@@ -228,6 +228,26 @@ class ShopifyIntegration {
   }
 
   /**
+   * Get all metafields for a product
+   */
+  async getProductMetafields(shopifyProductId) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.get({
+        path: `products/${shopifyProductId}/metafields`
+      });
+
+      await this.applyRateLimitDelay(response.headers);
+      return response.body.metafields || [];
+
+    } catch (error) {
+      console.error('❌ Failed to fetch product metafields:', error.message);
+      throw this.wrapShopifyError('product metafields ophalen', error);
+    }
+  }
+
+  /**
    * Add metafield to product (for competitor prices)
    */
   async addProductMetafield(shopifyProductId, namespace, key, value, type = 'json') {
