@@ -61,15 +61,28 @@ router.get('/:productId/competitors', async (req, res) => {
  * POST /api/v1/products/:productId/competitors
  * Add a new competitor URL
  * 
- * Body: { url: "https://coolblue.nl/product/123" }
+ * Body: { url: "https://coolblue.nl/product/123" } or { competitorUrl: "..." }
  */
 router.post('/:productId/competitors', async (req, res) => {
   try {
     const { productId } = req.params;
-    const { url } = req.body;
+    let url = req.body.url || req.body.competitorUrl; // Accept both field names
 
-    if (!url || !url.startsWith('http')) {
-      return res.status(400).json({ error: 'Valid URL required' });
+    if (!url) {
+      return res.status(400).json({ error: 'URL required' });
+    }
+
+    // Normalize URL - add https:// if missing
+    url = url.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    // Validate it's a proper URL
+    try {
+      new URL(url);
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL format' });
     }
 
     // Check product exists
@@ -149,7 +162,7 @@ router.post('/:productId/competitors', async (req, res) => {
         // This enables tracking their data and contacting them later
         try {
           const customerConfig = await db('customer_configs')
-            .where({ customer_id: req.customer.id })
+            .where({ customer_id: product.shopify_customer_id })
             .first();
           
           if (customerConfig?.shopify_domain && customerConfig?.shopify_access_token) {
