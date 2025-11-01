@@ -69,7 +69,7 @@ router.post('/:productId/competitors', async (req, res) => {
     let url = req.body.url || req.body.competitorUrl; // Accept both field names
 
     if (!url) {
-      return res.status(400).json({ error: 'URL required' });
+      return res.status(400).json({ error: 'URL verplicht' });
     }
 
     // Normalize URL - add https:// if missing
@@ -82,7 +82,7 @@ router.post('/:productId/competitors', async (req, res) => {
     try {
       new URL(url);
     } catch {
-      return res.status(400).json({ error: 'Invalid URL format' });
+      return res.status(400).json({ error: 'Ongeldige URL. Gebruik bijvoorbeeld: bol.com/product/123' });
     }
 
     // Check product exists
@@ -91,7 +91,19 @@ router.post('/:productId/competitors', async (req, res) => {
       .first();
 
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: 'Product niet gevonden' });
+    }
+
+    // Check if this exact URL already exists for this product (prevent duplicates)
+    const existingCompetitor = await db('competitor_prices')
+      .where({ product_id: productId, url })
+      .first();
+
+    if (existingCompetitor) {
+      return res.status(409).json({ 
+        error: 'Deze concurrent URL bestaat al voor dit product',
+        hint: 'Gebruik Re-scrape om de prijs bij te werken'
+      });
     }
 
     // Check subscription limits via customer tier
@@ -108,8 +120,8 @@ router.post('/:productId/competitors', async (req, res) => {
 
     if (maxCompetitors > 0 && currentCompetitors.length >= maxCompetitors) {
       return res.status(403).json({ 
-        error: `Competitor limit reached (${maxCompetitors} max for ${tier?.tier || 'your'} tier). Upgrade for more.`,
-        upgrade_url: '/pricing'
+        error: `Concurrent limiet bereikt (max ${maxCompetitors} voor ${tier?.tier || 'jouw'} abonnement)`,
+        hint: 'Upgrade naar een hoger abonnement voor meer concurrenten'
       });
     }
 
@@ -119,7 +131,11 @@ router.post('/:productId/competitors', async (req, res) => {
     const result = await scraper.scrapeProduct(url, null, null, productId);
 
     if (!result || !result.price) {
-      throw new Error('No price detected on competitor page');
+      return res.status(400).json({ 
+        error: 'Geen prijs gevonden op deze pagina',
+        hint: 'Controleer of de URL naar een productpagina verwijst',
+        url_tried: url
+      });
     }
 
     const retailer = normaliseRetailer(url);
@@ -251,22 +267,27 @@ router.post('/:productId/competitors', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Competitor added and scraped',
-      data: {
+      message: 'Concurrent toegevoegd en prijs opgehaald',
+      competitor: {
         url,
-        price: result.price,
         retailer,
+        price: result.price,
+        original_price: result.originalPrice || null,
         in_stock: result.inStock !== false,
-        method: result.tier,
-        cost: result.cost || 0
+        scrape_method: result.tier,
+        scrape_cost: result.cost || 0
       }
     });
 
   } catch (error) {
     console.error('Add competitor error:', error);
+    
+    // Return user-friendly errors
+    const errorMessage = error.message || 'Onbekende fout bij toevoegen concurrent';
+    
     res.status(500).json({ 
-      error: 'Failed to add competitor',
-      details: error.message 
+      error: errorMessage,
+      hint: 'Probeer het opnieuw of neem contact op met support'
     });
   }
 });
