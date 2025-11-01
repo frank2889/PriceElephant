@@ -981,11 +981,16 @@
         // Show last error if available
         if (data.lastError) {
           console.error('[Scraper Error]', data.lastError);
-          updateDebug('error', `⚠️ ${data.lastError}`);
+          const errorMessage = typeof data.lastError === 'object' 
+            ? (data.lastError.message || data.lastError.error || JSON.stringify(data.lastError))
+            : data.lastError;
+          const errorUrl = typeof data.lastError === 'object' ? data.lastError.url : null;
+          
+          updateDebug('error', `⚠️ ${errorMessage}`);
           addDebugError({
             stage: data.stage || 'progress',
-            message: data.lastError,
-            url: data.currentUrl || null
+            message: errorMessage,
+            url: errorUrl || data.currentUrl || null
           });
         }
 
