@@ -509,6 +509,9 @@ class SitemapImportService {
             
             // Auto-sync to Shopify
             try {
+              console.log(`[SitemapImport] 🔄 Attempting Shopify sync for: ${scrapedData.title}`);
+              console.log(`[SitemapImport] Shopify client initialized:`, !!this.shopify);
+              
               const shopifyProduct = await this.shopify.createProduct({
                 title: scrapedData.title,
                 description: `${scrapedData.brand || 'Product'} - imported from sitemap`,
@@ -518,6 +521,8 @@ class SitemapImportService {
                 tags: ['PriceElephant', `customer-${this.customerId}`, scrapedData.brand].filter(Boolean)
               });
               
+              console.log(`[SitemapImport] ✅ Shopify product created:`, shopifyProduct.id);
+              
               // Update with Shopify product ID
               await db('products')
                 .where({ id: newProduct.id })
@@ -526,9 +531,13 @@ class SitemapImportService {
                   updated_at: new Date()
                 });
               
-              console.log(`[SitemapImport] ✅ Synced to Shopify: ${shopifyProduct.id}`);
+              console.log(`[SitemapImport] ✅ DB updated with Shopify ID: ${shopifyProduct.id}`);
             } catch (shopifyError) {
-              console.error(`[SitemapImport] ⚠️ Shopify sync failed: ${shopifyError.message}`);
+              console.error(`[SitemapImport] ❌ Shopify sync failed for "${scrapedData.title}":`, {
+                error: shopifyError.message,
+                stack: shopifyError.stack,
+                shopifyInitialized: !!this.shopify
+              });
               // Continue even if Shopify sync fails - product is still in DB
             }
             
