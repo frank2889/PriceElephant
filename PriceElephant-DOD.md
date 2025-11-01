@@ -172,6 +172,503 @@
   - Answer questions like: "What were prices during last Black Friday?"
 - **Definition of Done:** ✅ Complete price history with event tracking and year-over-year analysis (deployed November 1, 2025)
 
+---
+
+## **TECHNICAL ARCHITECTURE: Sprint 2.12 & 2.13**
+
+### **📁 File Structure & Responsibilities**
+
+#### **Backend Routes**
+**`backend/routes/product-competitor-routes.js`** (418 lines)
+- **Line 1-21:** Imports and dependencies (Express, DB, HybridScraper, competitorPriceHistory)
+- **Line 14-22:** `normaliseRetailer(url)` - Extracts domain from URL for retailer identification
+- **Line 30-119:** `POST /:customerId/:productId/competitors` - Add competitor URL endpoint
+  - Validates customer tier limits via `customer_tiers` table
+  - Scrapes competitor immediately with HybridScraper
+  - Saves to `competitor_prices` table
+  - Records price history via `competitor-price-history.js`
+  - Syncs to Shopify `competitor_data` metafield
+  - Returns: `{success, competitor: {id, url, retailer, price, original_price, in_stock}}`
+- **Line 145-268:** `DELETE /:customerId/:productId/competitors/:competitorId` - Remove competitor
+  - Deletes from `competitor_prices` table
+  - Updates Shopify metafield to remove competitor
+  - Returns: `{success, message}`
+- **Line 272-418:** `POST /:productId/competitors/scrape` - Manual re-scrape all competitors
+  - Fetches competitor URLs from Shopify `competitor_data` metafield (source of truth)
+  - Scrapes each URL with HybridScraper (2-second rate limit between scrapes)
+  - Saves prices to `competitor_prices` table
+  - Records price history with event detection
+  - Updates metafield with latest prices
+  - Returns: `{success, scraped, failed, total_cost, metafield_synced, results[]}`
+
+**`backend/routes/admin-clear-orphans.js`** (138 lines)
+- **Line 6-32:** `POST /clear-orphaned-shopify-ids/:customerId` - Clear orphaned Shopify product IDs
+- **Line 35-138:** `POST /sync-collection/:customerId` - Bulk sync Shopify collection to database
+  - Uses `shopify_customer_id` column (NOT client_id)
+  - Calls `ShopifyIntegration.getCollections()` and `getCollectionProducts()`
+  - Creates/updates products in `products` table
+  - Returns: `{success, created, updated, total}`
+
+**`backend/integrations/shopify.js`** (391 lines)
+- **Line 196-213:** `getCollections()` - Fetch all Shopify custom collections
+- **Line 215-246:** `getCollectionProducts(customerId, collectionId)` - Fetch products in collection
+- **Line 248-286:** `getProductMetafields(shopifyProductId)` - Fetch product metafields
+- **Line 318-367:** `updateCompetitorData(shopifyProductId, ownUrl, competitorData)` - Update competitor_data metafield
+  - Checks for existing metafield
+  - Creates JSON: `{own_url, competitors: [{url, retailer, price, original_price, in_stock}]}`
+  - Uses GraphQL `metafieldsSet` mutation
+  - Returns: `{success, metafield_id}`
+
+**`backend/services/competitor-price-history.js`** (280 lines)
+- **Line 15-82:** `recordPrice(productId, retailer, url, price, originalPrice, inStock)` - Record price with change detection
+  - Checks last recorded price for this retailer
+  - Calculates price change amount and percentage
+  - Detects price events (Black Friday, Cyber Monday) via `detectPriceEvent()`
+  - Inserts into `competitor_price_history` table
+  - Returns: `{recorded, price_change, price_change_percent, event}`
+- **Line 84-108:** `detectPriceEvent()` - Detect if date is within ±3 days of major shopping event
+- **Line 110-135:** `getPriceHistory(productId, retailer, days)` - Retrieve historical prices
+- **Line 137-193:** `getYearOverYearComparison(productId, retailer, eventName)` - Compare prices between years
+- **Line 195-236:** `getPriceTrend(productId, retailer, days)` - Analyze trend (increasing/decreasing/stable)
+- **Line 238-280:** `syncToShopifyMetafield(shopifyProductId, productId, shopify)` - Create price_history_analysis metafield
+
+**`backend/app.js`** (93 lines)
+- **Line 13:** `const productCompetitorRoutes = require('./routes/product-competitor-routes');`
+- **Line 68:** `app.use('/api/v1/products', productRoutes);`
+- **Line 69:** `app.use('/api/v1/products', productCompetitorRoutes);` - Mounts competitor routes
+- **Line 70:** `app.use('/api/v1/products', variantRoutes);`
+
+#### **Frontend Dashboard**
+**`theme/assets/priceelephant-dashboard.js`** (1952 lines)
+- **Line 408-509:** `renderProducts()` - Renders product table with Re-scrape button
+  - Line 486-496: Adds 🔄 Re-scrape button if `competitorCount > 0`
+  - Button: `data-action="rescrape-competitors" data-product-id="${product.id}"`
+- **Line 1540-1619:** `handleRescrapeCompetitors(productId, triggerButton)` - Re-scrape handler
+  - Calls `POST /api/v1/products/${productId}/competitors/scrape`
+  - Shows loading state on button
+  - Displays success message with scrape count
+  - Reloads product list to show updated data
+- **Line 1903-1921:** Event listener for re-scrape button clicks
+  - Line 1913: `else if (action === 'rescrape-competitors')`
+
+### **🗄️ Database Schema**
+
+#### **`products` Table**
+```sql
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  shopify_customer_id VARCHAR(255) NOT NULL,  -- Customer who owns this product
+  product_name VARCHAR(500),
+  product_url TEXT,
+  product_ean VARCHAR(50),
+  own_price DECIMAL(10,2),
+  original_price DECIMAL(10,2),             -- Compare-at price
+  shopify_product_id VARCHAR(255),           -- Shopify product ID (for sync)
+  image_url TEXT,
+  brand VARCHAR(255),
+  category VARCHAR(255),
+  rating DECIMAL(3,2),
+  review_count INTEGER,
+  discount_percentage INTEGER,
+  has_free_shipping BOOLEAN,
+  stock_level INTEGER,
+  delivery_time VARCHAR(100),
+  bundle_info TEXT,
+  import_source VARCHAR(50),                 -- 'channable', 'sitemap', 'manual'
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_products_customer ON products(shopify_customer_id);
+CREATE INDEX idx_products_shopify_id ON products(shopify_product_id);
+CREATE INDEX idx_products_ean ON products(product_ean);
+```
+
+#### **`competitor_prices` Table** (Created by: `20251101d_create_competitor_prices_table.js`)
+```sql
+CREATE TABLE competitor_prices (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  retailer VARCHAR(100) NOT NULL,            -- 'bol.com', 'coolblue.nl', etc.
+  price DECIMAL(10,2) NOT NULL,
+  original_price DECIMAL(10,2),              -- Compare-at price (added 20251101)
+  url TEXT,                                   -- Competitor product URL
+  in_stock BOOLEAN DEFAULT true,
+  scraped_at TIMESTAMP DEFAULT NOW(),        -- When this price was scraped
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_competitor_prices_product ON competitor_prices(product_id, scraped_at DESC);
+CREATE INDEX idx_competitor_prices_retailer ON competitor_prices(retailer, scraped_at DESC);
+```
+**Purpose:** Stores every scrape result (historical snapshots). Multiple rows per product+retailer over time.
+
+#### **`competitor_price_history` Table** (Created by: `20251101c_add_competitor_price_history.js`)
+```sql
+CREATE TABLE competitor_price_history (
+  id BIGSERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  retailer VARCHAR(100) NOT NULL,
+  url TEXT,
+  price DECIMAL(10,2) NOT NULL,
+  original_price DECIMAL(10,2),
+  price_change DECIMAL(10,2),                -- Difference from last price
+  price_change_percent DECIMAL(5,2),         -- Percentage change
+  price_event VARCHAR(100),                  -- 'Black Friday 2024', 'Cyber Monday 2025', etc.
+  in_stock BOOLEAN DEFAULT true,
+  recorded_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_price_history_product ON competitor_price_history(product_id, recorded_at DESC);
+CREATE INDEX idx_price_history_retailer ON competitor_price_history(retailer, recorded_at DESC);
+CREATE INDEX idx_price_history_event ON competitor_price_history(price_event, recorded_at DESC);
+```
+**Purpose:** Smart price tracking - only records when prices change or during events. Used for trend analysis.
+
+#### **`price_events` Table** (Created by: `20251101c_add_competitor_price_history.js`)
+```sql
+CREATE TABLE price_events (
+  id SERIAL PRIMARY KEY,
+  event_name VARCHAR(100) NOT NULL,          -- 'Black Friday', 'Cyber Monday', etc.
+  event_date DATE NOT NULL,
+  event_year INTEGER NOT NULL,
+  event_type VARCHAR(50) DEFAULT 'sale',     -- 'sale', 'seasonal', 'holiday'
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX idx_price_events_date ON price_events(event_date);
+```
+**Pre-seeded data:**
+- Black Friday 2024 (2024-11-29), Black Friday 2025 (2025-11-28)
+- Cyber Monday 2024 (2024-12-02), Cyber Monday 2025 (2025-12-01)
+- Summer Sale 2025 (2025-07-01)
+- Holiday Season 2025 (2025-12-15)
+
+#### **`customer_configs` Table**
+```sql
+CREATE TABLE customer_configs (
+  id SERIAL PRIMARY KEY,
+  customer_id VARCHAR(255) UNIQUE NOT NULL,  -- Shopify customer ID
+  shopify_domain VARCHAR(255),                -- 'hobo.myshopify.com'
+  shopify_access_token TEXT,                  -- Shopify API access token
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### **`customer_tiers` Table**
+```sql
+CREATE TABLE customer_tiers (
+  id SERIAL PRIMARY KEY,
+  customer_id VARCHAR(255) UNIQUE NOT NULL,
+  tier VARCHAR(50) NOT NULL,                  -- 'trial', 'starter', 'professional', 'enterprise'
+  product_limit INTEGER DEFAULT 0,            -- 0 = unlimited
+  competitor_limit INTEGER DEFAULT 0,         -- 0 = unlimited
+  api_access BOOLEAN DEFAULT false,
+  monthly_price DECIMAL(10,2),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### **🔌 API Endpoints**
+
+#### **POST /api/v1/products/:customerId/:productId/competitors**
+Add a competitor URL to a product.
+
+**Request:**
+```json
+{
+  "competitorUrl": "https://www.bol.com/nl/p/product/123456",
+  "retailer": "bol.com"  // Optional, auto-detected if omitted
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "competitor": {
+    "id": 42,
+    "url": "https://www.bol.com/nl/p/product/123456",
+    "retailer": "bol.com",
+    "price": 299.99,
+    "original_price": 349.99,
+    "in_stock": true,
+    "scraped_at": "2025-11-01T17:30:00Z",
+    "method": "direct",       // Scraping tier used: direct/proxy/webshare/ai
+    "cost": 0.0000            // Cost in EUR
+  },
+  "metafield_synced": true
+}
+```
+
+**Response (Error - Limit Reached):**
+```json
+{
+  "error": "Competitor limit reached",
+  "limit": 10,
+  "current": 10
+}
+```
+
+**Implementation:**
+1. Check competitor limit from `customer_tiers` table
+2. Scrape URL immediately with `HybridScraper.scrapeProduct()`
+3. Insert into `competitor_prices` table
+4. Call `competitorPriceHistory.recordPrice()` for history tracking
+5. Fetch all competitors from database
+6. Update Shopify metafield via `shopify.updateCompetitorData()`
+
+#### **POST /api/v1/products/:productId/competitors/scrape**
+Manually re-scrape all competitor URLs for a product.
+
+**Request:** (No body needed)
+
+**Response:**
+```json
+{
+  "success": true,
+  "scraped": 4,
+  "failed": 0,
+  "total_cost": "€0.0000",
+  "metafield_synced": true,
+  "results": [
+    {
+      "retailer": "bol.com",
+      "url": "https://www.bol.com/nl/p/product/123456",
+      "success": true,
+      "price": 299.99,
+      "original_price": 349.99,
+      "in_stock": true,
+      "method": "direct",
+      "cost": 0.0000
+    },
+    {
+      "retailer": "coolblue.nl",
+      "url": "https://www.coolblue.nl/product/123456",
+      "success": false,
+      "error": "Page not found"
+    }
+  ]
+}
+```
+
+**Implementation:**
+1. Fetch product from `products` table
+2. Get Shopify credentials from `customer_configs`
+3. Fetch `competitor_data` metafield from Shopify (source of truth for URLs)
+4. Parse JSON to get competitor array
+5. For each competitor:
+   - Scrape with `HybridScraper.scrapeProduct()`
+   - Insert into `competitor_prices` table
+   - Call `competitorPriceHistory.recordPrice()`
+   - Wait 2 seconds (rate limit)
+6. Update metafield with latest prices
+7. Return results with cost breakdown
+
+#### **DELETE /api/v1/products/:customerId/:productId/competitors/:competitorId**
+Remove a competitor from a product.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Competitor verwijderd"
+}
+```
+
+**Implementation:**
+1. Delete from `competitor_prices` table
+2. Fetch remaining competitors
+3. Update Shopify metafield (removes deleted competitor)
+
+### **📊 Shopify Metafields**
+
+#### **`priceelephant.competitor_data` (JSON)**
+**Definition:**
+- **Namespace:** `priceelephant`
+- **Key:** `competitor_data`
+- **Type:** `json`
+- **Owner:** Product
+- **Description:** Multi-client competitor data with URLs, prices, and stock status
+
+**Structure:**
+```json
+{
+  "own_url": "https://www.hobo.nl/norstone-vinyl-lp-r-rack-platenrack",
+  "competitors": [
+    {
+      "url": "https://www.bol.com/nl/p/norstone-vinyl-lp-r-rack/9300000123456789",
+      "retailer": "bol.com",
+      "price": 299.99,
+      "original_price": 349.99,
+      "in_stock": true
+    },
+    {
+      "url": "https://www.coolblue.nl/product/123456/norstone-vinyl-lp-r-rack",
+      "retailer": "coolblue.nl",
+      "price": 289.00,
+      "original_price": null,
+      "in_stock": true
+    }
+  ]
+}
+```
+
+**Created by:** `setup-metafield-definitions.js` (line 48-54)  
+**Updated by:**
+- `product-competitor-routes.js` (add competitor, delete competitor, re-scrape)
+- `shopify.js` → `updateCompetitorData()` method
+
+#### **`priceelephant.price_history_analysis` (JSON)**
+**Definition:**
+- **Namespace:** `priceelephant`
+- **Key:** `price_history_analysis`
+- **Type:** `json`
+- **Owner:** Product
+- **Description:** Historical price analysis with trends and year-over-year comparisons
+
+**Structure:**
+```json
+{
+  "bol.com": {
+    "url": "https://www.bol.com/nl/p/product/123456",
+    "trend": "decreasing",
+    "currentPrice": 299.99,
+    "avgPrice": 324.50,
+    "minPrice": 289.00,
+    "maxPrice": 349.99,
+    "history": [
+      {
+        "date": "2025-11-01T10:00:00Z",
+        "price": 299.99,
+        "event": null
+      },
+      {
+        "date": "2024-11-29T00:00:00Z",
+        "price": 249.99,
+        "event": "Black Friday 2024"
+      }
+    ]
+  },
+  "coolblue.nl": {
+    "url": "https://www.coolblue.nl/product/123456",
+    "trend": "stable",
+    "currentPrice": 289.00,
+    "avgPrice": 289.00,
+    "minPrice": 289.00,
+    "maxPrice": 289.00,
+    "history": [
+      {
+        "date": "2025-11-01T10:00:00Z",
+        "price": 289.00,
+        "event": null
+      }
+    ]
+  }
+}
+```
+
+**Created by:** `setup-metafield-definitions.js` (line 59-65)  
+**Updated by:** `competitor-price-history.js` → `syncToShopifyMetafield()` method
+
+### **🔄 Data Flow: Add Competitor**
+
+```
+User clicks "Beheer" → "Concurrent toevoegen"
+  ↓
+theme/assets/priceelephant-dashboard.js (line 1200-1250)
+  ↓
+POST /api/v1/products/:customerId/:productId/competitors
+  ↓
+backend/routes/product-competitor-routes.js (line 30-119)
+  ├─ Check competitor limit in customer_tiers table
+  ├─ Scrape URL → backend/crawlers/hybrid-scraper.js
+  ├─ INSERT INTO competitor_prices (price, original_price, url, retailer, in_stock)
+  ├─ Record history → backend/services/competitor-price-history.js:recordPrice()
+  │   ├─ Detect price event (±3 days from price_events table)
+  │   └─ INSERT INTO competitor_price_history
+  ├─ Fetch all competitors for this product from competitor_prices
+  └─ Update Shopify metafield → backend/integrations/shopify.js:updateCompetitorData()
+      ├─ Build JSON: {own_url, competitors: [{url, retailer, price, original_price, in_stock}]}
+      ├─ GraphQL metafieldsSet mutation
+      └─ Save to Shopify product.metafields.priceelephant.competitor_data
+  ↓
+Response: {success, competitor: {...}, metafield_synced: true}
+  ↓
+Dashboard shows new competitor in list
+```
+
+### **🔄 Data Flow: Re-scrape Competitors**
+
+```
+User clicks "🔄 Re-scrape" button
+  ↓
+theme/assets/priceelephant-dashboard.js:handleRescrapeCompetitors() (line 1540-1619)
+  ↓
+POST /api/v1/products/:productId/competitors/scrape
+  ↓
+backend/routes/product-competitor-routes.js (line 272-418)
+  ├─ Fetch product from products table
+  ├─ Fetch Shopify credentials from customer_configs
+  ├─ Get metafields → backend/integrations/shopify.js:getProductMetafields()
+  ├─ Find competitor_data metafield
+  ├─ Parse JSON → competitors[] array (SOURCE OF TRUTH for URLs)
+  ├─ For each competitor:
+  │   ├─ Scrape URL → backend/crawlers/hybrid-scraper.js
+  │   ├─ INSERT INTO competitor_prices (new snapshot)
+  │   ├─ Record history → backend/services/competitor-price-history.js:recordPrice()
+  │   │   ├─ Compare with last price
+  │   │   ├─ Calculate price_change and price_change_percent
+  │   │   ├─ Detect event (Black Friday, Cyber Monday, etc.)
+  │   │   └─ INSERT INTO competitor_price_history (only if price changed)
+  │   ├─ Update competitor object with new price
+  │   └─ Wait 2 seconds (rate limit)
+  └─ Update Shopify metafield with latest prices
+      └─ GraphQL metafieldsSet mutation → competitor_data
+  ↓
+Response: {success, scraped: 4, failed: 0, total_cost, results: [...]}
+  ↓
+Dashboard shows success message: "✅ 4 concurrenten opgehaald"
+Dashboard reloads product list (updated prices visible)
+```
+
+### **🗂️ Database Migrations**
+
+**`backend/database/migrations/20251101_add_original_price_to_competitor_prices.js`**
+- Adds `original_price DECIMAL(10,2)` column to `competitor_prices` table
+- Stores compare-at prices from competitors
+- Checks if table exists before altering (production safety)
+
+**`backend/database/migrations/20251101c_add_competitor_price_history.js`**
+- Creates `competitor_price_history` table with price change tracking
+- Creates `price_events` table
+- Seeds 6 major shopping events (Black Friday 2024/2025, Cyber Monday, Summer Sale, Holiday Season)
+- Adds indexes for performance
+
+**`backend/database/migrations/20251101d_create_competitor_prices_table.js`**
+- Creates `competitor_prices` table (if not exists)
+- Includes `original_price` column
+- Creates indexes on product_id and retailer
+
+### **🔧 Configuration Requirements**
+
+**Environment Variables:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `SHOPIFY_API_SECRET` - For webhook verification
+- `SHOPIFY_API_KEY` - For API authentication
+- `SHOPIFY_API_VERSION` - Default: '2024-10'
+
+**Shopify Setup:**
+1. Install app in Shopify store
+2. Grant permissions: `read_products`, `write_products`, `read_customers`, `write_customers`
+3. Create metafield definitions via `backend/scripts/setup-metafield-definitions.js`
+4. Configure webhooks in Shopify Admin
+
+**Database Setup:**
+1. Run migrations: `npx knex migrate:latest`
+2. Verify tables: `competitor_prices`, `competitor_price_history`, `price_events`
+3. Check indexes created correctly
+
+---
+
 ### **What's Next (Immediate Priorities):**
 
 � **Sprint 3: Email Automation** - READY TO START (HIGH PRIORITY)
