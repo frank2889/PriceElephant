@@ -199,6 +199,14 @@ router.post('/:productId/competitors', async (req, res) => {
       }
     }
 
+    console.log(`\n💾 Saving competitor to database...`);
+    console.log(`   product_id: ${productId}`);
+    console.log(`   retailer: ${retailer}`);
+    console.log(`   url: ${url}`);
+    console.log(`   price: €${result.price}`);
+    console.log(`   competitor_registry_id: ${registry?.id || null}`);
+    console.log(`   ean: ${product.product_ean || null}`);
+
     await db('competitor_prices').insert({
       product_id: productId,
       retailer,
@@ -212,6 +220,8 @@ router.post('/:productId/competitors', async (req, res) => {
       created_at: new Date()
     });
 
+    console.log(`   ✅ Saved to competitor_prices table`);
+
     // Record price history
     await competitorPriceHistory.recordPrice(
       productId,
@@ -222,14 +232,19 @@ router.post('/:productId/competitors', async (req, res) => {
       result.inStock !== false
     );
 
+    console.log(`   ✅ Recorded price history`);
+
     // Sync competitor URLs and prices to Shopify metafield
     if (product.shopify_product_id) {
+      console.log(`\n📤 Syncing to Shopify metafield...`);
       try {
         // Get all competitors with prices for this product
         const allCompetitors = await db('competitor_prices')
           .where({ product_id: productId })
           .select('url', 'retailer', 'price', 'original_price', 'in_stock')
           .orderBy('retailer');
+
+        console.log(`   Total competitors for this product: ${allCompetitors.length}`);
 
         const competitorData = allCompetitors.map(c => ({
           url: c.url,
@@ -245,6 +260,7 @@ router.post('/:productId/competitors', async (req, res) => {
           .first();
 
         if (config && config.shopify_domain && config.shopify_access_token) {
+          console.log(`   Shopify domain: ${config.shopify_domain}`);
           const ShopifyIntegration = require('../integrations/shopify');
           const shopify = new ShopifyIntegration({
             shopDomain: config.shopify_domain,
@@ -257,13 +273,20 @@ router.post('/:productId/competitors', async (req, res) => {
             competitorData
           );
 
-          console.log(`✅ Synced ${competitorData.length} competitors with prices to Shopify metafield`);
+          console.log(`   ✅ Synced ${competitorData.length} competitors to Shopify metafield`);
+          console.log(`   Metafield: priceelephant.competitor_data`);
+        } else {
+          console.log(`   ⚠️  No Shopify credentials found - skipping metafield sync`);
         }
       } catch (metafieldError) {
-        console.error('⚠️  Failed to sync to Shopify metafield:', metafieldError.message);
+        console.error(`   ❌ Failed to sync to Shopify metafield: ${metafieldError.message}`);
         // Don't fail the request if metafield sync fails
       }
+    } else {
+      console.log(`   ⚠️  Product not synced to Shopify (no shopify_product_id) - skipping metafield sync`);
     }
+
+    console.log(`\n✅ ADD COMPETITOR COMPLETED SUCCESSFULLY`);
 
     res.json({
       success: true,
@@ -370,6 +393,7 @@ router.delete('/:productId/competitors/:retailer', async (req, res) => {
 router.post('/:productId/competitors/scrape', async (req, res) => {
   try {
     const { productId } = req.params;
+    console.log(`\n🔄 RE-SCRAPE REQUEST for product ${productId}`);
 
     // Get product
     const product = await db('products')
@@ -377,10 +401,16 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
       .first();
 
     if (!product) {
+      console.log(`❌ Product ${productId} not found`);
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    console.log(`✅ Product found: ${product.product_name}`);
+    console.log(`   shopify_product_id: ${product.shopify_product_id}`);
+    console.log(`   shopify_customer_id: ${product.shopify_customer_id}`);
+
     if (!product.shopify_product_id) {
+      console.log(`❌ Product not synced to Shopify`);
       return res.status(400).json({ 
         error: 'Product not synced to Shopify',
         hint: 'Sync product to Shopify first'
@@ -393,10 +423,13 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
       .first();
 
     if (!customerConfig) {
+      console.log(`❌ No customer config found for customer ${product.shopify_customer_id}`);
       return res.status(400).json({ 
         error: 'Shopify credentials not configured'
       });
     }
+
+    console.log(`✅ Customer config found for: ${customerConfig.shopify_domain}`);
 
     // Initialize Shopify integration
     const shopify = new ShopifyIntegration(
@@ -408,25 +441,40 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
     let competitors = [];
     let metafieldCompetitors = [];
     
+    console.log(`\n📊 Reading competitors from Shopify metafield...`);
     try {
       const metafields = await shopify.getProductMetafields(product.shopify_product_id);
+      console.log(`   Total metafields found: ${metafields?.length || 0}`);
+      
       const competitorDataMetafield = metafields.find(m => 
         m.namespace === 'priceelephant' && m.key === 'competitor_data'
       );
 
       if (competitorDataMetafield && competitorDataMetafield.value) {
+        console.log(`   ✅ Found priceelephant.competitor_data metafield`);
         const competitorData = JSON.parse(competitorDataMetafield.value);
         metafieldCompetitors = competitorData.competitors || [];
-        console.log(`📥 Found ${metafieldCompetitors.length} competitors in Shopify metafield`);
+        console.log(`   Competitors in metafield: ${metafieldCompetitors.length}`);
+        metafieldCompetitors.forEach((comp, i) => {
+          console.log(`      ${i+1}. ${comp.url} (${comp.retailer})`);
+        });
+      } else {
+        console.log(`   ❌ No priceelephant.competitor_data metafield found`);
       }
     } catch (metafieldError) {
-      console.log('⚠️  Could not read metafield:', metafieldError.message);
+      console.log(`   ⚠️  Could not read metafield: ${metafieldError.message}`);
     }
 
     // Get existing competitors from database
+    console.log(`\n💾 Reading competitors from database...`);
     const dbCompetitors = await db('competitor_prices')
       .where({ product_id: productId })
       .select('id', 'retailer', 'url', 'price', 'in_stock', 'scraped_at');
+
+    console.log(`   Found ${dbCompetitors.length} competitors in database`);
+    dbCompetitors.forEach((comp, i) => {
+      console.log(`      ${i+1}. ${comp.url} (${comp.retailer}) - €${comp.price}`);
+    });
 
     console.log(`💾 Found ${dbCompetitors.length} competitors in database`);
 
@@ -446,10 +494,11 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
     });
 
     // 2. Merge metafield competitors (add missing ones to database)
+    console.log(`\n🔄 Merging metafield competitors into database...`);
     for (const comp of metafieldCompetitors) {
       if (!competitorMap.has(comp.url)) {
         // URL exists in metafield but not in database → Add to database
-        console.log(`  ➕ Adding ${comp.retailer} from metafield to database`);
+        console.log(`   ➕ Adding ${comp.retailer} (${comp.url}) from metafield to database`);
         const [insertedId] = await db('competitor_prices').insert({
           product_id: productId,
           retailer: comp.retailer,
@@ -471,21 +520,29 @@ router.post('/:productId/competitors/scrape', async (req, res) => {
         });
       } else {
         // URL exists in both → Keep database version (will be updated by scrape)
-        console.log(`  ✅ ${comp.retailer} already in database`);
+        console.log(`   ✅ ${comp.retailer} already in database`);
       }
     }
 
     // 3. Convert map back to array
     competitors = Array.from(competitorMap.values());
 
+    console.log(`\n📋 FINAL MERGED COMPETITORS: ${competitors.length}`);
+    competitors.forEach((comp, i) => {
+      console.log(`   ${i+1}. ${comp.url} (${comp.retailer}) - Source: ${comp.source}`);
+    });
+
     if (competitors.length === 0) {
+      console.log(`\n❌ ERROR: No competitor URLs configured`);
+      console.log(`   Database had: ${dbCompetitors.length} competitors`);
+      console.log(`   Metafield had: ${metafieldCompetitors.length} competitors`);
       return res.status(400).json({ 
         error: 'No competitor URLs configured',
         hint: 'Add competitors first via Beheer button'
       });
     }
 
-    console.log(`🔍 Re-scraping ${competitors.length} competitors for product ${product.product_name}...`);
+    console.log(`\n🔍 Re-scraping ${competitors.length} competitors for product ${product.product_name}...`);
 
     // Scrape each competitor
     const scraper = new HybridScraper();
