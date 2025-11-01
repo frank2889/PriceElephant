@@ -1352,16 +1352,105 @@ SCRAPE_RETRY_ATTEMPTS=3
 - Auto-detection for product pages
 - Database migrations deployed
 
+#### Technical Architecture - Sprint 2.7 (Sitemap Import)
+
+**Purpose**: Import products from any e-commerce platform via sitemap.xml (alternative to Channable)
+
+**Core Files**:
+- `backend/routes/sitemap-routes.js` (576 lines) - Import API + SSE stream
+- `backend/services/sitemap-import.js` (682 lines) - Sitemap parser + scraper
+- `backend/scripts/cleanup-orphaned-products.js` (138 lines) - Pre-import cleanup
+
+**Key Features**:
+1. **Sitemap Index Detection** (Line 161-197): Auto-finds product sitemap in multi-sitemap files
+2. **URL Pattern Filtering** (Line 218-240): Pre-filter by regex before scraping
+3. **Fast Pre-Scan** (Line 245-265): Filter category pages using URL patterns (instant, no HTTP)
+4. **Intelligent Product Detection** (Line 270-350): HybridScr aper.isProductPage() - check meta tags
+5. **12-Field Extraction**: price, original_price, brand, rating, review_count, stock_level, delivery_time, discount, shipping, bundle_info, title, image
+6. **Resume Support** (Line 96-126): Save progress to `sitemap_configs` table, resume from last URL
+7. **SSE Streaming** (Line 100-200 in routes): Real-time progress updates to dashboard
+8. **Orphan Cleanup** (Line 133-146): Delete old products before import
+9. **Customer-Specific Shopify** (Line 34-54): Each customer uses own Shopify credentials
+
+**Database Table**:
+```sql
+CREATE TABLE sitemap_configs (
+    id SERIAL PRIMARY KEY,
+    customer_id BIGINT NOT NULL,
+    sitemap_url TEXT NOT NULL,
+    product_url_pattern VARCHAR(500),
+    last_import_at TIMESTAMP,
+    last_scraped_page INTEGER DEFAULT 0,
+    total_pages_scraped INTEGER DEFAULT 0,
+    max_products INTEGER DEFAULT 500,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(customer_id, sitemap_url)
+);
+```
+
+**API Endpoints**:
+- `POST /api/v1/sitemap/import` - Full import with results JSON
+- `GET /api/v1/sitemap/import-stream` - SSE stream with real-time progress
+- `POST /api/v1/sitemap/cancel` - Cancel active import
+- `GET /api/v1/sitemap/config/:customerId` - Get saved sitemap config
+
+**Achievements**: ✅ Universal platform support, ✅ Smart URL filtering, ✅ Resume capability, ✅ Real-time progress
+
+---
+
 ✅ **Sprint 2.8 (Customer Tiers)** - COMPLETE
 - Database-driven tier system (Shopify metafields as source of truth)
 - Enterprise tier with unlimited products
 - Auto-sync to Shopify (no manual button)
 - Comprehensive debug logging
 
+#### Technical Architecture - Sprint 2.8 (Customer Tiers)
+
+**Purpose**: Multi-tier subscription system with Shopify metafield sync as source of truth
+
+**Core Files**:
+- `backend/routes/customer-routes.js` (85 lines) - Tier API
+- `backend/database/migrations/20241028_create_customer_tiers.js` - Table schema
+- `backend/scripts/set-customer-tier.js` (65 lines) - CLI tier management  
+- `backend/scripts/sync-enterprise-tier.js` (80 lines) - Sync Shopify metafields
+
+**Database Table**: `customer_tiers` - tier VARCHAR(20), product_limit INT, competitor_limit INT, api_access BOOL, monthly_price DECIMAL
+
+**Tier Limits**: Trial (50/5), Starter (200/10/€29), Professional (500/20/€79), Enterprise (0=unlimited/0/custom)
+
+**Shopify Metafield** (Source of Truth): namespace=priceelephant, key=customer_tier, type=json
+
+**API**: `GET /api/v1/customers/:customerId/tier` - Metafield → DB fallback → default
+
+**Achievements**: ✅ Metafield sync, ✅ Dynamic limits, ✅ CLI management, ✅ Enterprise unlimited
+
+---
+
 ✅ **Sprint 2.9 (Anti-Bot Hardening)** - COMPLETE
 - Enhanced scraper with fail-proof fallbacks
 - Browser profile rotation
 - Adaptive throttling system
+
+#### Technical Architecture - Sprint 2.9 (Anti-Bot Hardening)
+
+**Purpose**: Bypass CAPTCHA, rate limits, and bot detection using BrowserBase + browser profiles
+
+**Core Files**:
+- `backend/utils/browser-profiles.js` (145 lines) - Randomized fingerprints
+- `backend/utils/http-cache-manager.js` (165 lines) - Response caching (1-hour window)
+- `backend/utils/proxy-pool.js` (180 lines) - Free + WebShare proxy rotation
+
+**Browser Profiles**: Randomize user-agent, screen resolution, timezone, language, WebGL vendor, fonts
+
+**HTTP Cache**: Cache successful scrapes for 1 hour (multi-tenant dedup)
+
+**Proxy Pool**: Rotate 10 free proxies, fallback to WebShare premium (90% success)
+
+**Adaptive Throttling**: Per-retailer delays (500ms-30s), 2x slowdown on 429, 5% speedup on success
+
+**Achievements**: ✅ Fingerprint randomization, ✅ HTTP caching, ✅ Proxy rotation, ✅ Adaptive delays
+
+---
 
 ✅ **Sprint 2.10 (Self-Learning Scraper + HTTP Bypass)** - COMPLETE ✅
 - **Self-Learning System:**
@@ -1374,6 +1463,22 @@ SCRAPE_RETRY_ATTEMPTS=3
   - Bypasses Cloudflare Bot Management (no browser fingerprint)
   - Extracts prices from meta tags, JSON-LD, and Magento inline data
   - 77ms response time (vs 30s timeout in browsers)
+
+#### Technical Architecture - Sprint 2.10 (Self-Learning + HTTP)
+
+**Purpose**: Learn selectors from AI, use HTTP scraping for 10x speed + cost savings
+
+**Core Files**: `selector-learning.js` (190 lines), `http-scraper.js` (210 lines), `hybrid-scraper.js` (Line 801-820)
+
+**Database**: `learned_selectors` table - domain, field_type, css_selector, confidence_score, success_count, fail_count
+
+**Learning Flow**: AI scrape → extract selectors → save to DB → next scrape uses learned (Tier 0, FREE, 95% success)
+
+**HTTP Scraper**: Cheerio parser, axios HTTP, 200-500ms response, €0 cost, 60% success (non-JS sites)
+
+**Achievements**: ✅ 95% free tier, ✅ AI learns, ✅ HTTP 10x faster, ✅ Confidence scoring
+
+---
   - Successfully scrapes hifi.eu and other anti-bot sites
   - Zero cost - no proxy, no AI Vision needed
 - **Cost Impact:** hifi.eu now scrapes at €0.00 instead of €0.02 per product (100% reduction)
@@ -1398,6 +1503,40 @@ SCRAPE_RETRY_ATTEMPTS=3
   - Prevents orphaned product accumulation
   - Reduces import time on resume
 - **Definition of Done:** ✅ Sitemap imports track progress and resume automatically (deployed October 30, 2025)
+
+#### Technical Architecture - Sprint 2.11 (Sitemap Intelligence)
+
+**Purpose**: Intelligent sitemap crawling with progress tracking, orphan cleanup, and pre-scan filtering
+
+**Core Files**: `sitemap-import.js` (Line 96-126, 218-265), `cleanup-orphaned-products.js` (138 lines), `hybrid-scraper.js` (Line 337-474 isProductPage)
+
+**Progress Tracking** (`sitemap_configs` table):
+- Columns: `last_scraped_page`, `total_pages_scraped`, `last_import_at`
+- Auto-resume: Check saved progress → start from `last_scraped_page`
+- Reset option: `resetProgress: true` → set `last_scraped_page = 0`
+- Manual jump: `resumeFromPage: N` → start from index N
+
+**Orphan Cleanup Flow**:
+1. Fetch all products from Shopify for customer
+2. Fetch all products from database for customer
+3. Compare: Find products in DB not in Shopify
+4. Delete orphans from database
+5. Run automatically before sitemap import (Line 133-146)
+
+**Fast Pre-Scan** (Line 245-265):
+- **URL Pattern Filter**: Exclude /category/, /collection/, /shop/, /search/, ?page=, &page=
+- **Instant analysis**: No HTTP request needed
+- **70%+ filtered**: Most URLs are category/search pages
+- **Reduces cost**: Only scrape product pages (not category listings)
+
+**Sitemap Index Detection** (Line 161-197):
+- Check if sitemap contains .xml files (sitemap index)
+- Auto-find product sitemap (url.includes('product'))
+- Fetch nested sitemap automatically
+
+**Achievements**: ✅ Progress tracking, ✅ Auto-resume, ✅ Orphan cleanup, ✅ Fast URL filtering, ✅ Sitemap index support
+
+---
 
 ✅ **Sprint 2.12 (Bi-Directional Shopify Sync)** - COMPLETE ✅
 - **Webhook System (Shopify → Database):**
