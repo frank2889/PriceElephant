@@ -357,16 +357,37 @@ class SitemapImportService {
             });
           }
 
-            console.log(`[SitemapImport] ❌ Not a product page (no price/title found)`);
+            // Enhanced logging for skipped products
+            const skipReason = !scrapedData 
+              ? 'No data returned from scraper'
+              : !scrapedData.price && !scrapedData.title
+              ? 'Missing both price and title'
+              : !scrapedData.price
+              ? 'Missing price'
+              : 'Missing title';
+            
+            console.log(`[SitemapImport] ⏭️ SKIPPED [${i+1}/${productUrlCandidates.length}]: ${skipReason}`);
+            console.log(`   URL: ${url}`);
+            if (scrapedData) {
+              console.log(`   Title: ${scrapedData.title || 'MISSING'}`);
+              console.log(`   Price: ${scrapedData.price || 'MISSING'}`);
+            }
+            
             results.skipped++;
+            results.errors.push({
+              url,
+              error: skipReason,
+              stage: 'scraping'
+            });
             
             sendProgress({
               stage: 'scanning',
-              message: `❌ Geen product: ${url.substring(0, 50)}...`,
+              message: `⏭️ Overgeslagen: ${skipReason.substring(0, 40)}...`,
               percentage: scanProgress,
               scanned: results.scanned,
               detectedProducts: results.detectedProducts,
-              skipped: results.skipped
+              skipped: results.skipped,
+              lastError: { url, message: skipReason }
             });
             
             continue;
@@ -593,6 +614,29 @@ class SitemapImportService {
         aiVision: scraperStats.aiVisionSuccess || 0,
         totalCost: parseFloat(scraperStats.totalCost) || 0
       };
+
+      // Analyze skip reasons for better debugging
+      const skipReasons = {};
+      results.errors.forEach(err => {
+        const reason = err.error || 'Unknown error';
+        skipReasons[reason] = (skipReasons[reason] || 0) + 1;
+      });
+
+      console.log(`\n📊 Import Summary:`);
+      console.log(`   Scanned: ${results.scanned} URLs`);
+      console.log(`   Detected: ${results.detectedProducts} products (with price + title)`);
+      console.log(`   Created: ${results.created} new products`);
+      console.log(`   Updated: ${results.updated} existing products`);
+      console.log(`   Skipped: ${results.skipped} URLs`);
+      
+      if (Object.keys(skipReasons).length > 0) {
+        console.log(`\n⏭️ Skip Reasons Breakdown:`);
+        Object.entries(skipReasons)
+          .sort((a, b) => b[1] - a[1])
+          .forEach(([reason, count]) => {
+            console.log(`   ${count}x - ${reason}`);
+          });
+      }
 
       sendProgress({
         stage: 'complete',
