@@ -90,8 +90,17 @@ class ShopifyIntegration {
    */
   async createProduct(productData) {
     try {
+      console.log('[Shopify] Creating product:', {
+        title: productData.title,
+        price: productData.price,
+        shop: this.shopDomain,
+        hasAccessToken: !!this.accessToken
+      });
+      
       const client = new this.shopify.clients.Rest({ session: this.session });
 
+      console.log('[Shopify] Client created, sending POST request...');
+      
       const response = await client.post({
         path: 'products',
         data: {
@@ -148,12 +157,17 @@ class ShopifyIntegration {
         }
       });
 
-      console.log(`✅ Created Shopify product: ${productData.title}`);
+      console.log('[Shopify] ✅ Product created successfully:', response.body.product.id);
       await this.applyRateLimitDelay(response.headers);
       return response.body.product;
 
     } catch (error) {
-      console.error('❌ Shopify product creation failed:', error.message);
+      console.error('[Shopify] ❌ Product creation failed:', {
+        message: error.message,
+        response: error.response?.body,
+        status: error.response?.code,
+        shop: this.shopDomain
+      });
       throw this.wrapShopifyError('product aanmaken', error);
     }
   }
@@ -343,6 +357,78 @@ class ShopifyIntegration {
   }
 
   /**
+   * Fetch PriceElephant customer tier metafields from Shopify
+   */
+  async getCustomerTierMetafields(customerId) {
+    try {
+      const client = new this.shopify.clients.Graphql({ session: this.session });
+      const globalId = String(customerId || '').startsWith('gid://')
+        ? customerId
+        : `gid://shopify/Customer/${customerId}`;
+
+      const query = `
+        query GetCustomerTier($id: ID!) {
+          customer(id: $id) {
+            id
+            tier: metafield(namespace: "priceelephant", key: "tier") { value }
+            productLimit: metafield(namespace: "priceelephant", key: "product_limit") { value }
+            competitorLimit: metafield(namespace: "priceelephant", key: "competitor_limit") { value }
+            apiAccess: metafield(namespace: "priceelephant", key: "api_access") { value }
+            monthlyPrice: metafield(namespace: "priceelephant", key: "monthly_price") { value }
+          }
+        }
+      `;
+
+      const result = await client.request(query, { variables: { id: globalId } });
+      const customer = result?.data?.customer;
+
+      if (!customer) {
+        return null;
+      }
+
+      return {
+        tier: customer.tier?.value || null,
+        product_limit: customer.productLimit?.value || null,
+        competitor_limit: customer.competitorLimit?.value || null,
+        api_access: customer.apiAccess?.value ?? null,
+        monthly_price: customer.monthlyPrice?.value || null
+      };
+
+    } catch (error) {
+      console.error('[ShopifyIntegration] ❌ Failed to fetch customer tier metafields:', error.message);
+      throw this.wrapShopifyError('klant tier-metafields ophalen', error);
+    }
+  }
+
+  /**
+   * Locate existing customer collection without creating a new one
+   */
+  async findCustomerCollection(customerId) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+      const response = await client.get({
+        path: 'custom_collections',
+        query: {
+          title: `PriceElephant - Customer ${customerId}`,
+          limit: 1
+        }
+      });
+
+      await this.applyRateLimitDelay(response.headers);
+
+      const collections = response.body.custom_collections;
+      if (collections && collections.length > 0) {
+        return collections[0];
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Collection lookup failed:', error.message);
+      throw this.wrapShopifyError('collection ophalen', error);
+    }
+  }
+
+  /**
    * Get or create customer collection
    * Returns collection ID for the customer
    */
@@ -351,17 +437,10 @@ class ShopifyIntegration {
       const client = new this.shopify.clients.Rest({ session: this.session });
       const collectionTitle = `PriceElephant - Customer ${customerId}`;
 
-      // Check if collection already exists
-      const searchResponse = await client.get({
-        path: 'custom_collections',
-        query: { title: collectionTitle }
-      });
-
-      if (searchResponse.body.custom_collections && searchResponse.body.custom_collections.length > 0) {
-        const collection = searchResponse.body.custom_collections[0];
-        console.log(`✅ Found existing collection: ${collection.title} (ID: ${collection.id})`);
-        await this.applyRateLimitDelay(searchResponse.headers);
-        return collection.id;
+      const existingCollection = await this.findCustomerCollection(customerId);
+      if (existingCollection) {
+        console.log(`✅ Found existing collection: ${existingCollection.title} (ID: ${existingCollection.id})`);
+        return existingCollection.id;
       }
 
       // Create new collection
@@ -428,6 +507,44 @@ class ShopifyIntegration {
   }
 
   /**
+   * Remove product from collection if linked
+   */
+  async removeProductFromCollection(productId, collectionId) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const lookupResponse = await client.get({
+        path: 'collects',
+        query: {
+          product_id: productId,
+          collection_id: collectionId,
+          limit: 1
+        }
+      });
+
+      await this.applyRateLimitDelay(lookupResponse.headers);
+
+      const collect = lookupResponse.body.collects && lookupResponse.body.collects[0];
+      if (!collect) {
+        console.log(`ℹ️  Product ${productId} is not linked to collection ${collectionId}`);
+        return false;
+      }
+
+      const deleteResponse = await client.delete({
+        path: `collects/${collect.id}`
+      });
+
+      await this.applyRateLimitDelay(deleteResponse.headers);
+      console.log(`🗑️  Removed product ${productId} from collection ${collectionId}`);
+      return true;
+
+    } catch (error) {
+      console.error('❌ Remove from collection failed:', error.message);
+      throw this.wrapShopifyError('product verwijderen uit collection', error);
+    }
+  }
+
+  /**
    * Bulk create products with collection assignment
    */
   async bulkCreateProducts(productsArray) {
@@ -481,6 +598,46 @@ class ShopifyIntegration {
         success: false,
         error: this.wrapShopifyError('verbindingstest', error).message
       };
+    }
+  }
+
+  /**
+   * Get all collections
+   */
+  async getCollections() {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.get({
+        path: 'custom_collections'
+      });
+
+      await this.applyRateLimitDelay(response.headers);
+      return response.body.custom_collections || [];
+
+    } catch (error) {
+      console.error(`[Shopify] Error fetching collections:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get products in a collection
+   */
+  async getCollectionProducts(customerId, collectionId) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.get({
+        path: `collections/${collectionId}/products`
+      });
+
+      await this.applyRateLimitDelay(response.headers);
+      return response.body.products || [];
+
+    } catch (error) {
+      console.error(`[Shopify] Error fetching collection products:`, error.message);
+      return [];
     }
   }
 }
