@@ -34,6 +34,34 @@ async function createCompetitorCustomer(registryId, domain, retailerName, shopif
     
     console.log(`  ✅ Created Shopify customer: ${customer.id}`);
     
+    // Add metafields via GraphQL
+    try {
+      await shopify.setMetafields('customer', customer.id, [
+        {
+          namespace: 'priceelephant',
+          key: 'is_competitor',
+          value: 'true',
+          type: 'boolean'
+        },
+        {
+          namespace: 'priceelephant',
+          key: 'competitor_domain',
+          value: domain,
+          type: 'single_line_text_field'
+        },
+        {
+          namespace: 'priceelephant',
+          key: 'registry_id',
+          value: registryId.toString(),
+          type: 'single_line_text_field'
+        }
+      ]);
+      console.log(`  ✅ Added metafields to customer`);
+    } catch (metafieldError) {
+      console.error(`  ⚠️ Failed to add metafields:`, metafieldError.message);
+      // Continue - customer is created, metafields are optional
+    }
+    
     // Update competitor_registry with Shopify customer ID
     await db('competitor_registry')
       .where({ id: registryId })
@@ -71,6 +99,34 @@ async function createCompetitorCollection(registryId, domain, retailerName, shop
     });
     
     console.log(`  ✅ Created collection: ${collection.id}`);
+    
+    // Add metafields via GraphQL
+    try {
+      await shopify.setMetafields('collection', collection.id, [
+        {
+          namespace: 'priceelephant',
+          key: 'is_competitor_collection',
+          value: 'true',
+          type: 'boolean'
+        },
+        {
+          namespace: 'priceelephant',
+          key: 'competitor_domain',
+          value: domain,
+          type: 'single_line_text_field'
+        },
+        {
+          namespace: 'priceelephant',
+          key: 'registry_id',
+          value: registryId.toString(),
+          type: 'single_line_text_field'
+        }
+      ]);
+      console.log(`  ✅ Added metafields to collection`);
+    } catch (metafieldError) {
+      console.error(`  ⚠️ Failed to add metafields:`, metafieldError.message);
+      // Continue - collection is created, metafields are optional
+    }
     
     // Update competitor_registry with collection ID
     await db('competitor_registry')

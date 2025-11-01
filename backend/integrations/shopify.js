@@ -768,6 +768,75 @@ class ShopifyIntegration {
       throw this.wrapShopifyError('collection aanmaken', error);
     }
   }
+
+  /**
+   * Set metafields on a Shopify resource (product, customer, collection, etc.)
+   * Uses GraphQL API for proper metafield support
+   * 
+   * @param {string} ownerType - 'product', 'customer', 'collection', etc.
+   * @param {number} ownerId - Shopify resource ID
+   * @param {Array} metafields - Array of metafield objects
+   */
+  async setMetafields(ownerType, ownerId, metafields) {
+    try {
+      const client = new this.shopify.clients.Graphql({ session: this.session });
+
+      // Convert owner type to GraphQL format
+      const ownerTypeMap = {
+        'product': 'PRODUCT',
+        'customer': 'CUSTOMER',
+        'collection': 'COLLECTION'
+      };
+
+      const gqlOwnerType = ownerTypeMap[ownerType.toLowerCase()] || ownerType.toUpperCase();
+      const ownerId_gql = `gid://shopify/${gqlOwnerType.charAt(0) + gqlOwnerType.slice(1).toLowerCase()}/${ownerId}`;
+
+      // Build metafields array for GraphQL
+      const metafieldsInput = metafields.map(mf => ({
+        namespace: mf.namespace,
+        key: mf.key,
+        value: mf.value.toString(),
+        type: mf.type
+      }));
+
+      const mutation = `
+        mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            metafields {
+              id
+              namespace
+              key
+              value
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const variables = {
+        metafields: metafieldsInput.map(mf => ({
+          ...mf,
+          ownerId: ownerId_gql
+        }))
+      };
+
+      const response = await client.request(mutation, { variables });
+
+      if (response.data.metafieldsSet.userErrors.length > 0) {
+        const errors = response.data.metafieldsSet.userErrors.map(e => e.message).join(', ');
+        throw new Error(`Metafield errors: ${errors}`);
+      }
+
+      return response.data.metafieldsSet.metafields;
+
+    } catch (error) {
+      console.error(`❌ Failed to set metafields on ${ownerType}:`, error.message);
+      throw this.wrapShopifyError('metafields instellen', error);
+    }
+  }
 }
 
 module.exports = ShopifyIntegration;
