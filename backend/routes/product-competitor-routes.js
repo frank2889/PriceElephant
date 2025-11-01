@@ -11,6 +11,7 @@ const db = require('../config/database');
 const HybridScraper = require('../crawlers/hybrid-scraper');
 const ShopifyIntegration = require('../integrations/shopify');
 const competitorPriceHistory = require('../services/competitor-price-history');
+const { extractDomain, normalizeRetailerName, extractCompanyName } = require('../utils/domain-extractor');
 
 function normaliseRetailer(url) {
   try {
@@ -109,12 +110,53 @@ router.post('/:productId/competitors', async (req, res) => {
 
     const retailer = normaliseRetailer(url);
 
+    // MULTI-TENANT: Register competitor domain (auto-create as prospect)
+    const domain = extractDomain(url);
+    let registry = null;
+    
+    if (domain) {
+      console.log(`📝 Registering competitor domain: ${domain}`);
+      
+      // Check if already registered
+      registry = await db('competitor_registry')
+        .where({ domain })
+        .first();
+      
+      if (registry) {
+        // Already registered - increment counters
+        console.log(`  ✅ Domain already registered (tracked by ${registry.tracked_by_customers} customers)`);
+        await db('competitor_registry')
+          .where({ id: registry.id })
+          .increment('total_products_tracked', 1);
+      } else {
+        // New competitor - register as prospect
+        console.log(`  🆕 New competitor domain - creating prospect customer`);
+        
+        [registry] = await db('competitor_registry').insert({
+          domain,
+          retailer_name: normalizeRetailerName(domain),
+          is_paying_customer: false,
+          shopify_customer_id: null,  // Will be set when they sign up
+          total_products_tracked: 1,
+          tracked_by_customers: 1,
+          first_tracked_at: new Date()
+        }).returning('*');
+        
+        console.log(`  ✅ Created competitor registry entry: ${registry.retailer_name}`);
+        
+        // TODO: Auto-create Shopify customer + collection for this competitor
+        // This enables tracking their data and contacting them later
+      }
+    }
+
     await db('competitor_prices').insert({
       product_id: productId,
       retailer,
       price: result.price,
       original_price: result.originalPrice || null,
       url,
+      competitor_registry_id: registry?.id || null,  // Link to registry
+      ean: product.product_ean || null,              // For multi-tenant deduplication
       in_stock: result.inStock !== false,
       scraped_at: new Date(),
       created_at: new Date()
