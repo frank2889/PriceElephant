@@ -112,6 +112,10 @@
   - Products managed in either system stay synchronized
   - Zero manual intervention needed
   - Supports unlimited customers with isolated data
+- **Bug Fixes (November 1, 2025):**
+  - Fixed missing `getCollections()` and `getCollectionProducts()` methods in Shopify integration
+  - Fixed database column mismatch: `client_id` vs `customer_id` in admin routes
+  - Dashboard sync button now fully functional
 - **Definition of Done:** ✅ Database and Shopify maintain perfect bidirectional sync via webhooks (deployed November 1, 2025)
 
 ### **What's Next (Immediate Priorities):**
