@@ -117,6 +117,43 @@ router.post('/:productId/competitors', async (req, res) => {
       created_at: new Date()
     });
 
+    // Sync competitor URLs to Shopify metafield
+    if (product.shopify_product_id) {
+      try {
+        // Get all competitor URLs for this product
+        const allCompetitors = await db('competitor_prices')
+          .where({ product_id: productId })
+          .select('url', 'retailer')
+          .orderBy('retailer');
+
+        const competitorUrls = allCompetitors.map(c => c.url);
+
+        // Get Shopify credentials for this customer
+        const config = await db('customer_configs')
+          .where('customer_id', product.shopify_customer_id)
+          .first();
+
+        if (config && config.shopify_domain && config.shopify_access_token) {
+          const ShopifyIntegration = require('../integrations/shopify');
+          const shopify = new ShopifyIntegration({
+            shopDomain: config.shopify_domain,
+            accessToken: config.shopify_access_token
+          });
+
+          await shopify.updateCompetitorUrls(
+            product.shopify_product_id,
+            product.product_url, // Own URL
+            competitorUrls
+          );
+
+          console.log(`✅ Synced ${competitorUrls.length} competitor URLs to Shopify metafield`);
+        }
+      } catch (metafieldError) {
+        console.error('⚠️  Failed to sync URLs to Shopify metafield:', metafieldError.message);
+        // Don't fail the request if metafield sync fails
+      }
+    }
+
     res.json({
       success: true,
       message: 'Competitor added and scraped',
@@ -147,9 +184,51 @@ router.delete('/:productId/competitors/:retailer', async (req, res) => {
   try {
     const { productId, retailer } = req.params;
 
+    // Get product info before deleting
+    const product = await db('products')
+      .where({ id: productId })
+      .first();
+
     await db('competitor_prices')
       .where({ product_id: productId, retailer })
       .del();
+
+    // Sync updated competitor URLs to Shopify metafield
+    if (product && product.shopify_product_id) {
+      try {
+        // Get remaining competitor URLs for this product
+        const remainingCompetitors = await db('competitor_prices')
+          .where({ product_id: productId })
+          .select('url', 'retailer')
+          .orderBy('retailer');
+
+        const competitorUrls = remainingCompetitors.map(c => c.url);
+
+        // Get Shopify credentials for this customer
+        const config = await db('customer_configs')
+          .where('customer_id', product.shopify_customer_id)
+          .first();
+
+        if (config && config.shopify_domain && config.shopify_access_token) {
+          const ShopifyIntegration = require('../integrations/shopify');
+          const shopify = new ShopifyIntegration({
+            shopDomain: config.shopify_domain,
+            accessToken: config.shopify_access_token
+          });
+
+          await shopify.updateCompetitorUrls(
+            product.shopify_product_id,
+            product.product_url, // Own URL
+            competitorUrls
+          );
+
+          console.log(`✅ Synced ${competitorUrls.length} competitor URLs to Shopify metafield after deletion`);
+        }
+      } catch (metafieldError) {
+        console.error('⚠️  Failed to sync URLs to Shopify metafield:', metafieldError.message);
+        // Don't fail the request if metafield sync fails
+      }
+    }
 
     res.json({
       success: true,

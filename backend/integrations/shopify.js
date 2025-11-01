@@ -308,6 +308,78 @@ class ShopifyIntegration {
   }
 
   /**
+   * Update competitor URLs metafield
+   * Stores own_url and competitor_urls for multi-client support
+   */
+  async updateCompetitorUrls(shopifyProductId, ownUrl, competitorUrls) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+      
+      // Get existing metafields
+      const existingMetafields = await client.get({
+        path: `products/${shopifyProductId}/metafields`,
+        query: { namespace: 'priceelephant' }
+      });
+      await this.applyRateLimitDelay(existingMetafields.headers);
+
+      const urlMetafield = existingMetafields.body.metafields.find(
+        m => m.key === 'competitor_urls'
+      );
+
+      const urlData = {
+        own_url: ownUrl,
+        competitor_urls: competitorUrls
+      };
+
+      const urlDataJson = JSON.stringify(urlData);
+
+      if (urlMetafield) {
+        // Update existing metafield
+        const updateResponse = await client.put({
+          path: `products/${shopifyProductId}/metafields/${urlMetafield.id}`,
+          data: {
+            metafield: {
+              id: urlMetafield.id,
+              value: urlDataJson,
+              type: 'json'
+            }
+          }
+        });
+        await this.applyRateLimitDelay(updateResponse.headers);
+      } else {
+        // Create new metafield
+        await this.addProductMetafield(
+          shopifyProductId,
+          'priceelephant',
+          'competitor_urls',
+          urlDataJson,
+          'json'
+        );
+      }
+
+      console.log(`🔗 Updated competitor URLs for product ${shopifyProductId}`);
+
+    } catch (error) {
+      console.error('❌ Failed to update competitor URLs:', error.message);
+      throw this.wrapShopifyError('competitor URLs bijwerken', error);
+    }
+  }
+
+  /**
+   * Get customer by email
+   */
+  async getCustomerByEmail(email) {
+    try {
+      const client = new this.shopify.clients.Rest({ session: this.session });
+
+      const response = await client.get({
+        path: 'customers/search',
+        query: { query: `email:${email}` }
+      });
+```
+  }
+
+  /**
    * Get customer by email
    */
   async getCustomerByEmail(email) {
