@@ -114,7 +114,11 @@
   - Supports unlimited customers with isolated data
 - **Bug Fixes (November 1, 2025):**
   - Fixed missing `getCollections()` and `getCollectionProducts()` methods in Shopify integration
-  - Fixed database column mismatch: `client_id` vs `customer_id` in admin routes
+  - Fixed database schema inconsistency issues:
+    - Products table uses `shopify_customer_id` (not `client_id` or `customer_id`)
+    - Customer_configs table uses `customer_id` 
+    - Removed non-existent `sync_status` column from insert queries
+  - Cleaned up 25 obsolete test/diagnostic scripts (3,317 lines removed)
   - Dashboard sync button now fully functional
 - **Definition of Done:** ✅ Database and Shopify maintain perfect bidirectional sync via webhooks (deployed November 1, 2025)
 
