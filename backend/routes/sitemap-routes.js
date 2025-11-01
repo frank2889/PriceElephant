@@ -190,6 +190,7 @@ router.get('/import-stream', async (req, res) => {
       const results = await service.importFromSitemap(sitemapUrl, {
         maxProducts: parseInt(maxProducts) || 500,
         productUrlPattern: productUrlPattern || null,
+        resetProgress: resetProgress === 'true',
         onProgress,
         isCancelled: () => cancelToken.cancelled
       });
