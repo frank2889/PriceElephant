@@ -906,6 +906,7 @@
     const sitemapUrl = formData.get('sitemapUrl')?.trim();
     const maxProducts = parseInt(formData.get('maxProducts'), 10) || 500;
     const productUrlPattern = formData.get('productUrlPattern')?.trim();
+    const resetProgress = document.getElementById('pe-reset-progress')?.checked || false;
 
     if (!sitemapUrl) {
       showStatus(sitemapStatus, 'Vul eerst een sitemap URL in.', 'error');
@@ -914,6 +915,7 @@
 
     try {
       console.log('[handleSitemapImport] Setting up SSE stream...');
+      console.log('[handleSitemapImport] Reset progress:', resetProgress);
       resetDebugErrors();
       sitemapCancelRequested = false;
       setSitemapRunning(true);
@@ -922,7 +924,7 @@
       progressContainer.hidden = false;
       progressFill.style.width = '0%';
       progressFill.style.background = 'linear-gradient(90deg, var(--pe-primary), var(--pe-primary-dark))';
-      progressText.textContent = 'Verbinding maken...';
+      progressText.textContent = resetProgress ? 'Starten vanaf begin...' : 'Verbinding maken...';
       
       // Use EventSource for real-time progress
       const eventSource = new EventSource(
@@ -930,7 +932,8 @@
           customerId,
           sitemapUrl,
           maxProducts: maxProducts.toString(),
-          productUrlPattern: productUrlPattern || ''
+          productUrlPattern: productUrlPattern || '',
+          resetProgress: resetProgress.toString()
         })
       );
 
