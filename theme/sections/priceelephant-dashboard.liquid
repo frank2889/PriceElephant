@@ -277,15 +277,9 @@
       </div>
       <div class="pe-competitors__list" id="pe-competitors-list"></div>
       <form id="pe-competitor-form" style="margin-top: 16px;" novalidate>
-        <div class="pe-field-group">
-          <div class="pe-field">
-            <label for="pe-competitor-retailer">Retailer</label>
-            <input type="text" id="pe-competitor-retailer" name="retailer" placeholder="coolblue">
-          </div>
-          <div class="pe-field" style="flex: 2 1 260px;">
-            <label for="pe-competitor-url">Product URL</label>
-            <input type="url" id="pe-competitor-url" name="competitorUrl" placeholder="https://www.coolblue.nl/product/...">
-          </div>
+        <div class="pe-field">
+          <label for="pe-competitor-url">Concurrent Product URL</label>
+          <input type="url" id="pe-competitor-url" name="competitorUrl" placeholder="https://www.bol.com/product/123 of bol.com/product/123">
         </div>
         <div class="pe-button-group">
           <button type="submit" class="pe-button pe-button--primary" data-role="competitor-submit">Concurrent toevoegen</button>

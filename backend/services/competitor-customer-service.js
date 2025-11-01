@@ -23,38 +23,13 @@ async function createCompetitorCustomer(registryId, domain, retailerName, shopif
     const companyName = domain.split('.')[0];
     const email = `contact@${domain}`;
     
-    // Create Shopify customer
+    // Create Shopify customer (without metafields - REST API limitation)
     const customer = await shopify.createCustomer({
       email: email,
       first_name: retailerName,
       last_name: '(Competitor)',
-      note: `Auto-registered competitor. Domain: ${domain}`,
-      tags: [
-        'competitor',
-        'prospect',
-        'auto-registered',
-        'tracked-by-customers'
-      ].join(','),
-      metafields: [
-        {
-          namespace: 'priceelephant',
-          key: 'is_competitor',
-          value: 'true',
-          type: 'boolean'
-        },
-        {
-          namespace: 'priceelephant',
-          key: 'competitor_domain',
-          value: domain,
-          type: 'single_line_text_field'
-        },
-        {
-          namespace: 'priceelephant',
-          key: 'registry_id',
-          value: registryId.toString(),
-          type: 'single_line_text_field'
-        }
-      ]
+      note: `Auto-registered competitor. Domain: ${domain}. Registry ID: ${registryId}`,
+      tags: 'competitor,prospect,auto-registered,tracked-by-customers'
     });
     
     console.log(`  ✅ Created Shopify customer: ${customer.id}`);
@@ -87,32 +62,12 @@ async function createCompetitorCollection(registryId, domain, retailerName, shop
   try {
     console.log(`📁 Creating Shopify collection for competitor: ${retailerName}`);
     
-    // Create collection
+    // Create collection (without metafields - REST API limitation)
     const collection = await shopify.createCollection({
       title: `${retailerName} - Competitor Products`,
       handle: `competitor-${domain.replace(/\./g, '-')}`,
-      body_html: `<p>Products tracked from competitor <strong>${retailerName}</strong> (${domain})</p><p>Auto-generated collection for competitive intelligence.</p>`,
-      published: false,  // Hidden from storefront
-      metafields: [
-        {
-          namespace: 'priceelephant',
-          key: 'is_competitor_collection',
-          value: 'true',
-          type: 'boolean'
-        },
-        {
-          namespace: 'priceelephant',
-          key: 'competitor_domain',
-          value: domain,
-          type: 'single_line_text_field'
-        },
-        {
-          namespace: 'priceelephant',
-          key: 'registry_id',
-          value: registryId.toString(),
-          type: 'single_line_text_field'
-        }
-      ]
+      body_html: `<p>Products tracked from competitor <strong>${retailerName}</strong> (${domain})</p><p>Auto-generated collection for competitive intelligence. Registry ID: ${registryId}</p>`,
+      published: false  // Hidden from storefront
     });
     
     console.log(`  ✅ Created collection: ${collection.id}`);
