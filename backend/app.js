@@ -19,6 +19,7 @@ const sitemapRoutes = require('./routes/sitemap-routes');
 const customerRoutes = require('./routes/customer-routes');
 const diagnosticRoutes = require('./routes/diagnostic-routes');
 const webhookRoutes = require('./routes/webhook-routes');
+const adminClearOrphans = require('./routes/admin-clear-orphans');
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use('/api/v1/sitemap', sitemapRoutes);
 app.use('/api/v1/customers', customerRoutes);
 app.use('/api/v1/diagnostic', diagnosticRoutes);
 app.use('/api/v1/webhooks', webhookRoutes);
+app.use('/api/v1/admin', adminClearOrphans);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
