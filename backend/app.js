@@ -20,6 +20,15 @@ const customerRoutes = require('./routes/customer-routes');
 
 const app = express();
 
+// Initialize background job queues
+console.log('[App] Initializing background job queues...');
+try {
+  require('./jobs/sitemap-import-queue');
+  console.log('[App] ✅ Sitemap import queue initialized');
+} catch (error) {
+  console.error('[App] ⚠️ Failed to initialize sitemap import queue:', error.message);
+}
+
 // Trust Railway proxy (for rate limiting and real IP detection)
 // Use specific proxy count instead of 'true' for security
 app.set('trust proxy', process.env.RAILWAY_ENVIRONMENT ? 1 : false);

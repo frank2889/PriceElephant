@@ -889,11 +889,110 @@
     }
   }
 
+  // Background import polling
+  let backgroundStatusInterval = null;
+
+  async function checkBackgroundStatus() {
+    try {
+      const status = await apiGet(`/api/v1/sitemap/import/status/${customerId}`);
+      const bgStatusDiv = document.getElementById('pe-background-status');
+      const bgStatusText = document.getElementById('pe-bg-status-text');
+      const bgProgress = document.getElementById('pe-bg-progress');
+      const bgScanned = document.getElementById('pe-bg-scanned');
+
+      if (status.status === 'running') {
+        bgStatusDiv.style.display = 'block';
+        bgStatusText.textContent = 'Bezig...';
+        bgProgress.textContent = `${status.progress || 0}%`;
+        bgScanned.textContent = status.scanned || 0;
+      } else if (status.status === 'completed') {
+        bgStatusDiv.style.display = 'block';
+        bgStatusText.textContent = '✅ Voltooid';
+        bgProgress.textContent = '100%';
+        bgScanned.textContent = status.scanned || 0;
+        
+        // Stop polling
+        if (backgroundStatusInterval) {
+          clearInterval(backgroundStatusInterval);
+          backgroundStatusInterval = null;
+        }
+        
+        // Refresh product list
+        await loadProducts();
+      } else if (status.status === 'failed') {
+        bgStatusDiv.style.display = 'block';
+        bgStatusText.textContent = `❌ Mislukt: ${status.error_message || 'Onbekende fout'}`;
+        
+        // Stop polling
+        if (backgroundStatusInterval) {
+          clearInterval(backgroundStatusInterval);
+          backgroundStatusInterval = null;
+        }
+      } else {
+        bgStatusDiv.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('[Background Status] Error:', error.message);
+    }
+  }
+
+  async function handleBackgroundImport() {
+    console.log('[handleBackgroundImport] Starting background import');
+    
+    const formData = new FormData(sitemapForm);
+    const sitemapUrl = formData.get('sitemapUrl')?.trim();
+    const maxProducts = parseInt(formData.get('maxProducts'), 10) || 500;
+    const productUrlPattern = formData.get('productUrlPattern')?.trim();
+    const resetProgress = document.getElementById('pe-reset-progress')?.checked || false;
+
+    if (!sitemapUrl) {
+      showStatus(sitemapStatus, 'Vul eerst een sitemap URL in.', 'error');
+      return;
+    }
+
+    try {
+      const response = await apiFetch('/api/v1/sitemap/import/background', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerId,
+          sitemapUrl,
+          maxProducts,
+          productUrlPattern: productUrlPattern || null,
+          resetProgress
+        })
+      });
+
+      showStatus(sitemapStatus, response.message || 'Import gestart op achtergrond!', 'success');
+      updateDebug('action', '🔄 Background import started');
+
+      // Start polling for status
+      if (backgroundStatusInterval) {
+        clearInterval(backgroundStatusInterval);
+      }
+      backgroundStatusInterval = setInterval(checkBackgroundStatus, 10000); // Poll every 10 seconds
+      
+      // Check immediately
+      await checkBackgroundStatus();
+
+    } catch (error) {
+      console.error('[handleBackgroundImport] Error:', error.message);
+      showStatus(sitemapStatus, `Start mislukt: ${error.message}`, 'error');
+      updateDebug('error', `❌ ${error.message}`);
+    }
+  }
+
   async function handleSitemapImport() {
     console.log('[handleSitemapImport] STARTED');
     updateDebug('action', '🗺️ Importing from sitemap');
     
     showStatus(sitemapStatus, '', null);
+
+    // Check if background mode is enabled
+    const backgroundMode = document.getElementById('pe-background-mode')?.checked || false;
+    
+    if (backgroundMode) {
+      return handleBackgroundImport();
+    }
 
     if (activeSitemapSource) {
       console.warn('[handleSitemapImport] Import already running');
@@ -1777,6 +1876,10 @@
       await loadSitemapConfig();
       updateDebug('action', '📡 Loading products...');
       await loadProducts();
+      
+      // Check for background import status
+      updateDebug('action', '📡 Checking background import status...');
+      await checkBackgroundStatus();
       
       updateDebug('action', '✅ All data loaded');
       console.log('[PriceElephant] Dashboard initialized successfully');

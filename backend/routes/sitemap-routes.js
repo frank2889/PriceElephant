@@ -296,6 +296,104 @@ router.post('/import/cancel', async (req, res) => {
 });
 
 /**
+ * POST /api/v1/sitemap/import/background
+ * Start a background sitemap import job
+ */
+router.post('/import/background', async (req, res) => {
+  try {
+    const { customerId, sitemapUrl, maxProducts, productUrlPattern, resetProgress } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'customerId is required' });
+    }
+
+    if (!sitemapUrl) {
+      return res.status(400).json({ error: 'sitemapUrl is required' });
+    }
+
+    console.log('[Sitemap Background] Starting background import for customer:', customerId);
+
+    // Check if already running
+    const existingStatus = await db('sitemap_import_status')
+      .where({ customer_id: customerId })
+      .first();
+
+    if (existingStatus && existingStatus.status === 'running') {
+      return res.status(409).json({
+        error: 'Import already running',
+        message: 'Er draait al een sitemap import voor deze klant. Wacht tot deze is afgerond.',
+        status: existingStatus
+      });
+    }
+
+    // Queue the import job
+    const sitemapImportQueue = require('../jobs/sitemap-import-queue');
+    const job = await sitemapImportQueue.add({
+      customerId,
+      sitemapUrl,
+      maxProducts: parseInt(maxProducts) || 500,
+      productUrlPattern: productUrlPattern || null,
+      resetProgress: resetProgress === true || resetProgress === 'true'
+    });
+
+    // Initialize status
+    await db('sitemap_import_status')
+      .insert({
+        customer_id: customerId,
+        status: 'running',
+        progress: 0,
+        started_at: db.fn.now(),
+        updated_at: db.fn.now()
+      })
+      .onConflict('customer_id')
+      .merge();
+
+    console.log('[Sitemap Background] Job queued:', job.id);
+
+    res.json({
+      success: true,
+      message: 'Import gestart op de achtergrond. Je kunt dit venster sluiten.',
+      jobId: job.id
+    });
+  } catch (error) {
+    console.error('[Sitemap Background] Failed to start:', error.message);
+    res.status(500).json({
+      error: 'Failed to start background import',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/v1/sitemap/import/status/:customerId
+ * Get current status of background import
+ */
+router.get('/import/status/:customerId', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const status = await db('sitemap_import_status')
+      .where({ customer_id: customerId })
+      .first();
+
+    if (!status) {
+      return res.json({
+        status: 'idle',
+        message: 'Geen actieve import'
+      });
+    }
+
+    res.json(status);
+  } catch (error) {
+    console.error('[Sitemap Background] Status fetch error:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch status',
+      message: error.message
+    });
+  }
+});
+
+/**
  * POST /api/v1/sitemap/configure
  * Save sitemap configuration
  */
